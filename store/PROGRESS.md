@@ -1335,3 +1335,28 @@ string-derived display client-side with div-by-zero guards.
 The project had **no local `.git`** — every commit above this point in history did
 not exist. Baseline `afdc118` captures Phases 0–5 exactly as audited; fixes land as
 the following commit.
+
+### Draft-expiry fix — 2026-08-22 (the audit's HIGH finding, built same day)
+
+**Policy:** an unconfirmed draft is a **60-minute lease**. `Order.finalised_at`
+(nullable, set by `finalise_order()`, migration `orders.0003`) separates a draft
+from a confirmed order awaiting payment — status alone cannot, because both are
+`pending` until Phase 7's fulfilment transitions.
+
+- `services.release_expired_drafts()` cancels expired drafts, hands
+  `reserved_stock` back with clamped atomic updates, and returns the draft's
+  discount use to `usage_count` — an abandoned basket must not burn a limited code.
+- Correctness never depends on cron existing: a lazy sweep runs inside
+  add-to-cart and checkout, throttled to once per 30 s cluster-wide via Redis
+  `cache.add`. The sweep runs **before any row is read**, because a courtesy
+  stock check that read a stale `reserved_stock` was itself the first bug the
+  test caught.
+- `manage.py release_expired_drafts` for the cron entry in `deploy/README.md`.
+
+    pytest apps/orders/test_checkout.py::TestExpiredDrafts  → 7 passed
+    mutation (sweep hooks disabled)                          → 1 failed (the wiring test)
+    full apps/orders                                         → 54 passed
+
+The management command, run on the dev database, found and released **3 real
+abandoned drafts** left by Phase 5's browser verification — the leak, caught in
+the wild on day one.

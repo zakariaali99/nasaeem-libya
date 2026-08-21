@@ -69,3 +69,15 @@ unrelated project, so this project uses **Django on 8010** and **Vite on 5183**
 again — a fallback is how a health check once hit a different app's API and
 returned a green result that meant nothing). Production still uses 8000 for
 gunicorn behind nginx.
+
+## Scheduled job — expired draft release
+
+An unconfirmed checkout draft holds reserved stock for `DRAFT_EXPIRY_MINUTES`
+(60, in `apps/orders/services.py`). A lazy sweep also runs inside
+add-to-cart/checkout throttled to once per 30 s, but the scheduled pass keeps
+availability honest when no one is shopping:
+
+```
+# /etc/cron.d/nasaim-drafts
+* * * * * zakaria  cd /srv/nasaim/backend && .venv/bin/python manage.py release_expired_drafts >> /var/log/nasaim/drafts.log 2>&1
+```

@@ -67,6 +67,10 @@ class CartView(CsrfProtectedAPIView):
         return Response({"data": _cart_payload(request, cart)})
 
     def post(self, request):
+        # A stale abandoned draft may be hiding exactly what the customer is
+        # asking for; release those before anything is read or judged.
+        services.maybe_release_expired_drafts()
+
         serializer = CartAddSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         payload = serializer.validated_data
@@ -187,6 +191,8 @@ class CartCheckoutView(CsrfProtectedAPIView):
         cart = services.get_or_create_cart(request, create=False)
         if cart is None or not cart.items.exists():
             return Response({"message": "السلة فارغة"}, status=status.HTTP_400_BAD_REQUEST)
+
+        services.maybe_release_expired_drafts()
 
         # A draft when no address has been chosen yet: `/checkout/:orderId` is
         # where the customer picks one, so the order id must exist first.

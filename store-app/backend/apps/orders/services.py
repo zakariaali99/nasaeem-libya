@@ -16,9 +16,13 @@ must fail. If it still passes, the test is wrong.
 
 from __future__ import annotations
 
+import logging
+from datetime import timedelta
 from decimal import Decimal
 
 from django.db import connection, transaction
+from django.db.models import F
+from django.db.models.functions import Greatest
 from django.utils import timezone
 
 from apps.catalog.models import Product, ProductVariant
@@ -37,6 +41,15 @@ from .models import (
 )
 
 TWO_PLACES = Decimal("0.01")
+
+# An unconfirmed draft holds stock for this long, then releases it. Long enough
+# to fill in an address on a slow connection; short enough that one abandoned
+# basket cannot hide the last unit all day.
+DRAFT_EXPIRY_MINUTES = 60
+DRAFT_SWEEP_CACHE_KEY = "orders:draft-sweep"
+DRAFT_SWEEP_INTERVAL_SECONDS = 30
+
+logger = logging.getLogger(__name__)
 
 
 class CheckoutError(Exception):
@@ -535,6 +548,7 @@ def finalise_order(
     order.customer_notes = customer_notes.strip()
     order.shipping_total = delivery_fee(region)
     order.total = money(order.subtotal - order.discount_total + order.shipping_total)
+    order.finalised_at = timezone.now()
 
     if payment_method:
         order.payment_method = payment_method
@@ -549,3 +563,90 @@ def finalise_order(
 
     order.save()
     return order
+
+
+# --------------------------------------------------------------------------
+# Expired drafts — reservations must be a lease, not a leak
+# --------------------------------------------------------------------------
+
+def release_expired_drafts(*, now=None) -> int:
+    """Cancel unconfirmed drafts past their TTL and hand their stock back.
+
+    A draft is a PENDING order whose `finalised_at` is still null: stock was
+    reserved at creation and the customer has not reached confirmation. Left
+    alone forever, one abandoned basket permanently hides stock from everyone.
+
+    Lock ordering here is safe against `checkout()`: it locks orders first,
+    which checkout never locks; the product/variant/discount rows it does
+    touch are updated with atomic F-expressions inside this transaction.
+    """
+    cutoff = (now or timezone.now()) - timedelta(minutes=DRAFT_EXPIRY_MINUTES)
+    released = 0
+
+    with transaction.atomic():
+        expired = list(
+            Order.objects.select_for_update()
+            .filter(
+                status=OrderStatus.PENDING,
+                finalised_at__isnull=True,
+                created_at__lt=cutoff,
+            )
+            .order_by("id")
+        )
+        if not expired:
+            return 0
+
+        product_qtys: dict[int, int] = {}
+        variant_qtys: dict[int, int] = {}
+        for order in expired:
+            for item in order.items.all():
+                if not item.product.track_quantity:
+                    continue
+                if item.variant_id:
+                    variant_qtys[item.variant_id] = variant_qtys.get(item.variant_id, 0) + item.quantity
+                else:
+                    product_qtys[item.product_id] = product_qtys.get(item.product_id, 0) + item.quantity
+            if order.discount_id is not None:
+                # The draft consumed a use of a limited code at creation;
+                # an abandoned draft must give it back.
+                Discount.objects.filter(pk=order.discount_id).update(
+                    usage_count=Greatest(F("usage_count") - 1, 0)
+                )
+            order.status = OrderStatus.CANCELLED
+            order.save(update_fields=["status", "updated_at"])
+            released += 1
+
+        if product_qtys:
+            for product in Product.objects.filter(id__in=product_qtys):
+                Product.objects.filter(pk=product.pk).update(
+                    reserved_stock=Greatest(
+                        F("reserved_stock") - product_qtys[product.pk], 0
+                    )
+                )
+        if variant_qtys:
+            for variant in ProductVariant.objects.filter(id__in=variant_qtys):
+                ProductVariant.objects.filter(pk=variant.pk).update(
+                    reserved_stock=Greatest(
+                        F("reserved_stock") - variant_qtys[variant.pk], 0
+                    )
+                )
+
+    logger.info("released expired drafts count=%s", released)
+    return released
+
+
+def maybe_release_expired_drafts() -> None:
+    """Throttled lazy sweep so correctness never depends on a cron existing.
+
+    Runs at most once per interval cluster-wide (Redis `add` is the gate), and
+    a failure here must never take a checkout down with it — the management
+    command and the next attempt remain.
+    """
+    from django.core.cache import cache
+
+    if not cache.add(DRAFT_SWEEP_CACHE_KEY, "1", DRAFT_SWEEP_INTERVAL_SECONDS):
+        return
+    try:
+        release_expired_drafts()
+    except Exception:
+        logger.exception("draft sweep failed; will retry on the next window")

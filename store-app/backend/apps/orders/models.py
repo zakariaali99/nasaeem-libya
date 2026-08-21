@@ -244,6 +244,7 @@ class Order(TimestampedModel):
     tracking_number = models.CharField("رقم التتبع", max_length=100, blank=True)
     tracking_url = models.CharField("رابط التتبع", max_length=255, blank=True)
     reference_id = models.CharField("المرجع", max_length=100, blank=True, db_index=True)
+    finalised_at = models.DateTimeField("وقت التأكيد", null=True, blank=True)
 
     class Meta:
         verbose_name = "طلب"

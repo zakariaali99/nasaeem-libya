@@ -6,9 +6,11 @@ mocking the race would prove nothing about the lock.
 """
 
 import threading
+from datetime import timedelta
 from decimal import Decimal
 
 import pytest
+from django.core.cache import cache
 from django.db import connections, transaction
 from django.urls import reverse
 from django.utils import timezone
@@ -621,3 +623,132 @@ class TestOrderNumberTag:
             "order_id": draft["id"], "region_id": region.id, "address": "شارع",
         }, format="json").json()["data"]
         assert confirmed["order_number"] == draft["order_number"]
+
+
+# --------------------------------------------------------------------------
+# Expired drafts — a reservation is a lease, not a leak
+# --------------------------------------------------------------------------
+
+@pytest.fixture
+def discount(db):
+    return Discount.objects.create(
+        code="LEASED", name="كود محدود", type=DiscountType.PERCENTAGE,
+        percentage=Decimal("10.00"), value=Decimal("0.00"),
+        is_active=True, usage_limit=1,
+    )
+
+
+def _age_draft(order_id: str, minutes: int = 61) -> None:
+    Order.objects.filter(id=order_id).update(
+        created_at=timezone.now() - timedelta(minutes=minutes)
+    )
+
+
+class TestExpiredDrafts:
+    def test_an_expired_draft_releases_its_reservation(self, buyer_api, product, region):
+        assert product.stock == 10
+        created = self._draft(buyer_api, product, region)
+        product.refresh_from_db()
+        assert product.reserved_stock == 1
+
+        _age_draft(created["id"])
+        released = services.release_expired_drafts()
+
+        assert released == 1
+        product.refresh_from_db()
+        assert product.reserved_stock == 0
+        assert Order.objects.get(id=created["id"]).status == OrderStatus.CANCELLED
+
+    def _draft(self, buyer_api, product, region):
+        buyer_api.post(reverse("cart"), {"product_id": str(product.id)}, format="json")
+        return buyer_api.post(reverse("cart-checkout"),
+                              {"region_id": region.id, "address": "شارع"},
+                              format="json").json()["data"]
+
+    def test_a_fresh_draft_is_never_touched(self, buyer_api, product, region):
+        created = self._draft(buyer_api, product, region)
+
+        assert services.release_expired_drafts() == 0
+
+        order = Order.objects.get(id=created["id"])
+        assert order.status == OrderStatus.PENDING
+        product.refresh_from_db()
+        assert product.reserved_stock == 1
+
+    def test_an_finalised_order_is_never_reclaimed_however_old(self, buyer_api, product, region):
+        draft = self._draft(buyer_api, product, region)
+        response = buyer_api.post(reverse("checkout-confirm"), {
+            "order_id": draft["id"], "region_id": region.id, "address": "شارع",
+        }, format="json")
+        assert response.status_code == 200
+        Order.objects.filter(id=draft["id"]).update(
+            created_at=timezone.now() - timedelta(days=7)
+        )
+
+        assert services.release_expired_drafts() == 0
+        assert Order.objects.get(id=draft["id"]).status == OrderStatus.PENDING
+
+    def test_an_expired_draft_cannot_be_finalised_afterwards(self, buyer_api, product, region):
+        draft = self._draft(buyer_api, product, region)
+        _age_draft(draft["id"])
+        services.release_expired_drafts()
+
+        response = buyer_api.post(reverse("checkout-confirm"), {
+            "order_id": draft["id"], "region_id": region.id, "address": "شارع",
+        }, format="json")
+
+        assert response.status_code == 409
+
+    def test_an_abandoned_draft_returns_its_discount_use(self, buyer_api, product, discount, region):
+        self._draft_with_code(buyer_api, product, region, discount.code)
+        discount.refresh_from_db()
+        assert discount.usage_count == 1
+
+        draft_id = Order.objects.first().id
+        _age_draft(draft_id)
+        services.release_expired_drafts()
+
+        discount.refresh_from_db()
+        assert discount.usage_count == 0
+
+    def _draft_with_code(self, buyer_api, product, region, code):
+        buyer_api.post(reverse("cart"), {"product_id": str(product.id)}, format="json")
+        return buyer_api.post(reverse("cart-checkout"), {
+            "region_id": region.id, "address": "شارع", "discount_code": code,
+        }, format="json").json()["data"]
+
+    def test_the_release_is_idempotent(self, buyer_api, product, region):
+        created = self._draft(buyer_api, product, region)
+        _age_draft(created["id"])
+
+        assert services.release_expired_drafts() == 1
+        assert services.release_expired_drafts() == 0
+        product.refresh_from_db()
+        assert product.reserved_stock == 0
+
+    def test_checking_out_frees_stock_an_abandoned_draft_was_hiding(
+        self, buyer_api, buyer, product, region,
+    ):
+        """The payoff: the last units are hidden by one customer's abandoned
+        basket, and another customer can still buy them — without any cron
+        having run."""
+        abandoned = self._draft(buyer_api, product, region)
+        _age_draft(abandoned["id"])
+        # The sweep is throttled to once per window; simulate the next window
+        # having arrived so the add-to-cart hook gets its turn.
+        cache.delete(services.DRAFT_SWEEP_CACHE_KEY)
+
+        other = User.objects.create_user(phone_number="0915555555", password=PASSWORD)
+        other_api = APIClient()
+        other_api.post(reverse("auth-login"),
+                       {"phone_number": other.phone_number, "password": PASSWORD},
+                       format="json")
+        other_api.post(reverse("cart"),
+                       {"product_id": str(product.id), "quantity": product.stock},
+                       format="json")
+        response = other_api.post(reverse("cart-checkout"),
+                                  {"region_id": region.id, "address": "شارع أخرى"},
+                                  format="json")
+
+        assert response.status_code == 201, response.json()
+        assert Order.objects.get(id=abandoned["id"]).status == OrderStatus.CANCELLED

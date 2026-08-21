@@ -51,12 +51,20 @@ def parse_spec():
     sections = {}
     current = None
     for line in text.splitlines():
-        header = re.match(r"^### `([A-Za-z]+)`", line)
-        if header:
-            current = header.group(1)
-            sections[current] = []
+        # A heading may name several models ("`ProductCategory` / `ProductCollection`").
+        # Every named model becomes a checked section; prose-only headings
+        # ("### Enums — …") close the current section instead of leaking their
+        # body into the previous model's field list.
+        names = re.findall(r"`([A-Za-z]+)`", line) if line.startswith("### ") else []
+        if names:
+            current = names[0]
+            for name in names:
+                sections.setdefault(name, [])
             continue
-        if line.startswith("## "):
+        if line.startswith("## ") or line.startswith("### "):
+            current = None
+            continue
+        if current:
             current = None
             continue
         if current:

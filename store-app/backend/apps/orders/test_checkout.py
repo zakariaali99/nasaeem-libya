@@ -438,6 +438,73 @@ class TestOrderVisibility:
         assert api.get(reverse("order-list")).status_code == 401
 
 
+@pytest.fixture
+def admin_api(db):
+    from apps.core.models import Role
+
+    User.objects.create_superuser(
+        phone_number="0912222222", password=PASSWORD, role=Role.OWNER
+    )
+    client = APIClient()
+    client.post(
+        reverse("auth-login"),
+        {"phone_number": "0912222222", "password": PASSWORD},
+        format="json",
+    )
+    return client
+
+
+class TestOrderAdminPatch:
+    """The admin order endpoint validates what it writes.
+
+    Transition *enforcement* is Phase 7; refusing an illegal *value* had to be
+    true the day the endpoint shipped. Before this test, `{"status": "<any
+    string>"}` was written straight through.
+    """
+
+    def test_an_unknown_status_value_is_refused(self, admin_api, buyer_api, product, region):
+        buyer_api.post(reverse("cart"), {"product_id": str(product.id)}, format="json")
+        created = buyer_api.post(reverse("cart-checkout"),
+                                 {"region_id": region.id, "address": "شارع"},
+                                 format="json").json()["data"]
+
+        response = admin_api.patch(reverse("order-detail", args=[created["order_number"]]),
+                                   {"status": "not-a-status"}, format="json")
+
+        assert response.status_code == 400
+        assert response.json()["errors"]["status"]
+        assert Order.objects.get(id=created["id"]).status == OrderStatus.PENDING
+
+    def test_an_unknown_field_is_refused_rather_than_ignored(self, admin_api, buyer_api, product, region):
+        buyer_api.post(reverse("cart"), {"product_id": str(product.id)}, format="json")
+        created = buyer_api.post(reverse("cart-checkout"),
+                                 {"region_id": region.id, "address": "شارع"},
+                                 format="json").json()["data"]
+
+        response = admin_api.patch(reverse("order-detail", args=[created["order_number"]]),
+                                   {"total": "1.00"}, format="json")
+
+        assert response.status_code == 400
+        assert Order.objects.get(id=created["id"]).total != Decimal("1.00")
+
+    def test_a_legal_change_still_writes(self, admin_api, buyer_api, product, region):
+        buyer_api.post(reverse("cart"), {"product_id": str(product.id)}, format="json")
+        created = buyer_api.post(reverse("cart-checkout"),
+                                 {"region_id": region.id, "address": "شارع"},
+                                 format="json").json()["data"]
+
+        response = admin_api.patch(
+            reverse("order-detail", args=[created["order_number"]]),
+            {"status": OrderStatus.PROCESSING, "tracking_number": " VX-0001 "},
+            format="json",
+        )
+
+        assert response.status_code == 200
+        order = Order.objects.get(id=created["id"])
+        assert order.status == OrderStatus.PROCESSING
+        assert order.tracking_number == "VX-0001"
+
+
 class TestOrderNumbers:
     def test_the_format_is_preserved(self, buyer_api, product, region):
         buyer_api.post(reverse("cart"), {"product_id": str(product.id)}, format="json")

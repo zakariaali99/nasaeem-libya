@@ -16,7 +16,7 @@ from apps.core.pagination import StandardPagination
 from apps.core.views import CsrfProtectedAPIView
 
 from . import services
-from .models import Cart, CartItem, Discount, Order
+from .models import Cart, CartItem, Discount, Order, OrderStatus, ShippingStatus
 from .serializers import (
     CartAddSerializer,
     CartDetailsSerializer,
@@ -333,10 +333,26 @@ class OrderDetailView(APIView):
         if order is None:
             return Response({"message": "الطلب غير موجود"}, status=status.HTTP_404_NOT_FOUND)
 
-        allowed = {"status", "shipping_status", "tracking_number", "tracking_url"}
+        allowed_enum_fields = {"status": OrderStatus, "shipping_status": ShippingStatus}
+        allowed_text_fields = {"tracking_number": 100, "tracking_url": 255}
+        errors = {}
         for field, value in request.data.items():
-            if field in allowed:
-                setattr(order, field, value)
+            if field in allowed_enum_fields:
+                if value not in allowed_enum_fields[field].values:
+                    errors[field] = ["قيمة غير صحيحة"]
+            elif field in allowed_text_fields:
+                if not isinstance(value, str) or len(value) > allowed_text_fields[field]:
+                    errors[field] = ["قيمة غير صحيحة"]
+            else:
+                errors[field] = ["حقل غير معروف"]
+        if errors:
+            return Response(
+                {"message": "تحتوي البيانات المُرسلة على قيم غير صحيحة", "errors": errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        for field, value in request.data.items():
+            setattr(order, field, value.strip() if isinstance(value, str) else value)
         order.save()
         return Response({"data": OrderSerializer(order, context={"request": request}).data,
                          "message": "تم تحديث الطلب"})

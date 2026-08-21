@@ -1220,3 +1220,118 @@ noted as needing to follow the label rather than the input.
 - `/checkout/redirect` is unrouted — it exists to handle a gateway's return leg.
 - `/me/orders` and `/me/orders/:orderId` are Phase 7; `/checkout/complete` links
   to them today and they 404 until then.
+
+---
+
+## Post-Phase-5 audit — 2026-08-22
+
+A full audit commissioned by the user: phase-consistency against `IMPLEMENTATION.md`,
+a forbidden-technology sweep, and a bug hunt over the delivered code. Nothing here
+weakens a gate; the record below lists what was found, what was fixed, and what was
+flagged rather than acted on.
+
+### The forbidden-technology sweep — clean
+
+No `next.config.*`, no `next` dependency, no `next/*` import, no express/fastify/
+`http.createServer`, no Dockerfile or compose file anywhere in `store-app/`. Node
+exists only as build tooling (`vite`/`tsc`/`vitest`). The quarantine
+(`store/reference/system/commerce-main`, `reference/commerce-main.zip`) is intact —
+nothing leaked out by filename, import, or content. Replicated static gates: raw
+palette classes 0 · hex colours in components 0 · physical-direction classes 0 ·
+`dir="rtl"` in exactly 1 file. Only grey-area item: undeclared `lighthouse/` and
+`@sentry/*` folders left in `frontend/node_modules/` by perf.mjs's documented
+`npm i --no-save`; not in the lockfile, not bundled.
+
+### Phase consistency — Phases 0–5 verify as claimed
+
+Every artifact named in `IMPLEMENTATION.md` for Phases 0–4 exists as described, and
+Phase 5's code matches its gate record (locking order, server-side totals, discount
+branches under lock, the real-thread concurrency test). Discrepancies found are
+bookkeeping, not behaviour:
+
+1. **Money contradicts itself across the spec.** `01-architecture.md`'s table says
+   "integer minor units server-side"; the normative `02-data-model.md` says
+   `DecimalField(10,2)`. The build follows the data model. A spec amendment is
+   needed; the code is compliant with the controlling document.
+2. **Model-count drift.** PROGRESS Phase 1 says "17 spec models" in one line and
+   implies 22 elsewhere; reality is 24 concrete models (22 excluding through-tables).
+3. **`check_models.py` never checked `ProductCollection`.** The combined heading
+   "`ProductCategory` / `ProductCollection`" parsed as one model, so deleting the
+   collection through-table would still print all-green. FIXED this session:
+
+         before → All 22 spec models present…     (ProductCollection uncheckable)
+         after  → All 23 spec models present…     (its own row, verified)
+
+   Its enum-section body also leaked into the previous model's field list; prose-only
+   headings now close the section.
+4. **Admin variants route deviates from route table #22** — `/admin/products/:id/variants`
+   instead of `/admin/products/new/variants`. Sensible (variants need an existing
+   product), but undocumented. Recorded, not changed.
+5. **`.env.example` omitted `MARSOL_API_TOKEN` / `MARSOL_SENDER_ID`** although
+   `apps/accounts/otp.py` reads both. FIXED this session.
+
+### Defects found by the bug hunt
+
+**Fixed this session, each with a regression test or mutation proof where the
+platform allows one:**
+
+- **HIGH — abandoned drafts leak reservations forever.** `checkout()` reserves stock
+  at draft time (by design), but nothing expires an unconfirmed draft: no field, no
+  cron, no reclamation path. An abandoned checkout permanently shrinks availability.
+  **Flagged for the user / Phase 6–7**, not acted on silently — it needs a policy
+  (expiry duration, release job, operator cancel) which is a scope decision.
+- **MEDIUM — the gallery's programmatic-scroll guard could wedge.** If a smooth
+  scroll to a thumbnail was interrupted mid-flight, `scrollingTo` never cleared:
+  dots froze on the wrong image and zoom opened it. Now released three ways: any
+  `pointerdown` on the track hands control back immediately; a 600 ms settle timer
+  clears the guard if scrolling goes quiet away from the target; arrival still
+  clears as before. (jsdom cannot animate scrolling, so this is verified by the
+  logic paths + carried to Phase 9's Playwright sweep, like the swipe itself.)
+- **MEDIUM — optimistic cart rollback could resurrect stale state.** Each mutation
+  snapshotted the cache; when an older mutation failed after a newer one had settled,
+  its rollback restored a pre-newer snapshot, transiently reverting confirmed cart
+  state. Rollbacks now restore `lastConfirmedCart` — the most recent **server**
+  payload (fetch/mutation/discount/details) — falling back to the snapshot only
+  when nothing has been confirmed yet.
+- **MEDIUM — `OrderDetailView.patch` wrote unvalidated values.** Any string was
+  accepted as `status`. It now refuses illegal enum values, over-length tracking
+  fields, and unknown fields outright. Mutation proof with the fix removed:
+
+        pytest apps/orders/test_checkout.py::TestOrderAdminPatch
+        → 3 failed in 2.37s          (old views.py)
+        → 47 passed                  (fixed views.py)
+
+  Transition *enforcement* remains Phase 7's gate; refusing illegal *values* is now
+  true from the day the endpoint shipped.
+- **LOW — `lib/api.ts` success path threw a raw `SyntaxError`** on a non-JSON 2xx
+  body, bypassing every `ApiError` branch (silently killing the discount-form error
+  display). Non-JSON success bodies now surface as `ApiError`.
+- **LOW — a cities-fetch outage read as "no delivery cities".** `/checkout` rendered
+  the store-misconfiguration message when the request merely failed. Fetch errors
+  now render `<ErrorState>` with retry; only a genuinely empty list shows the
+  empty-cities explanation.
+
+### Verified-clean areas worth recording
+
+Login goes through `authenticate()` only; CSRF holds on every public write
+(`CsrfProtectedAPIView`) and every authenticated write (SessionAuthentication's own
+enforcement); password reset is oracle-free and issues no session; OTP has no ported
+bypass and compares digests; throttles key on phone; pagination caps at 100;
+settings carry `ATOMIC_REQUESTS`, `SECURE_PROXY_SSL_HEADER`, HSTS, Secure/SameSite
+cookies, explicit CORS origins; money arithmetic stays in Decimal server-side and
+string-derived display client-side with div-by-zero guards.
+
+### Harness re-run after the fixes
+
+    pytest                          → 215 passed in 31.57s    (was 212)
+    npm test                        → 17 passed               (unchanged)
+    tsc --noEmit                    → clean
+    bash scripts/gates.sh           → 12 passed, 0 failed
+    scripts/check_models.py         → All 23 spec models present with every named field.
+    node scripts/check-contrast.mjs → All token pairs meet WCAG 2.1 AA.
+
+### Version control started this session
+
+The project had **no local `.git`** — every commit above this point in history did
+not exist. Baseline `afdc118` captures Phases 0–5 exactly as audited; fixes land as
+the following commit.

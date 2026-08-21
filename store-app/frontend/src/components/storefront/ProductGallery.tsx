@@ -25,27 +25,38 @@ export function ProductGallery({ images, productName }: ProductGalleryProps) {
   const trackRef = useRef<HTMLUListElement>(null)
   /* A programmatic scroll must not fight the scroll listener that reads it. */
   const scrollingTo = useRef<number | null>(null)
+  const settleTimer = useRef<number | undefined>(undefined)
 
-  const scrollTo = useCallback((index: number) => {
-    const track = trackRef.current
-    const slide = track?.children[index] as HTMLElement | undefined
-    if (!track || !slide) return
-    scrollingTo.current = index
-    setSelected(index)
-    /*
-     * Measured from the rendered boxes, not from `offsetLeft`. Under RTL a
-     * later slide has a SMALLER offsetLeft and the container's scrollLeft runs
-     * negative, so `slide.offsetLeft - track.offsetLeft` clamped to 0 and the
-     * track never moved — the thumbnail highlighted while the image stayed put.
-     * A signed delta added to the current position is correct in both
-     * directions.
-     */
-    const delta = slide.getBoundingClientRect().left - track.getBoundingClientRect().left
-    // A smooth scroll is an animation, and `07-design-system.md` requires
-    // prefers-reduced-motion to be respected by every one of them.
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    track.scrollTo({ left: track.scrollLeft + delta, behavior: reduced ? 'auto' : 'smooth' })
+  const releaseProgrammaticScroll = useCallback(() => {
+    scrollingTo.current = null
+    window.clearTimeout(settleTimer.current)
   }, [])
+
+  const scrollTo = useCallback(
+    (index: number) => {
+      const track = trackRef.current
+      const slide = track?.children[index] as HTMLElement | undefined
+      if (!track || !slide) return
+      scrollingTo.current = index
+      setSelected(index)
+      window.clearTimeout(settleTimer.current)
+      settleTimer.current = window.setTimeout(releaseProgrammaticScroll, 600)
+      /*
+       * Measured from the rendered boxes, not from `offsetLeft`. Under RTL a
+       * later slide has a SMALLER offsetLeft and the container's scrollLeft runs
+       * negative, so `slide.offsetLeft - track.offsetLeft` clamped to 0 and the
+       * track never moved — the thumbnail highlighted while the image stayed put.
+       * A signed delta added to the current position is correct in both
+       * directions.
+       */
+      const delta = slide.getBoundingClientRect().left - track.getBoundingClientRect().left
+      // A smooth scroll is an animation, and `07-design-system.md` requires
+      // prefers-reduced-motion to be respected by every one of them.
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      track.scrollTo({ left: track.scrollLeft + delta, behavior: reduced ? 'auto' : 'smooth' })
+    },
+    [releaseProgrammaticScroll],
+  )
 
   /* Reading the index from scroll position is what makes the swipe real: the
      finger moves the track, and everything else follows the track. */
@@ -60,16 +71,19 @@ export function ProductGallery({ images, productName }: ProductGalleryProps) {
         // Math.abs: in RTL the track's scrollLeft runs negative.
         const index = Math.round(Math.abs(track.scrollLeft) / width)
         if (scrollingTo.current !== null && scrollingTo.current !== index) return
-        scrollingTo.current = null
+        releaseProgrammaticScroll()
         setSelected((current) => (current === index ? current : index))
       })
     }
     track.addEventListener('scroll', onScroll, { passive: true })
+    track.addEventListener('pointerdown', releaseProgrammaticScroll, { passive: true })
     return () => {
       cancelAnimationFrame(frame)
       track.removeEventListener('scroll', onScroll)
+      track.removeEventListener('pointerdown', releaseProgrammaticScroll)
+      window.clearTimeout(settleTimer.current)
     }
-  }, [images.length])
+  }, [images.length, releaseProgrammaticScroll])
 
   if (images.length === 0) {
     return (

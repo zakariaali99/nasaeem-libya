@@ -173,7 +173,15 @@ export async function request<T>(
     throw await parseError(response)
   }
 
-  const payload = await response.json()
+  let payload: unknown
+  try {
+    payload = await response.json()
+  } catch {
+    // A 2xx with a non-JSON body (a proxy interposing an HTML page) is not a
+    // result the caller can use — surface it as an ApiError, not a raw
+    // SyntaxError that bypasses every error branch.
+    throw new ApiError(response.status, UNKNOWN_ERROR)
+  }
   // The server always wraps in {data}. Tolerate a bare payload so a single
   // non-conforming endpoint degrades instead of throwing.
   if (payload && typeof payload === 'object' && 'data' in payload) {

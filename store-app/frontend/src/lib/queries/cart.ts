@@ -20,11 +20,20 @@ const EMPTY_CART: CartState = {
   region_id: null,
 }
 
+/** The most recent server-confirmed basket. Rollbacks restore this rather than
+ * a per-mutation snapshot: a snapshot taken before another mutation settled
+ * would resurrect state the server had already replaced. */
+let lastConfirmedCart: CartState | null = null
+
 /** The cart is public — a guest holds one, keyed on the session cookie. */
 export function useCart() {
   return useQuery({
     queryKey: cartKeys.cart,
-    queryFn: async () => (await api.get<CartState>('/cart/')).data,
+    queryFn: async () => {
+      const cart = (await api.get<CartState>('/cart/')).data
+      lastConfirmedCart = cart
+      return cart
+    },
     staleTime: 10_000,
   })
 }
@@ -35,7 +44,8 @@ export function useCart() {
  * On a slow Libyan mobile connection, waiting for a round trip before the
  * basket updates is the single biggest "feels broken" signal in the app. The
  * server's response replaces the guess on settle, and a failure rolls back to
- * the exact snapshot taken before the change.
+ * the most recent **server-confirmed** basket, never to a snapshot another
+ * in-flight or settled mutation may have already superseded.
  */
 function useOptimisticCart<TInput>(
   mutationFn: (input: TInput) => Promise<{ data: CartState }>,
@@ -54,11 +64,13 @@ function useOptimisticCart<TInput>(
       return { previous }
     },
     onError: (_error, _input, context) => {
-      if (context?.previous) queryClient.setQueryData(cartKeys.cart, context.previous)
+      const restored = lastConfirmedCart ?? context?.previous
+      if (restored) queryClient.setQueryData<CartState>(cartKeys.cart, restored)
     },
     onSuccess: (response) => {
       // The server's numbers are the real ones — totals, stock ceilings and the
       // discount are all recomputed there.
+      lastConfirmedCart = response.data
       queryClient.setQueryData(cartKeys.cart, response.data)
     },
     onSettled: () => {
@@ -127,6 +139,7 @@ export function useApplyDiscount() {
         { code },
       )).data,
     onSuccess: (data) => {
+      lastConfirmedCart = data.cart
       queryClient.setQueryData(cartKeys.cart, data.cart)
     },
   })
@@ -138,7 +151,10 @@ export function useSaveCartDetails() {
     mutationFn: async (details: Record<string, string>) =>
       (await api.patch<{ cart: CartState }>('/cart/details/', details)).data,
     onSuccess: (data) => {
-      if (data.cart) queryClient.setQueryData(cartKeys.cart, data.cart)
+      if (data.cart) {
+        lastConfirmedCart = data.cart
+        queryClient.setQueryData(cartKeys.cart, data.cart)
+      }
     },
   })
 }
@@ -150,6 +166,7 @@ export function useCreateOrder() {
     mutationFn: async (input: Record<string, string> = {}) =>
       (await api.post<Order>('/cart/checkout/', input)).data,
     onSuccess: () => {
+      lastConfirmedCart = EMPTY_CART
       queryClient.setQueryData(cartKeys.cart, EMPTY_CART)
       queryClient.invalidateQueries({ queryKey: cartKeys.cart })
       queryClient.invalidateQueries({ queryKey: ['orders'] })

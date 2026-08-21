@@ -32,7 +32,13 @@ export default function CheckoutPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
   const [formError, setFormError] = useState<string | null>(null)
 
-  const { data: cityData, isPending: citiesPending } = useCities()
+  const {
+    data: cityData,
+    isPending: citiesPending,
+    isError: citiesError,
+    error: citiesFetchError,
+    refetch: refetchCities,
+  } = useCities()
   const { data: regionData } = useRegions(cityId || undefined)
   const { data: methods } = useDeliveryMethods()
 
@@ -131,8 +137,12 @@ export default function CheckoutPage() {
             <h2 className="text-lg font-semibold">عنوان التوصيل</h2>
 
             {/* The empty-city failure the reference shipped: an empty <select>
-                with no explanation, and a customer who could not order. */}
-            {!citiesPending && cities.length === 0 ? (
+                with no explanation, and a customer who could not order. A fetch
+                failure is NOT the same problem — it must not be reported as
+                "the store has no cities". */}
+            {citiesError ? (
+              <ErrorState error={citiesFetchError} onRetry={() => refetchCities()} />
+            ) : !citiesPending && cities.length === 0 ? (
               <Alert tone="error">
                 <AlertTriangle className="sr-only" aria-hidden="true" />
                 {cityData?.message ??

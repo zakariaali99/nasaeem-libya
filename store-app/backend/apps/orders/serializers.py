@@ -5,6 +5,10 @@ these responses is computed in `services.py` from database rows; the request
 body carries only ids, quantities and a discount code.
 """
 
+from datetime import timedelta
+from decimal import Decimal
+
+from django.db.models import Count
 from rest_framework import serializers
 
 from apps.catalog.serializers import ProductImageSerializer
@@ -19,6 +23,7 @@ from .models import (
     OrderStatus,
     PaymentStatus,
     ShippingStatus,
+    DiscountType,
 )
 
 
@@ -172,3 +177,71 @@ class DeliveryMethodSerializer(serializers.ModelSerializer):
 ORDER_STATUS_CHOICES = OrderStatus.choices
 SHIPPING_STATUS_CHOICES = ShippingStatus.choices
 PAYMENT_STATUS_CHOICES = PaymentStatus.choices
+
+
+class AdminDiscountWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Discount
+        fields = [
+            "code", "name", "type", "percentage", "value", "min_order_amount",
+            "max_discount_amount", "usage_limit", "start_date", "end_date",
+            "is_active", "products",
+        ]
+
+    def validate(self, attrs):
+        t = attrs.get("type")
+        if t == DiscountType.PERCENTAGE and not attrs.get("percentage"):
+            raise serializers.ValidationError({"percentage": ["النسبة مطلوبة لخصم النسبة المئوية"]})
+        if t == DiscountType.FIXED and not attrs.get("value"):
+            raise serializers.ValidationError({"value": ["المبلغ مطلوب للخصم الثابت"]})
+        return attrs
+
+
+class DashboardStatsSerializer(serializers.Serializer):
+    def build(self):
+        from datetime import timedelta
+
+        from django.db.models import F, Sum
+        from django.utils import timezone
+
+        from apps.catalog.models import Product
+        from apps.core.models import User
+
+        today = timezone.localtime().date()
+        month_start = today.replace(day=1)
+
+        by_status = dict(
+            Order.objects.values_list("status").annotate(c=Count("id"))
+        )
+        revenue = (
+            Order.objects.filter(status__in=[OrderStatus.PROCESSING, OrderStatus.COMPLETED])
+            .aggregate(s=Sum("total"))["s"]
+        ) or Decimal("0.00")
+        series = []
+        for offset in range(13, -1, -1):
+            day = today - timedelta(days=offset)
+            rows = Order.objects.filter(created_at__date=day)
+            series.append({
+                "date": day.isoformat(),
+                "orders": rows.count(),
+                "revenue": str(rows.aggregate(s=Sum("total"))["s"] or Decimal("0.00")),
+            })
+        return {
+            "pending_orders": by_status.get(OrderStatus.PENDING, 0),
+            "processing_orders": by_status.get(OrderStatus.PROCESSING, 0),
+            "completed_orders": by_status.get(OrderStatus.COMPLETED, 0),
+            "cancelled_orders": by_status.get(OrderStatus.CANCELLED, 0),
+            "today_orders": Order.objects.filter(created_at__date=today).count(),
+            "month_revenue": str(
+                (Order.objects.filter(
+                    status__in=[OrderStatus.PROCESSING, OrderStatus.COMPLETED],
+                    created_at__date__gte=month_start,
+                ).aggregate(s=Sum("total"))["s"]) or Decimal("0.00")
+            ),
+            "revenue_total": str(revenue),
+            "customers": User.objects.filter(role="customer").count(),
+            "low_stock": Product.objects.filter(track_quantity=True).filter(
+                stock__lte=F("reserved_stock") + 5,
+            ).count(),
+            "series": series,
+        }

@@ -118,3 +118,24 @@ class AdminUserUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ["role", "is_active", "banned", "ban_reason", "ban_expires_at", "name"]
+
+
+class ProfileUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ["name", "email"]
+
+
+class AddressSerializer(serializers.ModelSerializer):
+    region_name = serializers.CharField(source="region.name", read_only=True)
+    city_name = serializers.CharField(source="region.city.name", read_only=True)
+
+    class Meta:
+        from apps.core.models import UserAddress
+
+        model = UserAddress
+        fields = [
+            "id", "region", "region_name", "city_name", "address",
+            "is_default", "created_at", "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]

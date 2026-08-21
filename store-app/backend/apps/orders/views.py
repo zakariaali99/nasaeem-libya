@@ -4,6 +4,7 @@ The cart is **public by design** — a guest holds one, keyed on the session.
 Authentication is required at checkout, not at add-to-cart.
 """
 
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -18,12 +19,14 @@ from apps.core.views import CsrfProtectedAPIView
 from . import services
 from .models import Cart, CartItem, Discount, Order, OrderStatus, ShippingStatus
 from .serializers import (
+    AdminDiscountWriteSerializer,
     CartAddSerializer,
     CartDetailsSerializer,
     CartSerializer,
     CartUpdateSerializer,
     CheckoutSerializer,
     DiscountSerializer,
+    DashboardStatsSerializer,
     OrderSerializer,
 )
 
@@ -294,6 +297,45 @@ def _may_see(user, order) -> bool:
     return order.user_id == user.id
 
 
+# The business's allowed paths. Anything else — pending→completed, a terminal
+# state moving again — is refused server-side no matter what the client sends.
+STATUS_TRANSITIONS: dict[str, set[str]] = {
+    OrderStatus.PENDING: {OrderStatus.PROCESSING, OrderStatus.CANCELLED},
+    OrderStatus.PROCESSING: {OrderStatus.COMPLETED, OrderStatus.CANCELLED},
+    OrderStatus.COMPLETED: {OrderStatus.REFUNDED},
+    OrderStatus.CANCELLED: set(),
+    OrderStatus.REFUNDED: set(),
+}
+
+
+def _release_order_stock(order: Order) -> None:
+    """Undo the order's hold on stock.
+
+    Not yet paid → the goods were only reserved; give the reservation back.
+    Already paid   → the units left the shelf at confirmation; return them.
+    """
+    from django.db.models import F
+
+    from apps.catalog.models import Product, ProductVariant
+    from apps.payments.models import Payment
+    from apps.orders.models import PaymentStatus
+
+    paid = Payment.objects.filter(
+        order=order, status=PaymentStatus.COMPLETED
+    ).exists()
+    for item in order.items.select_related("product", "variant"):
+        if not item.product.track_quantity:
+            continue
+        if paid:
+            updates = {"stock": F("stock") + item.quantity}
+        else:
+            updates = {"reserved_stock": F("reserved_stock") - item.quantity}
+        if item.variant_id:
+            ProductVariant.objects.filter(pk=item.variant_id).update(**updates)
+        else:
+            Product.objects.filter(pk=item.product_id).update(**updates)
+
+
 class OrderListView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -357,9 +399,28 @@ class OrderDetailView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        for field, value in request.data.items():
-            setattr(order, field, value.strip() if isinstance(value, str) else value)
-        order.save()
+        # Transitions are enforced here, not in the UI: an operator can only
+        # move an order along paths the business allows, whatever client sends.
+        next_status = request.data.get("status")
+        if next_status and next_status != order.status:
+            allowed_targets = STATUS_TRANSITIONS.get(order.status, set())
+            if next_status not in allowed_targets:
+                return Response(
+                    {"message": f"لا يمكن نقل الطلب من «{order.get_status_display()}» إلى «{dict(OrderStatus.choices).get(next_status, next_status)}»",
+                     "errors": {"status": ["انتقال غير مسموح"]}},
+                    status=status.HTTP_409_CONFLICT,
+                )
+
+        with transaction.atomic():
+            locked = Order.objects.select_for_update().get(pk=order.pk)
+            for field, value in request.data.items():
+                setattr(locked, field, value.strip() if isinstance(value, str) else value)
+            if next_status in ("cancelled", "refunded"):
+                _release_order_stock(locked)
+            locked.save()
+            order = locked
+        return Response({"data": OrderSerializer(order, context={"request": request}).data,
+                         "message": "تم تحديث الطلب"})
         return Response({"data": OrderSerializer(order, context={"request": request}).data,
                          "message": "تم تحديث الطلب"})
 
@@ -423,3 +484,24 @@ class DiscountDetailView(APIView):
     def delete(self, request, discount_id):
         get_object_or_404(Discount, pk=discount_id).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AdminDiscountCreateView(CsrfProtectedAPIView):
+    permission_classes = [IsAdminRole]
+
+    def post(self, request):
+        serializer = AdminDiscountWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        discount = serializer.save()
+        return Response(
+            {"data": DiscountSerializer(discount).data, "message": "تم إنشاء الخصم"},
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class DashboardStatsView(APIView):
+    permission_classes = [IsAdminRole]
+
+    def get(self, request):
+        stats = DashboardStatsSerializer().build()
+        return Response({"data": stats})

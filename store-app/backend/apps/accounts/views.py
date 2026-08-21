@@ -8,6 +8,8 @@ import logging
 
 from django.contrib.auth import login as django_login
 from django.contrib.auth import logout as django_logout
+from django.db import transaction
+from django.db.models import Q
 from django.middleware.csrf import get_token
 from django.utils import timezone
 from rest_framework import status
@@ -17,6 +19,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.core.models import User
+from apps.core.pagination import StandardPagination
 from apps.core.views import CsrfProtectedAPIView
 
 from . import otp as otp_module
@@ -29,6 +32,8 @@ from .serializers import (
     PasswordResetRequestSerializer,
     RegisterSerializer,
     UserSerializer,
+    AddressSerializer,
+    ProfileUpdateSerializer,
 )
 from .throttling import LoginThrottle, PasswordResetThrottle, RegisterThrottle
 
@@ -118,6 +123,13 @@ class MeView(APIView):
 
     def get(self, request):
         return Response({"data": UserSerializer(request.user).data})
+
+    def patch(self, request):
+        serializer = ProfileUpdateSerializer(request.user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({"data": UserSerializer(request.user).data,
+                         "message": "تم تحديث الملف الشخصي"})
 
 
 class PasswordResetRequestView(CsrfProtectedAPIView):
@@ -215,3 +227,61 @@ class AdminUserDetailView(APIView):
             user.id, request.user.phone_number, timezone.now().isoformat(),
         )
         return Response({"data": UserSerializer(user).data, "message": "تم تحديث المستخدم"})
+
+
+class AddressListCreateView(CsrfProtectedAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        addresses = request.user.addresses.select_related("region__city").all()
+        return Response({"data": AddressSerializer(addresses, many=True).data})
+
+    def post(self, request):
+        serializer = AddressSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        with transaction.atomic():
+            if serializer.validated_data.get("is_default"):
+                request.user.addresses.update(is_default=False)
+            address = serializer.save(user=request.user)
+        return Response({"data": AddressSerializer(address).data,
+                         "message": "تم حفظ العنوان"}, status=status.HTTP_201_CREATED)
+
+
+class AddressDetailView(CsrfProtectedAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self, request, address_id):
+        return request.user.addresses.filter(id=address_id).first()
+
+    def patch(self, request, address_id):
+        address = self.get_object(request, address_id)
+        if address is None:
+            return Response({"message": "العنوان غير موجود"}, status=status.HTTP_404_NOT_FOUND)
+        serializer = AddressSerializer(address, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        with transaction.atomic():
+            if serializer.validated_data.get("is_default"):
+                request.user.addresses.exclude(pk=address.pk).update(is_default=False)
+            address = serializer.save()
+        return Response({"data": AddressSerializer(address).data, "message": "تم تحديث العنوان"})
+
+    def delete(self, request, address_id):
+        address = self.get_object(request, address_id)
+        if address is None:
+            return Response({"message": "العنوان غير موجود"}, status=status.HTTP_404_NOT_FOUND)
+        address.delete()
+        return Response(status=204)
+
+
+class AdminUserListView(APIView):
+    permission_classes = [IsAdminRole]
+
+    def get(self, request):
+        users = User.objects.order_by("-date_joined")
+        if search := request.query_params.get("search", "").strip():
+            users = users.filter(
+                Q(phone_number__icontains=search) | Q(name__icontains=search)
+            )
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(users, request, view=self)
+        return paginator.get_paginated_response(UserSerializer(page, many=True).data)

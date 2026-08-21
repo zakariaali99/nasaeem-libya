@@ -752,3 +752,48 @@ class TestExpiredDrafts:
 
         assert response.status_code == 201, response.json()
         assert Order.objects.get(id=abandoned["id"]).status == OrderStatus.CANCELLED
+
+
+class TestStatusTransitions:
+    """Phase 7 gate: transitions are enforced server-side."""
+
+    def _order(self, buyer_api, product, region):
+        buyer_api.post(reverse("cart"), {"product_id": str(product.id)}, format="json")
+        return buyer_api.post(reverse("cart-checkout"),
+                              {"region_id": region.id, "address": "شارع"},
+                              format="json").json()["data"]
+
+    def test_pending_to_processing_is_allowed(self, admin_api, buyer_api, product, region):
+        created = self._order(buyer_api, product, region)
+        response = admin_api.patch(reverse("order-detail", args=[created["order_number"]]),
+                                   {"status": "processing"}, format="json")
+        assert response.status_code == 200
+        assert Order.objects.get(id=created["id"]).status == OrderStatus.PROCESSING
+
+    def test_pending_cannot_jump_to_completed(self, admin_api, buyer_api, product, region):
+        created = self._order(buyer_api, product, region)
+        response = admin_api.patch(reverse("order-detail", args=[created["order_number"]]),
+                                   {"status": "completed"}, format="json")
+        assert response.status_code == 409
+        assert Order.objects.get(id=created["id"]).status == OrderStatus.PENDING
+
+    def test_cancelled_is_terminal(self, admin_api, buyer_api, product, region):
+        created = self._order(buyer_api, product, region)
+        admin_api.patch(reverse("order-detail", args=[created["order_number"]]),
+                        {"status": "cancelled"}, format="json")
+        response = admin_api.patch(reverse("order-detail", args=[created["order_number"]]),
+                                   {"status": "processing"}, format="json")
+        assert response.status_code == 409
+
+    def test_cancelling_an_unpaid_order_returns_the_reservation(
+        self, admin_api, buyer_api, product, region,
+    ):
+        created = self._order(buyer_api, product, region)
+        product.refresh_from_db()
+        assert product.reserved_stock == 1
+
+        admin_api.patch(reverse("order-detail", args=[created["order_number"]]),
+                        {"status": "cancelled"}, format="json")
+
+        product.refresh_from_db()
+        assert product.reserved_stock == 0

@@ -1,0 +1,1 @@
+ALTER TABLE "cities" ADD COLUMN "delivery_fee" numeric(10, 2);

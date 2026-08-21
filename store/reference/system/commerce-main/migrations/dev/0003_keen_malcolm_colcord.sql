@@ -1,0 +1,1 @@
+ALTER TABLE "order_items" ADD COLUMN "line_item_total" numeric(10, 2) NOT NULL;

@@ -1,0 +1,16 @@
+# Runtime
+Django==5.2.7
+djangorestframework==3.16.0
+psycopg[binary]==3.2.9
+django-redis==5.4.0
+redis==5.2.1
+Pillow==11.1.0
+gunicorn==23.0.0
+python-decouple==3.8
+django-cors-headers==4.7.0
+dj-database-url==2.3.0
+
+# Test
+pytest==8.3.5
+pytest-django==4.10.0
+pytest-cov==6.0.0

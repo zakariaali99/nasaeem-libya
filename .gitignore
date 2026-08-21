@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+staticfiles/
+*.egg-info/
+
+# Node — build-time tooling only (Rule 1: no Node runtime)
+node_modules/
+dist/
+
+# Secrets — never commit
+.env
+.env.local
+.env.*.local
+
+# Generated media (recreate with: python manage.py seed_demo)
+store-app/backend/media/
+
+# OS / editor noise
+.DS_Store
+.idea/
+.vscode/
+*.log

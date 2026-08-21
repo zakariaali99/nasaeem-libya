@@ -1,0 +1,189 @@
+@import "tailwindcss";
+
+/*
+ * Tailwind v4 is CSS-first. There is deliberately NO tailwind.config.ts —
+ * v4 does not read one unless @config'd, and the reference system shipped a
+ * config file holding the entire brand palette that never compiled once.
+ * Every token in this project lives here, in @theme.
+ */
+
+/*
+ * Cairo, self-hosted. Copied from @fontsource-variable/cairo into public/fonts/
+ * by scripts/sync-fonts.sh. Never linked from Google Fonts: an external font
+ * request on a slow or filtered Libyan connection is a blocked render.
+ * The Arabic face MUST cover U+0600-06FF or every Arabic glyph falls back —
+ * which is exactly what the reference did by loading Latin-only Inter.
+ */
+@font-face {
+  font-family: "Cairo";
+  font-style: normal;
+  font-weight: 200 1000;
+  font-display: swap;
+  src: url("/fonts/cairo-arabic.woff2") format("woff2-variations");
+  unicode-range: U+0600-06FF,U+0750-077F,U+0870-088E,U+0890-0891,U+0897-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC,U+102E0-102FB,U+10E60-10E7E,U+10EC2-10EC4,U+10EFC-10EFF,U+1EE00-1EE03,U+1EE05-1EE1F,U+1EE21-1EE22,U+1EE24,U+1EE27,U+1EE29-1EE32,U+1EE34-1EE37,U+1EE39,U+1EE3B,U+1EE42,U+1EE47,U+1EE49,U+1EE4B,U+1EE4D-1EE4F,U+1EE51-1EE52,U+1EE54,U+1EE57,U+1EE59,U+1EE5B,U+1EE5D,U+1EE5F,U+1EE61-1EE62,U+1EE64,U+1EE67-1EE6A,U+1EE6C-1EE72,U+1EE74-1EE77,U+1EE79-1EE7C,U+1EE7E,U+1EE80-1EE89,U+1EE8B-1EE9B,U+1EEA1-1EEA3,U+1EEA5-1EEA9,U+1EEAB-1EEBB,U+1EEF0-1EEF1;
+}
+
+@font-face {
+  font-family: "Cairo";
+  font-style: normal;
+  font-weight: 200 1000;
+  font-display: swap;
+  src: url("/fonts/cairo-latin.woff2") format("woff2-variations");
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
+
+@custom-variant dark (&:is(.dark *));
+
+@theme static {
+  /* type */
+  --font-sans: "Cairo", ui-sans-serif, system-ui, sans-serif;
+
+  /* type scale — 12 / 14 / 16 / 18 / 20 / 24 / 30 / 36 / 48. Nothing else. */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+  --text-5xl: 3rem;
+
+  /*
+   * brand — taken from the live site, nasaeemlibya.ly, not invented.
+   *
+   *   CTA green   #6D9B1F  oklch(0.63 0.155 129)   used for every button there
+   *   logo dark   #444943  oklch(0.40 0.012 140)
+   *   logo pale   #d7e7bb  oklch(0.90 0.061 124)
+   *
+   * The live green fails AA for white text (3.30:1). Hue and chroma are kept
+   * exactly; lightness drops 0.63 -> 0.545, which clears 4.5:1 at 4.51 and is
+   * visually the same green. Secondary is the logo's dark sage.
+   */
+  --color-primary: oklch(0.545 0.155 129);
+  --color-primary-foreground: oklch(0.99 0 0);
+  --color-secondary: oklch(0.40 0.012 140);
+  --color-secondary-foreground: oklch(0.99 0 0);
+
+  /* surfaces */
+  --color-background: oklch(1 0 0);
+  --color-foreground: oklch(0.15 0 0);
+  --color-card: oklch(1 0 0);
+  --color-card-foreground: oklch(0.15 0 0);
+  --color-popover: oklch(1 0 0);
+  --color-popover-foreground: oklch(0.15 0 0);
+  --color-muted: oklch(0.97 0 0);
+  --color-muted-foreground: oklch(0.45 0 0);
+  --color-accent: oklch(0.97 0 0);
+  --color-accent-foreground: oklch(0.15 0 0);
+  /*
+   * `border` is decorative (card edges, dividers) and is deliberately below
+   * 3:1 — WCAG 1.4.11 governs boundaries that are the ONLY way to identify a
+   * control. `input` IS that boundary for form fields, so it is held to 3:1 and
+   * checked by scripts/check-contrast.mjs. Do not use `border` on an input.
+   */
+  --color-border: oklch(0.92 0 0);
+  --color-input: oklch(0.66 0.01 240);
+  --color-ring: oklch(0.545 0.155 129);
+
+  /* commerce semantics — required, and absent from stock shadcn */
+  --color-price: oklch(0.15 0 0);
+  --color-price-sale: oklch(0.55 0.19 25);
+  --color-discount: oklch(0.55 0.19 25);
+  --color-in-stock: oklch(0.60 0.15 150);
+  --color-low-stock: oklch(0.67 0.15 70);
+  --color-out-of-stock: oklch(0.55 0.02 0);
+  --color-success: oklch(0.60 0.15 150);
+  --color-warning: oklch(0.66 0.15 80);
+  --color-info: oklch(0.60 0.12 240);
+  --color-destructive: oklch(0.58 0.22 27);
+  --color-destructive-foreground: oklch(0.99 0 0);
+  --color-rating: oklch(0.66 0.16 85);
+
+  /* radius */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+
+  /* motion — 150 / 200 / 300ms, ease-out entering, ease-in leaving */
+  --duration-fast: 150ms;
+  --duration-base: 200ms;
+  --duration-slow: 300ms;
+}
+
+/*
+ * Dark mode is WIRED, not decorative: a theme provider sets `.dark` on <html>.
+ * Only the tokens are redefined here. The reference shipped 246 `dark:` classes
+ * with no provider at all — every one of them unreachable.
+ */
+.dark {
+  --color-background: oklch(0.15 0.01 240);
+  --color-foreground: oklch(0.97 0 0);
+  --color-card: oklch(0.19 0.01 240);
+  --color-card-foreground: oklch(0.97 0 0);
+  --color-popover: oklch(0.19 0.01 240);
+  --color-popover-foreground: oklch(0.97 0 0);
+  --color-muted: oklch(0.26 0.01 240);
+  --color-muted-foreground: oklch(0.72 0 0);
+  --color-accent: oklch(0.26 0.01 240);
+  --color-accent-foreground: oklch(0.97 0 0);
+  --color-border: oklch(0.30 0.01 240);
+  --color-input: oklch(0.48 0.01 240);
+  --color-ring: oklch(0.72 0.130 129);
+
+  --color-primary: oklch(0.78 0.155 129);
+  --color-primary-foreground: oklch(0.18 0.03 129);
+  --color-secondary: oklch(0.86 0.055 124);
+  --color-secondary-foreground: oklch(0.22 0.02 140);
+
+  --color-price: oklch(0.97 0 0);
+  --color-price-sale: oklch(0.72 0.17 25);
+  --color-discount: oklch(0.72 0.17 25);
+  --color-in-stock: oklch(0.75 0.16 150);
+  --color-low-stock: oklch(0.80 0.14 70);
+  --color-out-of-stock: oklch(0.65 0.02 0);
+  --color-success: oklch(0.75 0.16 150);
+  --color-warning: oklch(0.82 0.14 80);
+  --color-info: oklch(0.72 0.12 240);
+  --color-destructive: oklch(0.70 0.19 27);
+  --color-destructive-foreground: oklch(0.15 0.02 27);
+  --color-rating: oklch(0.84 0.16 85);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    /* Arabic needs more leading than Latin. */
+    line-height: 1.75;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-synthesis-weight: none;
+  }
+
+  /* Visible focus on everything. Never outline:none without a replacement. */
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}

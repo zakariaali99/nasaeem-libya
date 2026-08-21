@@ -1,0 +1,20 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../vouchers_python"
+		},
+		{
+			"path": "../vouchers_dotnet"
+		},
+		{
+			"path": "../vouchers_js"
+		},
+		{
+			"path": "../vouchers_php"
+		}
+	],
+	"settings": {}
+}

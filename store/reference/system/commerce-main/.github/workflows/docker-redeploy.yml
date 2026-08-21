@@ -1,0 +1,111 @@
+name: Build and Redeploy to JPaaS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-and-redeploy:
+    name: Build, Migrate DB, Push Docker image, Redeploy JPaaS
+    runs-on: ubuntu-latest
+    env:
+      DOCKERHUB_REPO: hatcha6/wavec
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Determine next semantic version
+        run: |
+          set -euo pipefail
+          REPO="${DOCKERHUB_REPO}"
+          DEFAULT_BASE="v0.14.0"
+          TAGS=$(curl -sS "https://hub.docker.com/v2/repositories/${REPO}/tags?page_size=100" | jq -r '.results[].name')
+          LAST_TAG=$(printf "%s\n" ${TAGS:-} | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1 || true)
+          if [ -z "$LAST_TAG" ]; then
+            LAST_TAG="$DEFAULT_BASE"
+          fi
+          ver="${LAST_TAG#v}"
+          IFS='.' read -r major minor patch <<< "$ver"
+          next_patch=$((patch + 1))
+          NEXT_TAG="v${major}.${minor}.${next_patch}"
+          echo "Previous tag: $LAST_TAG"
+          echo "Next tag: $NEXT_TAG"
+          echo "DEPLOY_TAG=$NEXT_TAG" >> $GITHUB_ENV
+
+      # ──────────────────────────────────────────────
+      # Database Migration
+      # Only APPLIES already-committed migration files.
+      # Migration files must be generated locally by developers
+      # and committed to the repo via PRs.
+      # ──────────────────────────────────────────────
+      - name: Setup Node.js for migrations
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Apply production migrations
+        run: NODE_ENV=production npx drizzle-kit migrate
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+
+      # ──────────────────────────────────────────────
+      # Docker Build & Push
+      # ──────────────────────────────────────────────
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.DOCKERHUB_REPO }}:${{ env.DEPLOY_TAG }}
+            ${{ env.DOCKERHUB_REPO }}:${{ github.sha }}
+            ${{ env.DOCKERHUB_REPO }}:latest
+
+      - name: Redeploy containers on JPaaS
+        env:
+          JELASTIC_HOSTER_API_HOST: ${{ secrets.JELASTIC_HOSTER_API_HOST }}
+          JELASTIC_ENV_NAME: ${{ secrets.JELASTIC_ENV_NAME }}
+          JELASTIC_SESSION: ${{ secrets.JELASTIC_SESSION }}
+          JELASTIC_NODE_GROUP: ${{ secrets.JELASTIC_NODE_GROUP }}
+          JELASTIC_LOGIN: ${{ secrets.JELASTIC_LOGIN }}
+          JELASTIC_PASSWORD: ${{ secrets.JELASTIC_PASSWORD }}
+          MANAGE_DNS_STATE: ${{ secrets.JELASTIC_MANAGE_DNS_STATE }}
+          USE_EXISTING_VOLUMES: ${{ secrets.JELASTIC_USE_EXISTING_VOLUMES }}
+        run: |
+          set -euo pipefail
+          API_URL="https://${JELASTIC_HOSTER_API_HOST}/1.0/environment/control/rest/redeploycontainers"
+
+          curl -sS -X POST "$API_URL" \
+            --data-urlencode "envName=${JELASTIC_ENV_NAME}" \
+            --data-urlencode "session=${JELASTIC_SESSION}" \
+            --data-urlencode "tag=${DEPLOY_TAG}" \
+            --data-urlencode "nodeGroup=${JELASTIC_NODE_GROUP:-}" \
+            --data-urlencode "useExistingVolumes=${USE_EXISTING_VOLUMES:-true}" \
+            --data-urlencode "login=${JELASTIC_LOGIN:-}" \
+            --data-urlencode "password=${JELASTIC_PASSWORD:-}" \
+            --data-urlencode "manageDNSState=${MANAGE_DNS_STATE:-false}" \
+            | tee /tmp/jelastic-response.json
+
+          echo "Jelastic response:" && cat /tmp/jelastic-response.json
+
+          result=$(jq -r '.result' /tmp/jelastic-response.json)
+          if [ "$result" != "0" ]; then
+            echo "Redeploy failed with result=$result" >&2
+            exit 1
+          fi

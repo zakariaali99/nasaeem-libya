@@ -1,0 +1,30 @@
+[Unit]
+Description=nasaim-libya gunicorn (Django)
+After=network.target postgresql.service redis.service
+Requires=postgresql.service redis.service
+
+[Service]
+Type=notify
+User=nasaim
+Group=www-data
+WorkingDirectory=/srv/nasaim/backend
+EnvironmentFile=/srv/nasaim/backend/.env
+ExecStart=/srv/nasaim/backend/.venv/bin/gunicorn config.wsgi:application \
+    --bind 127.0.0.1:8000 \
+    --workers 4 \
+    --threads 2 \
+    --timeout 60 \
+    --access-logfile - \
+    --error-logfile -
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=always
+RestartSec=3
+KillMode=mixed
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

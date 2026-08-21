@@ -1,0 +1,28 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Django
+backend/media/
+backend/staticfiles/
+*.sqlite3
+
+# Secrets — never commit
+.env
+!.env.example
+
+# Node — build toolchain only, no runtime
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Test artefacts
+playwright-report/
+test-results/
+
+# OS
+.DS_Store

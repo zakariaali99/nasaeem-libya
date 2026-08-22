@@ -1,7 +1,9 @@
-import { Menu, Search, ShoppingBag, User, X } from 'lucide-react'
+import { Menu, Search, ShoppingBag, User } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
+import { CategoriesDrawer } from '@/components/storefront/CategoriesDrawer'
+import { CartDrawer } from '@/components/storefront/CartDrawer'
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
 import { useCart } from '@/lib/queries/cart'
 import { useCategories } from '@/lib/queries/catalog'
@@ -10,7 +12,6 @@ import { formatNumber } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 export function Header() {
-  const [menuOpen, setMenuOpen] = useState(false)
   const [elevated, setElevated] = useState(false)
   const { data: user } = useMe()
   const { data: categories } = useCategories()
@@ -29,88 +30,91 @@ export function Header() {
   return (
     <header
       className={cn(
-        'sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur-md transition-shadow duration-[var(--duration-base)] ease-out',
+        'sticky top-0 z-40 border-b border-border bg-card/85 backdrop-blur-md transition-shadow duration-[var(--duration-base)] ease-out',
         elevated ? 'shadow-sm' : 'shadow-none',
       )}
     >
-      <div className="mx-auto flex w-full max-w-6xl items-center gap-2 px-4 py-2">
-        <button
-          type="button"
-          className="inline-flex size-11 shrink-0 items-center justify-center rounded-md text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring lg:hidden"
-          aria-label={menuOpen ? 'إغلاق القائمة' : 'فتح قائمة التصنيفات'}
-          aria-expanded={menuOpen}
-          onClick={() => setMenuOpen((open) => !open)}
-        >
-          {menuOpen ? <X className="size-6" aria-hidden="true" /> : <Menu className="size-6" aria-hidden="true" />}
-        </button>
+      <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-2.5">
+        <CategoriesDrawer>
+          <button
+            type="button"
+            className="inline-flex size-11 shrink-0 items-center justify-center rounded-full text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            aria-label="فتح قائمة التصنيفات"
+          >
+            <Menu className="size-6" aria-hidden="true" />
+          </button>
+        </CategoriesDrawer>
 
         <Link
           to="/"
           viewTransition
-          className="flex h-11 shrink-0 items-center gap-2 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          className="flex h-11 shrink-0 items-center gap-2.5 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         >
-          <img src="/brand/logo.svg" alt="" width={36} height={36} className="size-9" />
-          <span className="font-display text-lg font-bold tracking-wide">نسائم ليبيا</span>
+          <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 border border-primary/20">
+            <img src="/brand/logo.svg" alt="" width={24} height={24} className="size-6" />
+          </div>
+          <span className="font-display text-lg font-bold tracking-wide text-foreground">نسائم ليبيا</span>
         </Link>
 
-        <div className="hidden min-w-0 flex-1 lg:block">
+        <div className="hidden min-w-0 flex-1 max-w-md mx-auto lg:block">
           <SearchBox />
         </div>
 
-        <nav className="ms-auto flex items-center gap-1" aria-label="حسابي">
+        <nav className="ms-auto flex items-center gap-1.5" aria-label="حسابي وسلتي">
           <ThemeToggle />
           <IconLink to="/search" label="البحث" className="lg:hidden">
-            <Search className="size-6" aria-hidden="true" />
+            <Search className="size-5" aria-hidden="true" />
           </IconLink>
           <IconLink to={user ? '/me' : '/login'} label={user ? 'حسابي' : 'تسجيل الدخول'}>
-            <User className="size-6" aria-hidden="true" />
+            <User className="size-5" aria-hidden="true" />
           </IconLink>
-          <IconLink
-            to="/cart"
-            label={cartCount > 0 ? `سلة التسوّق — ${cartCount} عنصر` : 'سلة التسوّق'}
-            className="relative"
-          >
-            <ShoppingBag className="size-6" aria-hidden="true" />
-            {cartCount > 0 ? (
-              // `end-1` and not `right-1`: the badge mirrors with the document.
-              // Keyed by count so every change replays the arrival animation.
-              <span
-                key={cartCount}
-                aria-hidden="true"
-                className="animate-badge-pop absolute end-1 top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1 text-xs font-bold text-primary-foreground tabular-nums"
-              >
-                {formatNumber(cartCount)}
-              </span>
-            ) : null}
-          </IconLink>
+          <CartDrawer>
+            <button
+              type="button"
+              aria-label={cartCount > 0 ? `سلة التسوّق — ${cartCount} عنصر` : 'سلة التسوّق'}
+              className="relative inline-flex size-11 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            >
+              <ShoppingBag className="size-5" aria-hidden="true" />
+              {cartCount > 0 ? (
+                <span
+                  key={cartCount}
+                  aria-hidden="true"
+                  className="animate-badge-pop absolute end-1.5 top-1.5 inline-flex min-w-4 h-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground tabular-nums"
+                >
+                  {formatNumber(cartCount)}
+                </span>
+              ) : null}
+            </button>
+          </CartDrawer>
         </nav>
       </div>
 
-      {/* Categories: a horizontal rail on desktop, an animated disclosure on
-       * mobile. The grid-rows animation lives in CSS — no measurement, no
-       * layout jitter, and it collapses to "always open" from lg up. */}
-      <nav className="mx-auto w-full max-w-6xl px-2" aria-label="التصنيفات">
-        <div className="disclosure-grid" data-open={menuOpen}>
-          <div>
-            <ul className="flex gap-1 overflow-x-auto pb-2 max-lg:flex-col">
-              <li>
-                <CategoryLink to="/products" onClick={() => setMenuOpen(false)}>
-                  كل المنتجات
-                </CategoryLink>
-              </li>
-              {(categories ?? []).map((category) => (
-                <li key={category.id}>
-                  <CategoryLink
-                    to={`/categories/${encodeURIComponent(category.slug)}`}
-                    onClick={() => setMenuOpen(false)}
-                  >
-                    {category.name}
-                  </CategoryLink>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
+      {/* Quick category pills rail */}
+      <nav className="mx-auto w-full max-w-6xl px-4 pb-2 border-t border-border/40 pt-1.5 hidden md:block" aria-label="التصنيفات السريعة">
+        <ul className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+          <li>
+            <CategoryLink to="/products">
+              كل المنتجات
+            </CategoryLink>
+          </li>
+          {(categories ?? []).slice(0, 7).map((category) => (
+            <li key={category.id}>
+              <CategoryLink to={`/categories/${encodeURIComponent(category.slug)}`}>
+                {category.name}
+              </CategoryLink>
+            </li>
+          ))}
+          <li>
+            <CategoriesDrawer>
+              <button
+                type="button"
+                className="inline-flex h-8 items-center rounded-full px-3 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
+              >
+                + المزيد من الأقسام
+              </button>
+            </CategoriesDrawer>
+          </li>
+        </ul>
       </nav>
     </header>
   )

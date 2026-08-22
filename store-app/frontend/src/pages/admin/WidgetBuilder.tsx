@@ -101,6 +101,7 @@ export default function WidgetBuilder() {
   const [selected, setSelected] = useState(0)
   const [savedNotice, setSavedNotice] = useState<string | null>(null)
   const [schedule, setSchedule] = useState<LayoutDraft | null>(null)
+  const [previewDevice, setPreviewDevice] = useState<'desktop' | 'tablet' | 'mobile'>('desktop')
 
   const currentSchedule: LayoutDraft = schedule ?? {
     name: layout?.name ?? '',
@@ -412,31 +413,83 @@ export default function WidgetBuilder() {
             </p>
           )}
 
-          {/* Live preview — the SAME renderers the storefront uses, so what you
-              see here is structurally what the customer gets after save. */}
-          <section aria-label="معاينة مباشرة" className="rounded-lg border border-border p-4">
-            <h2 className="mb-3 font-semibold">معاينة مباشرة</h2>
-            <div className="mx-auto max-w-2xl space-y-4 overflow-hidden rounded-lg border border-border bg-background p-2">
-              {widgets.filter((w) => w.is_active).length === 0 ? (
-                <p className="py-10 text-center text-sm text-muted-foreground">لا توجد أدوات نشطة للعرض</p>
-              ) : (
-                widgets.filter((w) => w.is_active).map((widget, previewIndex) => (
-                  <WidgetRenderer
-                    key={widget.id ?? `preview-${previewIndex}`}
-                    widget={{
-                      id: widget.id ?? `preview-${previewIndex}`,
-                      type: widget.type as Widget['type'],
-                      data: widget.data as Widget['data'],
-                      order: previewIndex,
-                      is_active: true,
-                      style: null,
-                      targeting: null,
-                    }}
-                  />
-                ))
-              )}
+          {/* Live preview — the SAME renderers the storefront uses with device switcher */}
+          <section aria-label="معاينة مباشرة" className="rounded-xl border border-border bg-card p-5 shadow-xs space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
+              <div>
+                <h2 className="font-bold text-foreground">معاينة مباشرة للتخطيط</h2>
+                <p className="text-xs text-muted-foreground">شاهد كيف تبدو الواجهة على مختلف الأجهزة</p>
+              </div>
+
+              {/* Device Frame Switcher */}
+              <div className="flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+                <button
+                  type="button"
+                  onClick={() => setPreviewDevice('desktop')}
+                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+                    previewDevice === 'desktop'
+                      ? 'bg-card text-foreground shadow-2xs'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  🖥️ شاشة كاملة
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewDevice('tablet')}
+                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+                    previewDevice === 'tablet'
+                      ? 'bg-card text-foreground shadow-2xs'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  📟 جهاز لوحي
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewDevice('mobile')}
+                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+                    previewDevice === 'mobile'
+                      ? 'bg-card text-foreground shadow-2xs'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  📱 هاتف
+                </button>
+              </div>
             </div>
-            <p className="mt-2 text-xs text-muted-foreground">
+
+            <div className="flex justify-center bg-muted/30 p-4 rounded-xl overflow-x-auto">
+              <div
+                className={`transition-all duration-300 space-y-4 overflow-hidden rounded-xl border border-border bg-background p-3 shadow-sm ${
+                  previewDevice === 'mobile'
+                    ? 'w-[375px] shrink-0'
+                    : previewDevice === 'tablet'
+                    ? 'w-[768px] shrink-0'
+                    : 'w-full'
+                }`}
+              >
+                {widgets.filter((w) => w.is_active).length === 0 ? (
+                  <p className="py-12 text-center text-sm text-muted-foreground">لا توجد أدوات نشطة للعرض</p>
+                ) : (
+                  widgets.filter((w) => w.is_active).map((widget, previewIndex) => (
+                    <WidgetRenderer
+                      key={widget.id ?? `preview-${previewIndex}`}
+                      widget={{
+                        id: widget.id ?? `preview-${previewIndex}`,
+                        type: widget.type as Widget['type'],
+                        data: widget.data as Widget['data'],
+                        order: previewIndex,
+                        is_active: true,
+                        style: null,
+                        targeting: null,
+                      }}
+                    />
+                  ))
+                )}
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
               الأدوات التي يملؤها النظام (منتجات، تصنيفات، مقترحات…) تُظهر محتواها بعد الحفظ على الصفحة الرئيسية الفعلية.
             </p>
           </section>

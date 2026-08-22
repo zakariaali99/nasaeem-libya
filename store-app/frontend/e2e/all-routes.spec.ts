@@ -39,6 +39,7 @@ let ctx: Record<string, string | null> = {
   adminOrderId: null,
   userId: null,
   layoutId: null,
+  discountId: null,
 }
 
 test.beforeAll(async () => {
@@ -50,6 +51,7 @@ test.beforeAll(async () => {
   ctx.adminOrderId = await idFrom(AUTH.owner, '/api/orders/', firstData)
   ctx.userId = await idFrom(AUTH.owner, '/api/admin/users/', firstData)
   ctx.layoutId = await idFrom(AUTH.owner, '/api/admin/storefront-layouts/', firstData)
+  ctx.discountId = await idFrom(AUTH.owner, '/api/discounts/', firstData)
 })
 
 function resolvePath(route: RouteDef): string | null {

@@ -169,3 +169,40 @@ class AdminLayoutDetailView(APIView):
             return Response({"message": "التخطيط غير موجود"}, status=status.HTTP_404_NOT_FOUND)
         layout.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AdminLayoutDuplicateView(APIView):
+    """`POST /api/admin/storefront-layouts/<id>/duplicate/` — deep clone a layout."""
+
+    permission_classes = [IsAdminRole]
+
+    def post(self, request, layout_id):
+        layout = StorefrontLayout.objects.prefetch_related("widgets").filter(id=layout_id).first()
+        if layout is None:
+            return Response({"message": "التخطيط غير موجود"}, status=status.HTTP_404_NOT_FOUND)
+
+        with transaction.atomic():
+            new_layout = StorefrontLayout.objects.create(
+                name=f"{layout.name} (نسخة)",
+                is_global_active=False,
+                active_start_date=layout.active_start_date,
+                active_end_date=layout.active_end_date,
+                active_days=layout.active_days,
+                active_start_hour=layout.active_start_hour,
+                active_end_hour=layout.active_end_hour,
+            )
+            for widget in layout.widgets.all():
+                Widget.objects.create(
+                    layout=new_layout,
+                    type=widget.type,
+                    data=widget.data,
+                    is_active=widget.is_active,
+                    targeting=widget.targeting,
+                    order=widget.order,
+                )
+
+        return Response(
+            {"data": LayoutSerializer(new_layout).data, "message": "تم استنساخ التخطيط بنجاح"},
+            status=status.HTTP_201_CREATED,
+        )
+

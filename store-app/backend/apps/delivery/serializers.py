@@ -32,3 +32,13 @@ class CitySerializer(serializers.ModelSerializer):
 
     def get_region_count(self, city):
         return city.regions.filter(is_active=True).count()
+
+
+class AdminDeliveryMethodSerializer(serializers.ModelSerializer):
+    class Meta:
+        from apps.orders.models import DeliveryMethod
+
+        model = DeliveryMethod
+        fields = ["id", "name", "code", "description", "is_active", "configuration", "created_at", "updated_at"]
+        read_only_fields = ["id", "code", "created_at", "updated_at"]
+

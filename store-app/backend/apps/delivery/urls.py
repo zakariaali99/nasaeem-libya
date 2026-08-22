@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views
+from . import admin_api, views
 
 urlpatterns = [
     path("delivery/methods/", views.DeliveryMethodListView.as_view(), name="delivery-methods"),
@@ -12,6 +12,13 @@ urlpatterns = [
          name="delivery-region"),
     path("geo/", views.GeoView.as_view(), name="geo"),
 
+    # Admin shipment & courier configuration
     path("admin/orders/<uuid:order_id>/shipment/", views.AdminShipmentCreateView.as_view(),
          name="admin-shipment-create"),
+    path("admin/delivery/methods/", admin_api.AdminDeliveryMethodListView.as_view(),
+         name="admin-delivery-methods"),
+    path("admin/delivery/methods/<str:method_code>/", admin_api.AdminDeliveryMethodDetailView.as_view(),
+         name="admin-delivery-method-detail"),
+    path("admin/delivery/sync/<str:method_code>/", admin_api.AdminDeliverySyncView.as_view(),
+         name="admin-delivery-sync"),
 ]

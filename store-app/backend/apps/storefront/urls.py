@@ -10,4 +10,9 @@ urlpatterns = [
         admin_api.AdminLayoutDetailView.as_view(),
         name="admin-layout-detail",
     ),
+    path(
+        "admin/storefront-layouts/<uuid:layout_id>/duplicate/",
+        admin_api.AdminLayoutDuplicateView.as_view(),
+        name="admin-layout-duplicate",
+    ),
 ]

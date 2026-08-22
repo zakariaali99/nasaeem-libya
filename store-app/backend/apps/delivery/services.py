@@ -67,6 +67,7 @@ def start_delivery(*, order: Order, force: bool = False) -> dict:
         if result.success:
             locked.tracking_number = (result.tracking_number or "")[:100]
             locked.save(update_fields=["tracking_number", "updated_at"])
+            order.tracking_number = locked.tracking_number
         logger.info(
             "shipment create: order=%s courier=%s success=%s",
             order.id, method.code, result.success,

@@ -3,27 +3,33 @@ import * as React from 'react'
 import { Label } from './label'
 
 interface FieldProps {
-  id: string
+  id?: string
+  htmlFor?: string
   label: string
   error?: string
   hint?: string
-  children: (props: { id: string; 'aria-invalid': boolean; 'aria-describedby'?: string }) => React.ReactNode
+  children:
+    | React.ReactNode
+    | ((props: { id: string; 'aria-invalid': boolean; 'aria-describedby'?: string }) => React.ReactNode)
 }
 
 /** Label + control + inline Arabic error, wired together for screen readers. */
-export function Field({ id, label, error, hint, children }: FieldProps) {
-  const errorId = `${id}-error`
-  const hintId = `${id}-hint`
-  const describedBy = [error ? errorId : null, hint ? hintId : null].filter(Boolean).join(' ')
+export function Field({ id, htmlFor, label, error, hint, children }: FieldProps) {
+  const targetId = id || htmlFor || ''
+  const errorId = targetId ? `${targetId}-error` : undefined
+  const hintId = targetId ? `${targetId}-hint` : undefined
+  const describedBy = [error ? errorId : null, hint ? hintId : null].filter(Boolean).join(' ') || undefined
 
   return (
     <div className="space-y-2">
-      <Label htmlFor={id}>{label}</Label>
-      {children({
-        id,
-        'aria-invalid': Boolean(error),
-        ...(describedBy ? { 'aria-describedby': describedBy } : {}),
-      })}
+      <Label htmlFor={targetId}>{label}</Label>
+      {typeof children === 'function'
+        ? children({
+            id: targetId,
+            'aria-invalid': Boolean(error),
+            ...(describedBy ? { 'aria-describedby': describedBy } : {}),
+          })
+        : children}
       {hint ? (
         <p id={hintId} className="text-xs text-muted-foreground">
           {hint}

@@ -43,6 +43,15 @@ export default function AdminDiscounts() {
           { key: 'type', header: 'النوع', cell: (d: Discount) => (d.type === 'percentage' ? `٪${Number(d.percentage).toFixed(0)}` : `${Number(d.value).toFixed(2)} د.ل`) },
           { key: 'usage', header: 'الاستخدام', cell: (d: Discount) => d.usage_limit ? `${d.usage_count} / ${d.usage_limit}` : `${d.usage_count}` },
           { key: 'is_active', header: 'الحالة', cell: (d: Discount) => d.is_active ? <Badge tone="success">مفعّل</Badge> : <Badge tone="neutral">معطّل</Badge> },
+          {
+            key: 'actions',
+            header: 'الإجراءات',
+            cell: (d: Discount) => (
+              <Button asChild size="sm" variant="outline">
+                <Link to={`/admin/discounts/${d.id}`}>تعديل</Link>
+              </Button>
+            ),
+          },
         ]}
         rows={query.data?.data ?? []}
         rowKey={(d: Discount) => d.id}

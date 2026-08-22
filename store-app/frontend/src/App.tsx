@@ -31,12 +31,15 @@ const ForgotPasswordPage = lazy(() => import('@/pages/auth/ForgotPassword'))
 const AccountPage = lazy(() => import('@/pages/storefront/Account'))
 // Cart and checkout are lazy too: they are navigated TO, never the first paint
 // whose LCP is being measured, and they pull in the delivery queries.
+// Storefront routes
 const CartPage = lazy(() => import('@/pages/storefront/Cart'))
 const CheckoutPage = lazy(() => import('@/pages/storefront/Checkout'))
 const CheckoutCompletePage = lazy(() => import('@/pages/storefront/CheckoutComplete'))
+const CheckoutRedirectPage = lazy(() => import('@/pages/storefront/CheckoutRedirect'))
 const MyOrdersPage = lazy(() => import('@/pages/storefront/MyOrders'))
 const MyOrderDetailPage = lazy(() => import('@/pages/storefront/MyOrderDetail'))
 const MyAddressesPage = lazy(() => import('@/pages/storefront/MyAddresses'))
+const ApiDocsPage = lazy(() => import('@/pages/storefront/ApiDocs'))
 
 // Admin — 26 of the 44 routes. Lazy so a customer never downloads any of it.
 const AdminLayout = lazy(() =>
@@ -45,6 +48,7 @@ const AdminLayout = lazy(() =>
 const AdminDashboard = lazy(() => import('@/pages/admin/Dashboard'))
 const AdminProducts = lazy(() => import('@/pages/admin/Products'))
 const AdminProductNew = lazy(() => import('@/pages/admin/ProductNew'))
+const AdminProductNewVariants = lazy(() => import('@/pages/admin/ProductNewVariants'))
 const AdminProductEdit = lazy(() => import('@/pages/admin/ProductEdit'))
 const AdminProductVariants = lazy(() => import('@/pages/admin/ProductVariants'))
 const AdminCategories = lazy(() => import('@/pages/admin/Categories'))
@@ -59,7 +63,12 @@ const AdminDiscounts = lazy(() => import('@/pages/admin/AdminDiscounts'))
 const DiscountForm = lazy(() =>
   import('@/pages/admin/AdminDiscounts').then((m) => ({ default: m.DiscountForm })),
 )
+const DiscountEditPage = lazy(() => import('@/pages/admin/DiscountEdit'))
 const AdminCities = lazy(() => import('@/pages/admin/AdminCities'))
+const AdminDeliveryMethods = lazy(() => import('@/pages/admin/DeliveryMethods'))
+const DeliveryMethodConfig = lazy(() => import('@/pages/admin/DeliveryMethodConfig'))
+const AdminPaymentMethods = lazy(() => import('@/pages/admin/PaymentMethods'))
+const PaymentMethodConfig = lazy(() => import('@/pages/admin/PaymentMethodConfig'))
 const AdminCustomization = lazy(() => import('@/pages/admin/AdminCustomization'))
 const WidgetBuilder = lazy(() => import('@/pages/admin/WidgetBuilder'))
 
@@ -98,6 +107,8 @@ const router = createBrowserRouter([
           { path: '/categories/:slug', element: <CategoryListingPage /> },
           { path: '/collections/:slug', element: <CollectionListingPage /> },
           { path: '/cart', element: withSuspense(<CartPage />) },
+          { path: '/developers/api', element: withSuspense(<ApiDocsPage />) },
+          { path: '/checkout/redirect', element: withSuspense(<CheckoutRedirectPage />) },
           {
             element: <RequireAuth />,
             children: [
@@ -124,6 +135,7 @@ const router = createBrowserRouter([
               { index: true, element: withSuspense(<AdminDashboard />) },
               { path: 'products', element: withSuspense(<AdminProducts />) },
               { path: 'products/new', element: withSuspense(<AdminProductNew />) },
+              { path: 'products/new/variants', element: withSuspense(<AdminProductNewVariants />) },
               { path: 'products/:productSlugOrId', element: withSuspense(<AdminProductEdit />) },
               { path: 'products/:productSlugOrId/variants', element: withSuspense(<AdminProductVariants />) },
               { path: 'categories', element: withSuspense(<AdminCategories />) },
@@ -136,7 +148,12 @@ const router = createBrowserRouter([
               { path: 'users/:userId', element: withSuspense(<AdminUserDetail />) },
               { path: 'discounts', element: withSuspense(<AdminDiscounts />) },
               { path: 'discounts/new', element: withSuspense(<DiscountForm />) },
+              { path: 'discounts/:id', element: withSuspense(<DiscountEditPage />) },
               { path: 'cities', element: withSuspense(<AdminCities />) },
+              { path: 'delivery', element: withSuspense(<AdminDeliveryMethods />) },
+              { path: 'delivery/:courierCode', element: withSuspense(<DeliveryMethodConfig />) },
+              { path: 'payment_methods', element: withSuspense(<AdminPaymentMethods />) },
+              { path: 'payment_methods/:methodCode', element: withSuspense(<PaymentMethodConfig />) },
               { path: 'customization', element: withSuspense(<AdminCustomization />) },
               { path: 'customization/:layoutId', element: withSuspense(<WidgetBuilder />) },
             ],

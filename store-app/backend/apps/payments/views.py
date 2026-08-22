@@ -19,13 +19,24 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.orders.models import Order, PaymentStatus
+from apps.orders.models import Order, PaymentMethodConfiguration, PaymentStatus
 from apps.orders.views import _may_see
 
 from . import services
 from .models import Payment
+from .serializers import PublicPaymentMethodSerializer
 
 logger = logging.getLogger(__name__)
+
+
+class PublicPaymentMethodListView(APIView):
+    """`GET /api/payment_methods/` — public list of enabled payment methods."""
+
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        methods = PaymentMethodConfiguration.objects.filter(is_enabled=True).order_by("sort_order", "display_name")
+        return Response({"data": PublicPaymentMethodSerializer(methods, many=True).data})
 
 
 class PaymentInitiateView(APIView):

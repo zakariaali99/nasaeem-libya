@@ -13,6 +13,7 @@ import { ApiError } from '@/lib/api'
 import { formatPrice } from '@/lib/format'
 import { useConfirmCheckout } from '@/lib/queries/cart'
 import { useCities, useDeliveryMethods, useOrder, useRegions } from '@/lib/queries/delivery'
+import { useInitiatePayment, usePublicPaymentMethods } from '@/lib/queries/payments'
 import { usePageTitle } from '@/lib/usePageTitle'
 
 export default function CheckoutPage() {
@@ -22,6 +23,8 @@ export default function CheckoutPage() {
 
   const { data: order, isPending, isError, error, refetch } = useOrder(orderId)
   const confirm = useConfirmCheckout()
+  const initiatePayment = useInitiatePayment()
+  const { data: availablePaymentMethods } = usePublicPaymentMethods()
 
   const [cityId, setCityId] = useState('')
   const [regionId, setRegionId] = useState('')
@@ -108,6 +111,27 @@ export default function CheckoutPage() {
         payment_method: payment,
         customer_notes: notes,
       })
+
+      // Electronic gateways initiate payment and redirect
+      if (['moamalat', 'plutu', 'sadad_pay', 'binance_pay'].includes(payment)) {
+        try {
+          const initResult = await initiatePayment.mutateAsync({
+            order_id: order.id,
+            method_code: payment,
+          })
+          if (initResult.action === 'redirect' && initResult.gateway_url) {
+            window.location.href = initResult.gateway_url
+            return
+          }
+          navigate(`/checkout/redirect?order_id=${encodeURIComponent(order.id)}`)
+          return
+        } catch {
+          // If gateway initiation fails, fall through to redirect page for retry
+          navigate(`/checkout/redirect?order_id=${encodeURIComponent(order.id)}`)
+          return
+        }
+      }
+
       navigate(`/checkout/complete?order=${encodeURIComponent(order.order_number)}`)
     } catch (failure) {
       if (failure instanceof ApiError) {
@@ -240,25 +264,35 @@ export default function CheckoutPage() {
 
           <section className="space-y-3 rounded-lg border border-border bg-card p-4">
             <h2 className="text-lg font-semibold">طريقة الدفع</h2>
-            {/*
-              Only the two methods that need no gateway integration are offered
-              here. The six gateways arrive in Phase 6, and listing one that
-              cannot yet take a payment would be a button that does nothing.
-            */}
-            <PaymentChoice
-              value="manual_payment"
-              checked={payment === 'manual_payment'}
-              onChange={setPayment}
-              title="تحويل بنكي"
-              description="سنرسل لك تفاصيل الحساب، وتُرفق إيصال التحويل بعد الدفع."
-            />
-            <PaymentChoice
-              value="bank_cards_on_delivery"
-              checked={payment === 'bank_cards_on_delivery'}
-              onChange={setPayment}
-              title="بطاقة عند الاستلام"
-              description="الدفع بالبطاقة عبر جهاز المندوب عند التسليم."
-            />
+            {availablePaymentMethods && availablePaymentMethods.length > 0 ? (
+              availablePaymentMethods.map((m) => (
+                <PaymentChoice
+                  key={m.id}
+                  value={m.method_code}
+                  checked={payment === m.method_code}
+                  onChange={setPayment}
+                  title={m.display_name}
+                  description={m.description || ''}
+                />
+              ))
+            ) : (
+              <>
+                <PaymentChoice
+                  value="manual_payment"
+                  checked={payment === 'manual_payment'}
+                  onChange={setPayment}
+                  title="تحويل بنكي"
+                  description="سنرسل لك تفاصيل الحساب، وتُرفق إيصال التحويل بعد الدفع."
+                />
+                <PaymentChoice
+                  value="bank_cards_on_delivery"
+                  checked={payment === 'bank_cards_on_delivery'}
+                  onChange={setPayment}
+                  title="بطاقة عند الاستلام"
+                  description="الدفع بالبطاقة عبر جهاز المندوب عند التسليم."
+                />
+              </>
+            )}
           </section>
         </div>
 

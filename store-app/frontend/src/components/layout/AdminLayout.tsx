@@ -1,5 +1,19 @@
 import {
-  Blocks, Boxes, ClipboardList, FolderTree, LayoutGrid, Menu, Package, Tags, X,
+  Blocks,
+  Boxes,
+  ClipboardList,
+  CreditCard,
+  FolderTree,
+  LayoutGrid,
+  MapPin,
+  Menu,
+  Package,
+  Percent,
+  ShoppingBag,
+  Tags,
+  Truck,
+  Users,
+  X,
 } from 'lucide-react'
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
@@ -9,12 +23,18 @@ import { cn } from '@/lib/utils'
 
 const NAV = [
   { to: '/admin', label: 'لوحة التحكم', icon: LayoutGrid, end: true },
+  { to: '/admin/orders', label: 'الطلبات', icon: ShoppingBag },
   { to: '/admin/products', label: 'المنتجات', icon: Package },
   { to: '/admin/categories', label: 'التصنيفات', icon: FolderTree },
   { to: '/admin/collections', label: 'المجموعات', icon: Tags },
   { to: '/admin/inventory', label: 'المخزون', icon: Boxes },
   { to: '/admin/inventory/logs', label: 'سجل المخزون', icon: ClipboardList },
-  { to: '/admin/customization', label: 'تخصيص الصفحة', icon: Blocks },
+  { to: '/admin/users', label: 'العملاء', icon: Users },
+  { to: '/admin/discounts', label: 'كوبونات الخصم', icon: Percent },
+  { to: '/admin/cities', label: 'المدن والشحن', icon: MapPin },
+  { to: '/admin/delivery', label: 'شركات التوصيل', icon: Truck },
+  { to: '/admin/payment_methods', label: 'طرق الدفع', icon: CreditCard },
+  { to: '/admin/customization', label: 'تخصيص المتجر', icon: Blocks },
 ]
 
 export function AdminLayout() {

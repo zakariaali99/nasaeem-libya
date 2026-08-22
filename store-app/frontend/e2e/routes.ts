@@ -33,8 +33,8 @@ export interface RouteDef {
   label: string
   path: string // may contain :param tokens resolved by the spec
   access: Access
-  /** Needs a dynamic entity id fetched at runtime (order/user/layout). */
-  dynamic?: 'productSlug' | 'categorySlug' | 'collectionSlug' | 'orderId' | 'adminOrderId' | 'userId' | 'layoutId'
+  /** Needs a dynamic entity id fetched at runtime (order/user/layout/discount). */
+  dynamic?: 'productSlug' | 'categorySlug' | 'collectionSlug' | 'orderId' | 'adminOrderId' | 'userId' | 'layoutId' | 'discountId'
   /** Paused Phase 6 screen — not built yet. */
   pending?: boolean
 }
@@ -47,7 +47,7 @@ export const ROUTES: RouteDef[] = [
   { n: 4, label: 'Cart', path: '/cart', access: 'public' },
   { n: 5, label: 'Checkout', path: '/checkout/:orderId', access: 'customer', dynamic: 'orderId' },
   { n: 6, label: 'Order confirmed', path: '/checkout/complete', access: 'customer' },
-  { n: 7, label: 'Gateway return', path: '/checkout/redirect', access: 'customer', pending: true },
+  { n: 7, label: 'Gateway return', path: '/checkout/redirect', access: 'customer' },
   { n: 8, label: 'Login', path: '/login', access: 'public' },
   { n: 9, label: 'Register', path: '/register', access: 'public' },
   { n: 10, label: 'Forgot password', path: '/forgot-password', access: 'public' },
@@ -58,13 +58,13 @@ export const ROUTES: RouteDef[] = [
   { n: 15, label: 'Category listing', path: '/categories/:slug', access: 'public', dynamic: 'categorySlug' },
   { n: 16, label: 'Collection listing', path: '/collections/:slug', access: 'public', dynamic: 'collectionSlug' },
   { n: 17, label: 'Search', path: '/search?q=%D8%B9%D9%88%D8%AF', access: 'public' },
-  { n: 18, label: 'API docs', path: '/developers/api', access: 'public', pending: true },
+  { n: 18, label: 'API docs', path: '/developers/api', access: 'public' },
 
   // Admin — 26
   { n: 19, label: 'Dashboard', path: '/admin', access: 'owner' },
   { n: 20, label: 'Product list', path: '/admin/products', access: 'owner' },
   { n: 21, label: 'Create product', path: '/admin/products/new', access: 'owner' },
-  { n: 22, label: 'Variant matrix (new)', path: '/admin/products/new/variants', access: 'owner', pending: true },
+  { n: 22, label: 'Variant matrix (new)', path: '/admin/products/new/variants', access: 'owner' },
   { n: 23, label: 'Edit product', path: '/admin/products/:productSlug', access: 'owner', dynamic: 'productSlug' },
   { n: 24, label: 'Categories', path: '/admin/categories', access: 'owner' },
   { n: 25, label: 'Collections', path: '/admin/collections', access: 'owner' },
@@ -76,17 +76,17 @@ export const ROUTES: RouteDef[] = [
   { n: 31, label: 'Customer detail', path: '/admin/users/:userId', access: 'owner', dynamic: 'userId' },
   { n: 32, label: 'Discounts', path: '/admin/discounts', access: 'owner' },
   { n: 33, label: 'Create discount', path: '/admin/discounts/new', access: 'owner' },
-  { n: 34, label: 'Edit discount', path: '/admin/discounts/:id', access: 'owner', pending: true },
+  { n: 34, label: 'Edit discount', path: '/admin/discounts/:id', access: 'owner', dynamic: 'discountId' },
   { n: 35, label: 'Cities & regions', path: '/admin/cities', access: 'owner' },
-  { n: 36, label: 'Courier overview', path: '/admin/delivery', access: 'owner', pending: true },
-  { n: 37, label: 'Vanex config', path: '/admin/delivery/vanex', access: 'owner', pending: true },
-  { n: 38, label: 'Nawres config', path: '/admin/delivery/nawres', access: 'owner', pending: true },
-  { n: 39, label: 'Darb Sabeel config', path: '/admin/delivery/darb_sabeel', access: 'owner', pending: true },
-  { n: 40, label: 'Gateway overview', path: '/admin/payment_methods', access: 'owner', pending: true },
-  { n: 41, label: 'Moamalat config', path: '/admin/payment_methods/moamalat', access: 'owner', pending: true },
-  { n: 42, label: 'Plutu config', path: '/admin/payment_methods/plutu', access: 'owner', pending: true },
-  { n: 43, label: 'Binance Pay config', path: '/admin/payment_methods/binance_pay', access: 'owner', pending: true },
-  { n: 44, label: 'Sadad Pay config', path: '/admin/payment_methods/sadad_pay', access: 'owner', pending: true },
+  { n: 36, label: 'Courier overview', path: '/admin/delivery', access: 'owner' },
+  { n: 37, label: 'Vanex config', path: '/admin/delivery/vanex', access: 'owner' },
+  { n: 38, label: 'Nawres config', path: '/admin/delivery/nawres', access: 'owner' },
+  { n: 39, label: 'Darb Sabeel config', path: '/admin/delivery/darb_sabeel', access: 'owner' },
+  { n: 40, label: 'Gateway overview', path: '/admin/payment_methods', access: 'owner' },
+  { n: 41, label: 'Moamalat config', path: '/admin/payment_methods/moamalat', access: 'owner' },
+  { n: 42, label: 'Plutu config', path: '/admin/payment_methods/plutu', access: 'owner' },
+  { n: 43, label: 'Binance Pay config', path: '/admin/payment_methods/binance_pay', access: 'owner' },
+  { n: 44, label: 'Sadad Pay config', path: '/admin/payment_methods/sadad_pay', access: 'owner' },
 
   // Phase 8 customisation (beyond the original 44)
   { n: '8a', label: 'Customisation layouts', path: '/admin/customization', access: 'owner' },

@@ -6,10 +6,11 @@ pay-on-delivery money rules — against exactly what Vanex would receive.
 """
 
 import pytest
+from decimal import Decimal
 from django.urls import reverse
 from rest_framework.test import APIClient
 
-from apps.core.models import Role, User
+from apps.core.models import City, Region, Role, User
 from apps.delivery import services as delivery_services
 from apps.orders.models import (
     DeliveryMethod,
@@ -20,6 +21,24 @@ from apps.orders.models import (
 pytestmark = pytest.mark.django_db
 
 PASSWORD = "CorrectHorse9"
+
+
+@pytest.fixture
+def numeric_city(db):
+    """Vanex keys cities by its own NUMERIC ids; ours are synced from it.
+    The shared conftest city uses a slug id, which the courier contract
+    rejects by design — these tests use provider-shaped ids."""
+    return City.objects.create(
+        id="1001", name="طرابلس", code="TIP", delivery_fee=Decimal("15.00"),
+    )
+
+
+@pytest.fixture
+def numeric_region(numeric_city):
+    return Region.objects.create(
+        id="2002", name="قرقارش", city=numeric_city,
+        delivery_fee=Decimal("5.00"), estimated_delivery_days=2,
+    )
 
 
 @pytest.fixture
@@ -56,19 +75,29 @@ def pickup_method(db):
     )
 
 
-@pytest.fixture
-def finalised_order(buyer, product, region, vanex_method):
-    """A finalised PENDING order, built through the real service layer."""
+def _draft_order(user, product, quantity=1):
+    """A PENDING draft through the real service layer: stock reserved, no
+    region or delivery choice yet — what `finalise_order` completes."""
     from apps.orders import services as order_services
-
-    cart = order_services.get_or_create_cart(_FakeRequest(buyer))
     from apps.orders.models import CartItem
 
-    CartItem.objects.create(cart=cart, product=product, quantity=1)
-    order = order_services.checkout(cart=cart)
+    cart = order_services.get_or_create_cart(_FakeRequest(user))
+    CartItem.objects.create(cart=cart, product=product, quantity=quantity)
+    return order_services.checkout(
+        cart=cart, user=user, region_id=None, address="", require_delivery=False,
+    )
+
+
+
+@pytest.fixture
+def finalised_order(buyer, product, numeric_region, vanex_method):
+    """A finalised PENDING order carrying the courier and payment method."""
+    from apps.orders import services as order_services
+
+    order = _draft_order(buyer, product)
     return order_services.finalise_order(
         order,
-        region_id=region.id,
+        region_id=numeric_region.id,
         address="شارع الشحن، مبنى 4",
         delivery_method_code=vanex_method.code,
         payment_method="manual_payment",
@@ -107,17 +136,14 @@ class TestShipmentCreation:
         assert calls[0]["token"] == "token-123"
 
     def test_the_customer_pays_the_courier_on_pay_on_delivery_methods(
-        self, buyer, product, region, vanex_method, monkeypatch
+        self, buyer, product, numeric_region, vanex_method, monkeypatch
     ):
         from apps.orders import services as order_services
-        from apps.orders.models import CartItem
 
-        cart = order_services.get_or_create_cart(_FakeRequest(buyer))
-        CartItem.objects.create(cart=cart, product=product, quantity=2)
-        order = order_services.checkout(cart=cart)
+        order = _draft_order(buyer, product, quantity=2)
         order = order_services.finalise_order(
             order,
-            region_id=region.id,
+            region_id=numeric_region.id,
             address="شارع آخر",
             delivery_method_code=vanex_method.code,
             payment_method="bank_cards_on_delivery",
@@ -160,12 +186,7 @@ class TestShipmentCreation:
         assert finalised_order.tracking_number == "VX-SECOND"
 
     def test_an_unfinalised_order_cannot_ship(self, buyer, product, region, vanex_method):
-        from apps.orders import services as order_services
-        from apps.orders.models import CartItem
-
-        cart = order_services.get_or_create_cart(_FakeRequest(buyer))
-        CartItem.objects.create(cart=cart, product=product, quantity=1)
-        draft = order_services.checkout(cart=cart)
+        draft = _draft_order(buyer, product)
 
         with pytest.raises(delivery_services.DeliveryError):
             delivery_services.start_delivery(order=draft)
@@ -174,11 +195,8 @@ class TestShipmentCreation:
         self, buyer, product, region, pickup_method
     ):
         from apps.orders import services as order_services
-        from apps.orders.models import CartItem
 
-        cart = order_services.get_or_create_cart(_FakeRequest(buyer))
-        CartItem.objects.create(cart=cart, product=product, quantity=1)
-        order = order_services.checkout(cart=cart)
+        order = _draft_order(buyer, product)
         order = order_services.finalise_order(
             order, region_id=region.id, address="العنوان",
             delivery_method_code=pickup_method.code, payment_method="manual_payment",

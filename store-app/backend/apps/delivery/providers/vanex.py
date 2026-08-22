@@ -53,6 +53,17 @@ class VanexCourier(Courier):
         pay_on_delivery = order.payment_method in _PAY_ON_DELIVERY
         first_item = order.items.select_related("product").first()
         product = first_item.product if first_item else None
+        # Vanex keys cities by its own numeric ids; ours are synced from it.
+        # A non-numeric id means this row did not come from the sync — refuse
+        # loudly instead of shipping the parcel to city 0.
+        try:
+            city_id = int(order.shipping_region.city_id) if order.shipping_region_id else int(getattr(order, "shipping_city_id", 0) or 0)
+            region_id = int(order.shipping_region_id) if order.shipping_region_id else None
+        except (TypeError, ValueError, AttributeError):
+            return ShipmentResult(
+                success=False,
+                message="معرّف المدينة غير متوافق مع ڤانيكس — تحقق من مزامنة المدن",
+            )
         payload = {
             "type": 1,
             "description": f"Order #{order.id}",
@@ -69,8 +80,8 @@ class VanexCourier(Courier):
             "reciever": order.user.name if order.user and order.user.name else (order.user.phone_number if order.user else ""),
             "phone": order.user.phone_number if order.user else "",
             "phone_b": order.user.phone_number if order.user else "",
-            "city": int(order.shipping_city_id or 0),
-            "address_child": int(order.shipping_region_id) if order.shipping_region_id else None,
+            "city": city_id,
+            "address_child": region_id,
             "price": float(order.total),
             "sticker_notes": "",
             # Pay-on-delivery: the customer pays the courier's fee; otherwise we do.

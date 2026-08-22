@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { api } from '@/lib/api'
 import type { City, DeliveryMethod, DeliveryRegion, Order } from '@/types/api'
@@ -66,3 +66,75 @@ export function useOrders(params: Record<string, string | number> = {}) {
     },
   })
 }
+
+export interface AdminDeliveryMethod {
+  id: string
+  name: string
+  code: string
+  description: string
+  is_active: boolean
+  configuration: Record<string, any>
+  created_at: string
+  updated_at: string
+}
+
+export function useAdminDeliveryMethods() {
+  return useQuery({
+    queryKey: ['admin-delivery-methods'],
+    queryFn: async () => {
+      const response = await api.get<AdminDeliveryMethod[]>('/admin/delivery/methods/')
+      return response.data
+    },
+  })
+}
+
+export function useAdminDeliveryMethod(code?: string) {
+  return useQuery({
+    queryKey: ['admin-delivery-methods', code],
+    enabled: Boolean(code),
+    queryFn: async () => {
+      const response = await api.get<AdminDeliveryMethod>(`/admin/delivery/methods/${code}/`)
+      return response.data
+    },
+  })
+}
+
+export function useUpdateAdminDeliveryMethod() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      code,
+      data,
+    }: {
+      code: string
+      data: Partial<AdminDeliveryMethod>
+    }) => {
+      const response = await api.patch<AdminDeliveryMethod>(
+        `/admin/delivery/methods/${code}/`,
+        data,
+      )
+      return response.data
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['admin-delivery-methods'] })
+      queryClient.invalidateQueries({ queryKey: ['admin-delivery-methods', variables.code] })
+      queryClient.invalidateQueries({ queryKey: deliveryKeys.methods })
+    },
+  })
+}
+
+export function useSyncDeliveryMethod() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (code: string) => {
+      const response = await api.post<{ synced_cities: number; synced_regions: number }>(
+        `/admin/delivery/sync/${code}/`,
+      )
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: deliveryKeys.cities })
+    },
+  })
+}
+

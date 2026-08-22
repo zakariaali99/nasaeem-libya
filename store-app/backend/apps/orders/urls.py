@@ -19,5 +19,6 @@ urlpatterns = [
     path("discounts/<uuid:discount_id>/", views.DiscountDetailView.as_view(), name="discount-detail"),
 
     path("admin/discounts/", views.AdminDiscountCreateView.as_view(), name="admin-discount-create"),
+    path("admin/discounts/<uuid:discount_id>/", views.DiscountDetailView.as_view(), name="admin-discount-detail"),
     path("admin/dashboard/", views.DashboardStatsView.as_view(), name="admin-dashboard"),
 ]

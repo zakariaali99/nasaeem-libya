@@ -1,257 +1,295 @@
-"""Payment lifecycle — the money path after checkout.
+"""Payment orchestration — the ONLY module that moves money state.
 
-Three rules this module exists to enforce:
+The providers own the wire protocol (hashes, payloads, redirects); this module
+owns the store's reaction to them. Three rules govern everything here:
 
-1. **A webhook is untrusted until its signature verifies.** The gateway layer
-   answers `signature_valid=False` and nothing here may touch an order.
-2. **The same notification delivered twice credits the order once.** Every
-   confirmation runs inside one transaction holding a lock on the ORDER row;
-   the second delivery finds a COMPLETED payment and changes nothing.
-3. **Stock leaves the shelf only on confirmed payment.** Checkout reserves; the
-   single decrement point is `confirm_payment()`.
-
-Delivery starts here too: an online order ships when its payment confirms, a
-pay-on-delivery order ships when the operator marks its payment collected.
+1. **Stock leaves the shelf only on a CONFIRMED payment.** Checkout reserves;
+   confirmation converts the reservation into a sale. Nothing before that
+   touches `stock`.
+2. **A webhook is processed at most once.** The same notification delivered
+   twice credits the order once — the second delivery is acknowledged with the
+   same outcome but performs no state change.
+3. **Every path to "paid" funnels through `_confirm_payment`** — webhook,
+   redirect poll, or operator verification — so idempotency cannot drift
+   between entry points.
 """
 
 from __future__ import annotations
 
 import logging
-from decimal import Decimal
 
 from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
 
-from apps.catalog.models import Product, ProductVariant
-from apps.orders.models import (
-    Order,
-    OrderStatus,
-    PaymentMethodConfiguration,
-    PaymentStatus,
-)
+from apps.orders.models import Order, OrderStatus, PaymentStatus
 
 from .models import Payment
-from .providers import registry
-from .providers.base import InitiationResult, WebhookResult
+from .providers.base import WebhookResult
+from .providers.registry import get_gateway
 
 logger = logging.getLogger(__name__)
 
 
 class PaymentError(Exception):
-    def __init__(self, message, *, status=400):
+    def __init__(self, message: str, *, status: int = 409, field: str = ""):
         super().__init__(message)
         self.message = message
         self.status = status
+        self.field = field
 
 
-def get_method_config(method_code: str) -> dict:
-    row = PaymentMethodConfiguration.objects.filter(method_code=method_code).first()
-    if row is None or not row.is_enabled:
-        return {}
-    return row.config_data or {}
+def get_configuration(method_code: str):
+    """The gateway's stored settings. A disabled or unknown method is not a
+    500: it is a plain "unavailable" answer, because a customer choosing it is
+    a normal state, not an error."""
+    from apps.orders.models import PaymentMethodConfiguration
 
-
-def initiate_payment(*, order: Order, method_code: str, user_input: dict | None = None) -> tuple[Payment, InitiationResult]:
-    """Record the intent to pay and ask the gateway how to proceed.
-
-    One live payment per (order, method): re-initiating updates the record
-    instead of stacking rows, unless a COMPLETED payment already exists — then
-    the initiation is refused outright.
-    """
-    try:
-        gateway = registry.get_gateway(method_code)
-    except KeyError as exc:
-        raise PaymentError(str(exc), status=404)
-
-    config = get_method_config(method_code)
-    result = gateway.initiate(order=order, config=config, user_input=user_input or {})
-
-    with transaction.atomic():
-        existing_completed = Payment.objects.select_for_update().filter(
-            order=order, method_code=method_code, status=PaymentStatus.COMPLETED
-        ).first()
-        if existing_completed:
-            raise PaymentError("تم تأكيد الدفع لهذا الطلب مسبقاً", status=409)
-
-        payment, _created = Payment.objects.update_or_create(
-            order=order,
-            method_code=method_code,
-            defaults={
-                "status": result.next_step,
-                "reference_id": result.payment_id or "",
-                "provider_payload": {"initiation": result.data},
-            },
-        )
-    return payment, result
-
-
-def handle_webhook(*, method_code: str, payload: dict, headers: dict) -> WebhookResult:
-    """Route a provider notification. An invalid signature never reaches the
-    order; a valid one goes through the same idempotent confirmation as any
-    other path."""
-    try:
-        gateway = registry.get_gateway(method_code)
-    except KeyError as exc:
-        raise PaymentError(str(exc), status=404)
-
-    config = get_method_config(method_code)
-    if not config:
-        return WebhookResult(success=False, signature_valid=False,
-                             message="طريقة الدفع غير مهيّأة")
-
-    result = gateway.handle_webhook(payload, headers, config)
-    if not result.signature_valid:
-        logger.warning("webhook signature rejected method=%s", method_code)
-        return result
-
-    if not result.order_number:
-        return result
-
-    if result.status == PaymentStatus.COMPLETED:
-        confirm_payment(
-            order_number=result.order_number,
-            method_code=method_code,
-            transaction_id=result.transaction_id or "",
-            provider_payload={"webhook": result.raw},
-            amount=result.amount,
-        )
-    else:
-        _mark_failed(order_number=result.order_number, method_code=method_code,
-                     provider_payload={"webhook": result.raw}, message=result.message)
-    return result
-
-
-@transaction.atomic
-def confirm_payment(
-    *,
-    order_number: str,
-    method_code: str,
-    transaction_id: str = "",
-    provider_payload: dict | None = None,
-    amount: Decimal | None = None,
-) -> Payment:
-    """Mark an order's payment completed — idempotently.
-
-    The ORDER row lock serialises everything racing to credit the same order:
-    two webhook deliveries, a webhook and `/checkout/redirect`, an operator and
-    a webhook. Whichever arrives second sees the COMPLETED payment and exits
-    without side effects.
-    """
-    order = Order.objects.select_for_update().filter(order_number=order_number).first()
-    if order is None:
-        raise PaymentError("الطلب غير موجود", status=404)
-
-    already = Payment.objects.filter(
-        order=order, method_code=method_code, status=PaymentStatus.COMPLETED
+    configuration = PaymentMethodConfiguration.objects.filter(
+        method_code=method_code, is_enabled=True
     ).first()
+    if configuration is None:
+        raise PaymentError("طريقة الدفع غير متاحة حالياً", status=400, field="method_code")
+    return configuration
 
-    if already is None:
-        payment, _ = Payment.objects.update_or_create(
-            order=order,
-            method_code=method_code,
-            defaults={
-                "status": PaymentStatus.COMPLETED,
-                "amount": amount if amount is not None else order.total,
-                "reference_id": transaction_id,
-                "provider_payload": provider_payload or {},
-                "verified_at": timezone.now(),
-            },
+
+def initiate_payment(*, order: Order, method_code: str, user_input: dict | None = None) -> dict:
+    """Start (or re-start) a payment for a finalised order.
+
+    Re-initiating while a payment is still pending replaces the attempt — a
+    customer who closed the lightbox must be able to try again. Re-initiating
+    after a COMPLETED payment is refused: one order, one charge.
+    """
+    if not order.finalised_at:
+        raise PaymentError("أكمل تفاصيل الطلب قبل الدفع", field="order_id")
+
+    # Most-specific refusal first: a paid order stays paid whatever else is
+    # wrong with the request.
+    if Payment.objects.filter(order=order, status=PaymentStatus.COMPLETED).exists():
+        raise PaymentError("تم دفع هذا الطلب مسبقاً")
+
+    if not method_code:
+        raise PaymentError(
+            "طريقة الدفع لا تطابق المختارة عند تأكيد الطلب", field="method_code"
         )
-        _decrement_stock(order)
-        if order.status == OrderStatus.PENDING:
-            order.status = OrderStatus.PROCESSING
-            order.save(update_fields=["status", "updated_at"])
-    else:
-        payment = already
 
-    # Best-effort shipment creation; a courier outage must not roll back a
-    # confirmed payment. Retried from the admin action or the next verify.
-    if not order.tracking_number:
-        try:
-            from apps.delivery.services import start_delivery
+    # Unknown or disabled gateways are answered as "unavailable", never as a
+    # 500 — a customer landing on a switched-off method is normal life.
+    try:
+        gateway = get_gateway(method_code)
+    except KeyError:
+        raise PaymentError(
+            "طريقة الدفع غير متاحة حالياً", status=400, field="method_code"
+        ) from None
 
-            start_delivery(order)
-        except Exception:
-            logger.exception("shipment creation failed for %s", order.order_number)
+    if order.payment_method and order.payment_method != method_code:
+        raise PaymentError(
+            "طريقة الدفع لا تطابق المختارة عند تأكيد الطلب", field="method_code"
+        )
 
-    order.refresh_from_db()
-    return payment
+    if order.status != OrderStatus.PENDING:
+        raise PaymentError("لا يمكن دفع هذا الطلب في حالته الحالية")
 
+    configuration = get_configuration(method_code)
 
-def _mark_failed(*, order_number: str, method_code: str, provider_payload: dict, message: str) -> None:
-    Payment.objects.filter(
-        order__order_number=order_number, method_code=method_code
-    ).exclude(status=PaymentStatus.COMPLETED).update(
-        status=PaymentStatus.FAILED,
-        provider_payload={**provider_payload, "failure": message},
-        verified_at=timezone.now(),
+    result = gateway.initiate(
+        order=order, config=configuration.config_data, user_input=user_input or {}
     )
 
+    with transaction.atomic():
+        # One live attempt per order+method: retrying supersedes the previous
+        # pending row rather than accumulating duplicates.
+        payment = (
+            Payment.objects.select_for_update()
+            .filter(order=order, method_code=method_code, status=PaymentStatus.PENDING)
+            .first()
+        )
+        if result.next_step == PaymentStatus.WAITING_FOR_VERIFICATION and payment is None:
+            payment = (
+                Payment.objects.select_for_update()
+                .filter(
+                    order=order,
+                    method_code=method_code,
+                    status=PaymentStatus.WAITING_FOR_VERIFICATION,
+                )
+                .first()
+            )
+        if payment is None:
+            payment = Payment(order=order, method_code=method_code)
+        payment.status = result.next_step
+        payment.amount = order.total
+        payment.provider_payload = {"initiate": result.data}
+        if result.transaction_id:
+            payment.reference_id = result.transaction_id[:100]
+        payment.save()
 
-def _decrement_stock(order: Order) -> None:
-    """THE stock decrement point. Reserved at checkout; leaves the shelf now."""
+    return {
+        "success": result.success,
+        "next_step": result.next_step,
+        "message": result.message,
+        "redirect_url": result.redirect_url,
+        "payment_id": str(payment.id),
+        "transaction_id": result.transaction_id,
+        "data": result.data,
+    }
+
+
+def _convert_reservation_to_sale(order: Order) -> None:
+    """The units were reserved at checkout; on a confirmed payment they leave
+    the shelf. `stock` decrements exactly once — here."""
+    from apps.catalog.models import Product, ProductVariant
+
     for item in order.items.select_related("product", "variant"):
         if not item.product.track_quantity:
             continue
+        updates = {
+            "stock": F("stock") - item.quantity,
+            "reserved_stock": F("reserved_stock") - item.quantity,
+        }
         if item.variant_id:
-            ProductVariant.objects.filter(pk=item.variant_id).update(
-                reserved_stock=F("reserved_stock") - item.quantity,
-                stock=F("stock") - item.quantity,
-            )
+            ProductVariant.objects.filter(pk=item.variant_id).update(**updates)
         else:
-            Product.objects.filter(pk=item.product_id).update(
-                reserved_stock=F("reserved_stock") - item.quantity,
-                stock=F("stock") - item.quantity,
-            )
+            Product.objects.filter(pk=item.product_id).update(**updates)
 
 
-def resolve_redirect(*, reference: str) -> dict:
-    """State for `/checkout/redirect` — works before AND after the webhook.
+@transaction.atomic
+def confirm_payment(*, payment: Payment, transaction_id: str = "", raw: dict | None = None) -> bool:
+    """Mark a payment COMPLETED and advance its order. Returns True when THIS
+    call did the crediting; False means it was already credited (the webhook
+    arrived twice, or the redirect beat the webhook).
 
-    If no confirmed payment exists yet and the gateway can answer remotely,
-    ask it right now; that closes the window where the customer returns faster
-    than the notification travels.
+    The row is locked for the whole critical section so two concurrent
+    deliveries serialise, the second observing COMPLETED and doing nothing.
     """
-    order = (
-        Order.objects.filter(order_number=reference).first()
-        or Order.objects.filter(reference_id=reference).first()
+    locked = Payment.objects.select_for_update().select_related("order").get(pk=payment.pk)
+    if locked.status == PaymentStatus.COMPLETED:
+        return False
+
+    order: Order = locked.order
+    locked.status = PaymentStatus.COMPLETED
+    locked.verified_at = timezone.now()
+    if transaction_id:
+        locked.reference_id = transaction_id[:100]
+    if raw is not None:
+        locked.provider_payload = {**locked.provider_payload, "confirm": raw}
+    locked.save(update_fields=["status", "verified_at", "reference_id",
+                               "provider_payload", "updated_at"])
+
+    _convert_reservation_to_sale(order)
+
+    # PENDING → PROCESSING is the paid transition. The order may already have
+    # moved (an operator got there first); both are legal, neither re-runs.
+    if order.status == OrderStatus.PENDING:
+        order.status = OrderStatus.PROCESSING
+        order.save(update_fields=["status", "updated_at"])
+
+    return True
+
+
+@transaction.atomic
+def fail_payment(*, payment: Payment, raw: dict | None = None) -> None:
+    locked = Payment.objects.select_for_update().get(pk=payment.pk)
+    if locked.status in (PaymentStatus.COMPLETED, PaymentStatus.FAILED):
+        return
+    locked.status = PaymentStatus.FAILED
+    if raw is not None:
+        locked.provider_payload = {**locked.provider_payload, "failure": raw}
+    locked.save(update_fields=["status", "provider_payload", "updated_at"])
+
+
+def handle_webhook(*, method_code: str, payload: dict, headers: dict) -> tuple[dict, int]:
+    """Verify, then process, a provider notification. The response body is the
+    provider's receipt: 200 either way once verified — providers retry on
+    failures, and a duplicate is not a failure — but 400 on a bad signature,
+    which is a request we want the provider to stop sending."""
+    gateway = get_gateway(method_code)
+    configuration = get_configuration(method_code)
+
+    result: WebhookResult = gateway.handle_webhook(
+        payload=payload, headers=headers, config=configuration.config_data
     )
+
+    if not result.signature_valid:
+        logger.warning("payment webhook rejected: bad signature method=%s", method_code)
+        return {"success": False, "message": result.message}, 400
+
+    order = Order.objects.filter(order_number=result.order_number or "").first()
     if order is None:
-        raise PaymentError("الطلب غير موجود", status=404)
+        return {"success": False, "message": "الطلب غير معروف"}, 200
 
-    payments = list(order.payments.all())
-    completed = [p for p in payments if p.status == PaymentStatus.COMPLETED]
+    payment = (
+        Payment.objects.filter(order=order, method_code=method_code)
+        .exclude(status__in=[PaymentStatus.CANCELLED])
+        .order_by("-created_at")
+        .first()
+    )
+    if payment is None:
+        return {"success": False, "message": "لا توجد عملية دفع لهذا الطلب"}, 200
 
-    if not completed and payments:
-        payment = payments[0]
-        try:
-            gateway = registry.get_gateway(payment.method_code)
-        except KeyError:
-            gateway = None
-        if gateway is not None:
-            config = get_method_config(payment.method_code)
-            remote = gateway.verify_remotely(payment=payment, config=config)
-            if remote is not None and remote.signature_valid:
-                if remote.status == PaymentStatus.COMPLETED and remote.order_number:
-                    confirm_payment(
-                        order_number=remote.order_number,
-                        method_code=payment.method_code,
-                        transaction_id=remote.transaction_id or "",
-                        provider_payload={"remote_verify": remote.raw},
-                    )
-                    completed = list(order.payments.filter(status=PaymentStatus.COMPLETED))
-                elif remote.status == PaymentStatus.FAILED:
-                    _mark_failed(order_number=order.order_number,
-                                 method_code=payment.method_code,
-                                 provider_payload={"remote_verify": remote.raw},
-                                 message=remote.message)
-                    payments = list(order.payments.all())
+    # The provider says an amount; the order says an amount. They are the same
+    # order — a mismatch means the notification does not describe this charge,
+    # and confirming it would be booking money we did not ask for.
+    if result.amount is not None and result.amount != payment.amount:
+        logger.warning(
+            "payment webhook amount mismatch: payment=%s webhook=%s",
+            payment.amount, result.amount,
+        )
+        return {"success": False, "message": "مبلغ الإشعار لا يطابق المبلغ المستحق"}, 200
 
-    latest = max(payments + completed, key=lambda p: p.updated_at, default=None)
+    if result.status == PaymentStatus.COMPLETED:
+        credited = confirm_payment(payment=payment, transaction_id=result.transaction_id, raw=result.raw)
+        message = "تم تأكيد الدفع" if credited else "الدفع مؤكد مسبقاً"
+        return {"success": True, "credited": credited, "message": message}, 200
+
+    if result.status == PaymentStatus.FAILED:
+        fail_payment(payment=payment, raw=result.raw)
+        return {"success": False, "message": "فشلت عملية الدفع"}, 200
+
+    return {"success": False, "message": result.message or "حالة غير مكتملة"}, 200
+
+
+def resolve_redirect(*, order: Order) -> dict:
+    """`/checkout/redirect` — the customer is back from the gateway.
+
+    Works whichever arrived first: the webhook already credited → report that;
+    it has not → query the gateway server-to-server and credit now if it can.
+    Either way the SPA gets the authoritative state and routes accordingly.
+    """
+    payment = (
+        Payment.objects.filter(order=order).exclude(status=PaymentStatus.CANCELLED)
+        .order_by("-created_at")
+        .first()
+    )
+    if payment is None:
+        raise PaymentError("لا توجد عملية دفع لهذا الطلب", field="order_id")
+    if payment.status == PaymentStatus.COMPLETED:
+        return {"payment_status": payment.status, "confirmed": True}
+
+    gateway = get_gateway(payment.method_code)
+    configuration = get_configuration(payment.method_code)
+
+    result = gateway.verify_remotely(payment=payment, config=configuration.config_data)
+    if result is not None and result.signature_valid:
+        if result.status == PaymentStatus.COMPLETED:
+            confirm_payment(payment=payment, transaction_id=result.transaction_id, raw=result.raw)
+            payment.refresh_from_db()
+        elif result.status == PaymentStatus.FAILED:
+            fail_payment(payment=payment, raw=result.raw)
+            payment.refresh_from_db()
+
     return {
-        "order_number": order.order_number,
-        "status": PaymentStatus.COMPLETED if completed else (latest.status if latest else PaymentStatus.PENDING),
-        "tracking_number": order.tracking_number,
-        "total": str(order.total),
+        "payment_status": payment.status,
+        "confirmed": payment.status == PaymentStatus.COMPLETED,
     }
+
+
+@transaction.atomic
+def admin_verify(*, payment: Payment) -> dict:
+    """An operator confirms a manual / waiting-for-verification payment.
+
+    Same funnel as every other confirmation — the stock conversion and the
+    order advance cannot diverge from the webhook path.
+    """
+    credited = confirm_payment(payment=payment)
+    payment.refresh_from_db()
+    return {"credited": credited, "payment_status": payment.status}

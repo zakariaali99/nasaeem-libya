@@ -20,6 +20,7 @@ urlpatterns = [
     path("api/", include("apps.storefront.urls")),
     path("api/", include("apps.orders.urls")),
     path("api/", include("apps.delivery.urls")),
+    path("api/", include("apps.payments.urls")),
     path("robots.txt", spa.robots_txt, name="robots"),
     path("sitemap.xml", spa.sitemap_xml, name="sitemap"),
 ]

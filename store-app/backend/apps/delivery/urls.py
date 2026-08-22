@@ -11,4 +11,7 @@ urlpatterns = [
     path("delivery/regions/<str:region_id>/", views.RegionDetailView.as_view(),
          name="delivery-region"),
     path("geo/", views.GeoView.as_view(), name="geo"),
+
+    path("admin/orders/<uuid:order_id>/shipment/", views.AdminShipmentCreateView.as_view(),
+         name="admin-shipment-create"),
 ]

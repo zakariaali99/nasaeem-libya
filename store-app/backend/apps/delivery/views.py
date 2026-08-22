@@ -10,14 +10,16 @@ the response says so in Arabic instead of returning a bare `[]` for the client
 to render as an empty `<select>`.
 """
 
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.core.models import City, Region
-from apps.orders.models import DeliveryMethod
+from apps.orders.models import DeliveryMethod, Order
 from apps.orders.serializers import DeliveryMethodSerializer
+from apps.orders.views import _may_see
 
+from . import services
 from .serializers import CitySerializer, RegionSerializer
 
 EMPTY_CITIES = "لا توجد مدن توصيل مُعرّفة في المتجر حالياً، يرجى التواصل معنا لإتمام الطلب"
@@ -101,3 +103,34 @@ class GeoView(APIView):
             "region": RegionSerializer(address.region).data,
             "city": CitySerializer(address.region.city).data,
         }})
+
+
+class AdminShipmentCreateView(APIView):
+    """`POST /api/admin/orders/<id>/shipment/` — create the courier shipment.
+
+    The operator's "ship it" button. Idempotent by default: pressing it twice
+    returns the number already held; `{"force": true}` re-dispatches."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, order_id):
+        if not getattr(request.user, "is_admin_role", False):
+            return Response({"message": "غير مصرح"}, status=403)
+        order = Order.objects.select_related("delivery_method").filter(id=order_id).first()
+        if order is None:
+            return Response({"message": "الطلب غير موجود"}, status=404)
+
+        try:
+            result = services.start_delivery(
+                order=order, force=bool(request.data.get("force")),
+            )
+        except services.DeliveryError as exc:
+            return Response({"message": exc.message}, status=exc.status)
+
+        order.refresh_from_db()
+        return Response({
+            "data": {
+                **result,
+                "tracking_number": order.tracking_number or result["tracking_number"],
+            }
+        })

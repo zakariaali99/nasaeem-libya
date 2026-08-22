@@ -359,4 +359,36 @@ export interface Order {
   tracking_url: string
   items: OrderLine[]
   created_at: string
+  user?: { id: string; name: string; phone_number: string } | null
+}
+
+export interface Address {
+  id: string
+  region: string
+  region_name: string
+  city_name: string
+  address: string
+  is_default: boolean
+}
+
+export interface DashboardStats {
+  pending_orders: number
+  processing_orders: number
+  completed_orders: number
+  cancelled_orders: number
+  today_orders: number
+  month_revenue: string
+  revenue_total: string
+  customers: number
+  low_stock: number
+  series: { date: string; orders: number; revenue: string }[]
+}
+
+export interface CityAdmin {
+  id: string
+  name: string
+  code: string
+  delivery_fee: string
+  is_active: boolean
+  regions: { id: string; name: string; delivery_fee: string; is_active: boolean }[]
 }

@@ -34,6 +34,9 @@ const AccountPage = lazy(() => import('@/pages/storefront/Account'))
 const CartPage = lazy(() => import('@/pages/storefront/Cart'))
 const CheckoutPage = lazy(() => import('@/pages/storefront/Checkout'))
 const CheckoutCompletePage = lazy(() => import('@/pages/storefront/CheckoutComplete'))
+const MyOrdersPage = lazy(() => import('@/pages/storefront/MyOrders'))
+const MyOrderDetailPage = lazy(() => import('@/pages/storefront/MyOrderDetail'))
+const MyAddressesPage = lazy(() => import('@/pages/storefront/MyAddresses'))
 
 // Admin — 26 of the 44 routes. Lazy so a customer never downloads any of it.
 const AdminLayout = lazy(() =>
@@ -48,6 +51,15 @@ const AdminCategories = lazy(() => import('@/pages/admin/Categories'))
 const AdminCollections = lazy(() => import('@/pages/admin/Collections'))
 const AdminInventory = lazy(() => import('@/pages/admin/Inventory'))
 const AdminInventoryLogs = lazy(() => import('@/pages/admin/InventoryLogs'))
+const AdminOrders = lazy(() => import('@/pages/admin/AdminOrders'))
+const AdminOrderDetail = lazy(() => import('@/pages/admin/AdminOrderDetail'))
+const AdminUsers = lazy(() => import('@/pages/admin/AdminUsers'))
+const AdminUserDetail = lazy(() => import('@/pages/admin/AdminUserDetail'))
+const AdminDiscounts = lazy(() => import('@/pages/admin/AdminDiscounts'))
+const DiscountForm = lazy(() =>
+  import('@/pages/admin/AdminDiscounts').then((m) => ({ default: m.DiscountForm })),
+)
+const AdminCities = lazy(() => import('@/pages/admin/AdminCities'))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -88,6 +100,9 @@ const router = createBrowserRouter([
             element: <RequireAuth />,
             children: [
               { path: '/me', element: withSuspense(<AccountPage />) },
+              { path: '/me/orders', element: withSuspense(<MyOrdersPage />) },
+              { path: '/me/orders/:orderId', element: withSuspense(<MyOrderDetailPage />) },
+              { path: '/me/addresses', element: withSuspense(<MyAddressesPage />) },
               { path: '/checkout/complete', element: withSuspense(<CheckoutCompletePage />) },
               { path: '/checkout/:orderId', element: withSuspense(<CheckoutPage />) },
             ],
@@ -113,6 +128,13 @@ const router = createBrowserRouter([
               { path: 'collections', element: withSuspense(<AdminCollections />) },
               { path: 'inventory', element: withSuspense(<AdminInventory />) },
               { path: 'inventory/logs', element: withSuspense(<AdminInventoryLogs />) },
+              { path: 'orders', element: withSuspense(<AdminOrders />) },
+              { path: 'orders/:orderIdOrNumber', element: withSuspense(<AdminOrderDetail />) },
+              { path: 'users', element: withSuspense(<AdminUsers />) },
+              { path: 'users/:userId', element: withSuspense(<AdminUserDetail />) },
+              { path: 'discounts', element: withSuspense(<AdminDiscounts />) },
+              { path: 'discounts/new', element: withSuspense(<DiscountForm />) },
+              { path: 'cities', element: withSuspense(<AdminCities />) },
             ],
           },
         ],

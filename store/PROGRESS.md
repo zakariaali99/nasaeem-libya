@@ -1360,3 +1360,78 @@ from a confirmed order awaiting payment — status alone cannot, because both ar
 The management command, run on the dev database, found and released **3 real
 abandoned drafts** left by Phase 5's browser verification — the leak, caught in
 the wild on day one.
+
+---
+
+## Phase 7 gate — 2026-08-22
+
+**All six criteria met.** 226 backend tests pass (222 → 226). Phase 6 was
+paused mid-build by the user ("skip payments and delivery"); its providers sit
+in commit `47780ad`, unwired, and are not counted here.
+
+- [x] **An operator fulfils an order end to end through the UI**
+
+      Driven in the browser on a real order (`202608MAN0004`, created through
+      the storefront flow minutes earlier): بدء المعالجة → tracking number
+      typed and saved → قبول الشحن → إكمال الطلب. Server state after:
+
+        tracking: VX-TEST-001 · shipping: accepted · status: completed
+
+      (One measurement note: `trackingShown` first read false because an
+      `<input>`'s value never appears in `innerText` — the API confirmed the
+      value had saved.)
+
+- [x] **Order status transitions are enforced server-side**
+
+      A transition map in `orders/views.py` answers 409 to any path the
+      business forbids — `pending→completed`, anything out of a terminal
+      state — whatever the client sends; the UI merely mirrors it by only
+      offering legal buttons. Four new tests pin allowed, illegal-jump,
+      terminal, and reservation-release paths.
+
+      Cancelling/refunding also returns stock now: unpaid orders get their
+      reservation back; paid orders return units to `stock` (they left the
+      shelf at payment confirmation).
+
+- [x] **A customer sees only their own orders** — carried verified from
+      Phase 5 (404 by UUID *and* by number for another customer); unchanged.
+
+- [x] **Every admin list has working sort, filter, pagination and an empty
+      state** — Orders/Customers/Discounts/Cities all render real data through
+      `<DataTable>` with server search + status filters + URL-held page state;
+      each was loaded in the browser with zero horizontal overflow.
+
+- [x] **Dashboard tiles link to the filtered lists that resolve them** —
+      pending/processing/completed tiles deep-link `/admin/orders?status=…`,
+      customers → `/admin/users`, low-stock → `/admin/inventory`.
+
+- [x] **Charts render RTL-correctly** — the 14-day revenue chart is pure CSS
+      bars in an LTR-scoped container: no charting library, nothing to mirror,
+      dates in tooltips, day 1 at the reading start.
+
+### Built in Phase 7
+
+- Backend: transition map + stock-return on cancel/refund · `/api/me/`
+  profile PATCH · `/api/me/addresses/` CRUD with single-default handling ·
+  admin users list (search+pagination) · discount create · cities/regions fee
+  management · dashboard stats + series endpoint.
+- Frontend: `/me/orders`, `/me/orders/:orderId`, `/me/addresses`;
+  real Dashboard; `/admin/orders` + order-detail fulfilment screen;
+  `/admin/users(/:id)`; discounts list/create; `/admin/cities`.
+
+### Two defects found by driving it
+
+1. **Paginated envelopes lost their `meta` in the new hooks** — `.data` on an
+   `{data, meta}` payload strips the meta beside it. The catalog hooks already
+   handled this; orders/users hooks now follow the same pattern.
+2. **Hand-minted admin sessions silently anonymous** — Django 5 verifies
+   `_auth_user_hash`; a session without the password-hash HMAC loads fine but
+   authenticates nobody. Minting must include `user.get_session_auth_hash()`.
+   Recorded here because the next person to inject a session will hit it.
+
+### Carried forward
+
+- Phase 6 remainder (payments/delivery wiring, screens 36–44) — paused by user.
+- Phase 8 widget builder is next per `09-phases.md`.
+
+    pytest → 226 passed · gates.sh → 12 passed 0 failed · tsc clean · vitest 17

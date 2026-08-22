@@ -1,78 +1,78 @@
-import { Boxes, FolderTree, Package, Tags } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
-import { PageHeader } from '@/components/layout/AdminLayout'
+import { useDashboardStats } from '@/lib/queries/orders'
+import { formatPrice } from '@/lib/format'
 import { Skeleton } from '@/components/ui/skeleton'
-import { formatNumber } from '@/lib/format'
-import { useCategories, useCollections, useProducts } from '@/lib/queries/catalog'
-import { usePageTitle } from '@/lib/usePageTitle'
 
-/** Phase 3 stand-in. The actionable dashboard — orders awaiting fulfilment,
- * payments awaiting verification, revenue trend — is Phase 7. */
-export default function AdminDashboardPage() {
-  usePageTitle('لوحة التحكم')
-  const products = useProducts({ limit: 1 })
-  const lowStock = useProducts({ limit: 1, in_stock: false })
-  const categories = useCategories()
-  const collections = useCollections()
+const TILES = [
+  { key: 'pending_orders', label: 'طلبات بانتظار التأكيد', to: '/admin/orders?status=pending', tone: 'text-warning' },
+  { key: 'processing_orders', label: 'قيد المعالجة', to: '/admin/orders?status=processing', tone: 'text-info' },
+  { key: 'completed_orders', label: 'طلبات مكتملة', to: '/admin/orders?status=completed', tone: 'text-success' },
+  { key: 'today_orders', label: 'طلبات اليوم', to: '/admin/orders', tone: '' },
+] as const
 
-  const tiles = [
-    {
-      label: 'المنتجات',
-      value: products.data?.meta?.total,
-      to: '/admin/products',
-      icon: Package,
-      loading: products.isLoading,
-    },
-    {
-      label: 'التصنيفات',
-      value: categories.data?.length,
-      to: '/admin/categories',
-      icon: FolderTree,
-      loading: categories.isLoading,
-    },
-    {
-      label: 'المجموعات',
-      value: collections.data?.length,
-      to: '/admin/collections',
-      icon: Tags,
-      loading: collections.isLoading,
-    },
-    {
-      label: 'المخزون',
-      value: lowStock.data?.meta?.total,
-      to: '/admin/inventory',
-      icon: Boxes,
-      loading: lowStock.isLoading,
-    },
-  ]
+export default function Dashboard() {
+  const { data, isPending } = useDashboardStats()
+
+  if (isPending || !data) {
+    return (
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-28" />)}
+      </div>
+    )
+  }
+
+  const maxRevenue = Math.max(...data.series.map((d) => Number(d.revenue)), 1)
 
   return (
-    <>
-      <PageHeader title="لوحة التحكم" description="نظرة سريعة على المتجر." />
-      <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {tiles.map(({ label, value, to, icon: Icon, loading }) => (
-          <li key={label}>
-            {/* Every tile links to the list that resolves it. */}
-            <Link
-              to={to}
-              className="flex min-h-28 flex-col justify-between rounded-lg border border-border bg-card p-5 transition-colors hover:border-primary"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">{label}</span>
-                <Icon className="size-5 text-muted-foreground" aria-hidden="true" />
-              </div>
-              {loading ? (
-                <Skeleton className="h-8 w-16" />
-              ) : (
-                <span className="text-3xl font-bold text-foreground">
-                  {value === undefined ? '—' : formatNumber(value)}
-                </span>
-              )}
-            </Link>
-          </li>
+    <div className="space-y-8">
+      <h1 className="text-2xl font-bold">لوحة التحكم</h1>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {TILES.map((tile) => (
+          <Link
+            key={tile.key}
+            to={tile.to}
+            className="rounded-lg border border-border bg-card p-4 transition-colors hover:border-primary"
+          >
+            <p className="text-sm text-muted-foreground">{tile.label}</p>
+            <p className={`mt-2 text-3xl font-bold ${tile.tone}`}>{data[tile.key]}</p>
+          </Link>
         ))}
-      </ul>
-    </>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="text-sm text-muted-foreground">إيرادات الشهر</p>
+          <p className="mt-2 text-2xl font-bold">{formatPrice(data.month_revenue)}</p>
+        </div>
+        <Link to="/admin/users" className="rounded-lg border border-border bg-card p-4 transition-colors hover:border-primary">
+          <p className="text-sm text-muted-foreground">العملاء</p>
+          <p className="mt-2 text-3xl font-bold">{data.customers}</p>
+        </Link>
+        <Link to="/admin/inventory" className="rounded-lg border border-border bg-card p-4 transition-colors hover:border-primary">
+          <p className="text-sm text-muted-foreground">مخزون منخفض</p>
+          <p className="mt-2 text-3xl font-bold text-warning">{data.low_stock}</p>
+        </Link>
+      </div>
+
+      <section className="rounded-lg border border-border bg-card p-4">
+        <h2 className="mb-4 font-semibold">إيرادات آخر ١٤ يوماً</h2>
+        {/* Pure CSS bars — RTL-correct by construction: the first day starts at
+            the inline start, and no charting library mirrors axes for us. */}
+        <div dir="ltr" className="flex h-40 items-end gap-1.5">
+          {[...data.series].reverse().map((day) => {
+            const height = Math.max((Number(day.revenue) / maxRevenue) * 100, Number(day.revenue) > 0 ? 4 : 1)
+            return (
+              <div key={day.date} className="group relative flex-1" title={`${day.date}: ${formatPrice(day.revenue)}`}>
+                <div
+                  className="w-full rounded-t bg-primary transition-opacity group-hover:opacity-80"
+                  style={{ height: `${height}%`, position: 'absolute', bottom: 0 }}
+                />
+                <div style={{ height: '100%' }} />
+              </div>
+            )
+          })}
+        </div>
+        <p className="mt-3 text-xs text-muted-foreground">الإجمالي التراكمي: {formatPrice(data.revenue_total)}</p>
+      </section>
+    </div>
   )
 }

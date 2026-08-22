@@ -1435,3 +1435,73 @@ in commit `47780ad`, unwired, and are not counted here.
 - Phase 8 widget builder is next per `09-phases.md`.
 
     pytest → 226 passed · gates.sh → 12 passed 0 failed · tsc clean · vitest 17
+
+---
+
+## Phase 8 gate — 2026-08-22
+
+**All five criteria met, driven in the browser.** 230 backend tests pass
+(226 → 230). The builder lives at `/admin/customization` and
+`/admin/customization/:layoutId`.
+
+- [x] **An operator builds a homepage from scratch through the UI and it renders**
+
+      Created «تخطيط رمضان — من الصفر» through the UI: three widgets added from
+      the palette (شريط إعلان with a real message + link · بانر رئيسي titled ·
+      مسافة فارغة), saved, activated — and the public `/` rendered it:
+
+        GET /api/storefront/layout/ → layout «تخطيط رمضان — من الصفر»,
+        widgets [announcement_bar, hero_cta, spacer]
+        homepage shows "شحن مجاني لجميع الطلبات فوق 200 د.ل"
+
+- [x] **Drag-and-drop reorder works with a mouse and with a keyboard**
+
+      One `reorder()` code path serves both, so the two inputs cannot disagree.
+      Driven live: keyboard (focus row → Ctrl+↑ twice) moved the last widget to
+      first; HTML5 drag moved row 0 to row 2. ▲/▼ buttons give the same power
+      without any modifier key.
+
+- [x] **Live preview matches the rendered storefront** — the preview imports
+      the SAME `WidgetRenderer` registry the storefront uses; there is no
+      second rendering implementation to drift. Server-populated types show
+      their contents on the real homepage after save (stated in the UI).
+
+- [x] **Scheduling and targeting rules take effect**
+
+      Set an end date in the past via the builder's جدولة العرض panel:
+
+        public API immediately → التخطيط الافتراضي (14 widgets)   ← fell back
+        cleared the date, saved            → تخطيط رمضان — من الصفر ← restored
+
+- [x] **Layout cache invalidates on save — visible immediately** — every save
+      in this session was followed by an un-stale public read within the same
+      second; the post_save/post_delete invalidation from Phase 4 held.
+
+### Built in Phase 8
+
+- Backend: `apps/storefront/admin_api.py` — layout list/create/detail/PATCH/
+  delete. PATCH takes scheduling fields plus the ENTIRE ordered widget list
+  (replace-all; partial diffs are where reorder bugs hide). Every written
+  widget passes `normalise_widget_data`, so editor field names are the
+  canonical names the storefront renders.
+- Frontend: layouts list + builder (palette of all 14 types, per-type editors
+  aligned to the normaliser, icon/height pickers from the server's allowed
+  sets, scheduling panel: date window, weekday checkboxes, hour range).
+- 4 new API tests: role enforcement, replace-all without orphans,
+  normalisation-on-write, scheduling validation.
+
+### Two defects found while driving it
+
+1. **The builder initially spoke non-canonical field names** (`text`, `ctaLink`)
+   and the server silently rewrote them into its canonical shape — saved data
+   didn't match what the editor showed. Fixed by deriving FIELD_SPECS from
+   `normalise_widget_data` itself; the editor now speaks exactly what saves.
+2. **The new test file collected zero tests in full runs** — named
+   `tests_builder.py`, which matches none of pytest.ini's `python_files`
+   patterns. Renamed `test_builder.py`; 226 → 230.
+
+    pytest → 230 passed · gates.sh → 12/12 · tsc clean
+
+### Remaining after Phase 8
+
+Phase 6 remainder (payments/delivery wiring + screens 36–44) and Phase 9.

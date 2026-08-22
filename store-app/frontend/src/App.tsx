@@ -60,6 +60,8 @@ const DiscountForm = lazy(() =>
   import('@/pages/admin/AdminDiscounts').then((m) => ({ default: m.DiscountForm })),
 )
 const AdminCities = lazy(() => import('@/pages/admin/AdminCities'))
+const AdminCustomization = lazy(() => import('@/pages/admin/AdminCustomization'))
+const WidgetBuilder = lazy(() => import('@/pages/admin/WidgetBuilder'))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -135,6 +137,8 @@ const router = createBrowserRouter([
               { path: 'discounts', element: withSuspense(<AdminDiscounts />) },
               { path: 'discounts/new', element: withSuspense(<DiscountForm />) },
               { path: 'cities', element: withSuspense(<AdminCities />) },
+              { path: 'customization', element: withSuspense(<AdminCustomization />) },
+              { path: 'customization/:layoutId', element: withSuspense(<WidgetBuilder />) },
             ],
           },
         ],

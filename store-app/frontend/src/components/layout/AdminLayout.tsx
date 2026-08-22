@@ -1,5 +1,5 @@
 import {
-  Boxes, ClipboardList, FolderTree, LayoutGrid, Menu, Package, Tags, X,
+  Blocks, Boxes, ClipboardList, FolderTree, LayoutGrid, Menu, Package, Tags, X,
 } from 'lucide-react'
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
@@ -14,6 +14,7 @@ const NAV = [
   { to: '/admin/collections', label: 'المجموعات', icon: Tags },
   { to: '/admin/inventory', label: 'المخزون', icon: Boxes },
   { to: '/admin/inventory/logs', label: 'سجل المخزون', icon: ClipboardList },
+  { to: '/admin/customization', label: 'تخصيص الصفحة', icon: Blocks },
 ]
 
 export function AdminLayout() {

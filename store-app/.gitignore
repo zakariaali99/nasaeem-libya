@@ -23,6 +23,7 @@ frontend/.vite/
 # Test artefacts
 playwright-report/
 test-results/
+frontend/e2e/.auth/
 
 # OS
 .DS_Store

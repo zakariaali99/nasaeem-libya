@@ -25,9 +25,10 @@ export function BottomNav() {
             <NavLink
               to={to}
               end={end}
+              viewTransition
               className={({ isActive }) =>
                 cn(
-                  'flex h-14 flex-col items-center justify-center gap-0.5 text-xs focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
+                  'flex h-14 flex-col items-center justify-center gap-0.5 text-xs transition-colors duration-[var(--duration-fast)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
                   isActive ? 'text-primary' : 'text-muted-foreground',
                 )
               }

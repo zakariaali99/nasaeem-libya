@@ -33,7 +33,24 @@ export function HeroCta({ widget, priority = false }: { widget: Widget; priority
           />
           <div className="absolute inset-0 bg-foreground/50" aria-hidden="true" />
         </>
-      ) : null}
+      ) : (
+        <>
+          {/* No photo? Depth comes from token-lit light blooms instead of a
+              flat fill — the hero reads as staged, not as an empty box. */}
+          <div
+            aria-hidden="true"
+            className="absolute -start-24 -top-24 size-80 rounded-full bg-primary/30 blur-3xl"
+          />
+          <div
+            aria-hidden="true"
+            className="absolute -bottom-28 -end-16 size-72 rounded-full bg-primary/15 blur-3xl"
+          />
+          <div
+            aria-hidden="true"
+            className="absolute inset-x-0 top-0 h-px bg-gradient-to-l from-transparent via-background/25 to-transparent"
+          />
+        </>
+      )}
 
       <div
         className={cn(
@@ -42,7 +59,9 @@ export function HeroCta({ widget, priority = false }: { widget: Widget; priority
           hasImage && 'text-background',
         )}
       >
-        {title ? <h2 className="text-3xl font-bold leading-tight sm:text-4xl">{title}</h2> : null}
+        {title ? (
+          <h2 className="text-3xl font-bold leading-tight tracking-wide sm:text-4xl">{title}</h2>
+        ) : null}
         {subtitle ? <p className="max-w-2xl text-lg leading-relaxed">{subtitle}</p> : null}
         {buttonLabel ? (
           buttonUrl ? (

@@ -18,8 +18,15 @@ dist/
 # Generated media (recreate with: python manage.py seed_demo)
 store-app/backend/media/
 
+# Test artefacts & MCP logs
+.playwright-mcp/
+playwright-report/
+test-results/
+*.sqlite3
+
 # OS / editor noise
 .DS_Store
 .idea/
 .vscode/
 *.log
+

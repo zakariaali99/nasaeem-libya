@@ -95,6 +95,8 @@ function ProductView({
   const addToCart = useAddToCart()
   const max = product.track_quantity ? availableStock : undefined
 
+  useProductJsonLd(product, price, inStock)
+
   // Choosing a different variant changes what is in stock, so the quantity has
   // to come back inside the new ceiling rather than silently exceed it.
   useEffect(() => {
@@ -120,15 +122,23 @@ function ProductView({
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6">
       <nav aria-label="مسار التصفح" className="mb-4 text-sm text-muted-foreground">
-        <ol className="flex flex-wrap items-center gap-1">
+        <ol className="-my-2 flex flex-wrap items-center gap-1">
           <li>
-            <Link to="/" className="hover:text-foreground">
+            <Link
+              to="/"
+              viewTransition
+              className="inline-flex min-h-11 items-center rounded px-2 transition-colors hover:text-foreground"
+            >
               الرئيسية
             </Link>
           </li>
           <li aria-hidden="true">/</li>
           <li>
-            <Link to="/products" className="hover:text-foreground">
+            <Link
+              to="/products"
+              viewTransition
+              className="inline-flex min-h-11 items-center rounded px-2 transition-colors hover:text-foreground"
+            >
               المنتجات
             </Link>
           </li>
@@ -138,7 +148,8 @@ function ProductView({
               <li>
                 <Link
                   to={`/categories/${encodeURIComponent(product.categories[0].slug)}`}
-                  className="hover:text-foreground"
+                  viewTransition
+                  className="inline-flex min-h-11 items-center rounded px-2 transition-colors hover:text-foreground"
                 >
                   {product.categories[0].name}
                 </Link>
@@ -196,12 +207,15 @@ function ProductView({
           </div>
 
           {added ? (
-            <Alert tone="success" role="status">
-              تمت الإضافة إلى السلة.{' '}
-              <Link to="/cart" className="font-semibold underline">
-                عرض السلة
-              </Link>
-            </Alert>
+            // fade-rise: purposeful state-change feedback, not decoration.
+            <div className="animate-fade-rise">
+              <Alert tone="success" role="status">
+                تمت الإضافة إلى السلة.{' '}
+                <Link to="/cart" className="font-semibold underline">
+                  عرض السلة
+                </Link>
+              </Alert>
+            </div>
           ) : null}
           {addToCart.isError ? (
             <Alert tone="error" role="alert">
@@ -230,7 +244,6 @@ function ProductView({
       <Specs product={product} variant={variant} />
       <RelatedProducts product={product} />
 
-      <ProductJsonLd product={product} price={price} inStock={inStock} />
 
       {/* Sticky summary on mobile — the price stays reachable while scrolling
           the description. It sits above the bottom navigation. */}
@@ -273,7 +286,7 @@ function Specs({ product, variant }: { product: Product; variant: ProductVariant
   return (
     <section className="mt-10">
       <h2 className="mb-3 text-xl font-bold">المواصفات</h2>
-      <dl className="max-w-2xl divide-y divide-border rounded-lg border border-border">
+      <dl className="max-w-2xl divide-y divide-border overflow-hidden rounded-lg border border-border bg-card shadow-xs">
         {rows.map(([label, value]) => (
           <div key={label} className="flex gap-4 px-4 py-3 text-sm">
             <dt className="w-32 shrink-0 text-muted-foreground">{label}</dt>
@@ -328,48 +341,59 @@ function RelatedProducts({ product }: { product: Product }) {
  * `Product` structured data. The prices come from the same values rendered
  * above, so the rich result cannot disagree with the page.
  */
-function ProductJsonLd({
-  product,
-  price,
-  inStock,
-}: {
-  product: Product
-  price: string | null
-  inStock: boolean
-}) {
-  const payload = {
-    '@context': 'https://schema.org',
-    '@type': 'Product',
-    name: product.name,
-    description: product.description || undefined,
-    sku: product.sku || undefined,
-    // Absolute: a crawler resolving `/media/...` against schema.org's own
-    // context, or against a syndicated copy of the page, gets nothing.
-    image: (product.images ?? []).map((image) =>
-      new URL(image.renditions?.full || image.url, window.location.origin).toString(),
-    ),
-    brand: product.categories?.[0]
-      ? { '@type': 'Brand', name: product.categories[0].name }
-      : undefined,
-    offers: {
-      '@type': 'Offer',
-      priceCurrency: 'LYD',
-      price: price ?? undefined,
-      availability: inStock
-        ? 'https://schema.org/InStock'
-        : 'https://schema.org/OutOfStock',
-      url: window.location.href,
-    },
-  }
+/**
+ * Keeps a single JSON-LD `Product` block in `<head>`, current for the product
+ * on screen.
+ *
+ * The server shell (`apps.storefront.spa`) injects a `[data-seo]` JSON-LD node
+ * so crawlers and `curl` see the product without running JS. This effect REUSES
+ * that same node — overwriting its contents — so a full page load has exactly
+ * one block, and an SPA navigation to another product replaces the previous
+ * (server-injected, now stale) data rather than leaving it or adding a second.
+ * On leaving the product page the node is removed.
+ */
+function useProductJsonLd(product: Product, price: string | null, inStock: boolean) {
+  useEffect(() => {
+    const payload = {
+      '@context': 'https://schema.org',
+      '@type': 'Product',
+      name: product.name,
+      description: product.description || undefined,
+      sku: product.sku || undefined,
+      // Absolute: a crawler resolving `/media/...` against schema.org's own
+      // context, or against a syndicated copy of the page, gets nothing.
+      image: (product.images ?? []).map((image) =>
+        new URL(image.renditions?.full || image.url, window.location.origin).toString(),
+      ),
+      brand: product.categories?.[0]
+        ? { '@type': 'Brand', name: product.categories[0].name }
+        : undefined,
+      offers: {
+        '@type': 'Offer',
+        priceCurrency: 'LYD',
+        price: price ?? undefined,
+        availability: inStock
+          ? 'https://schema.org/InStock'
+          : 'https://schema.org/OutOfStock',
+        url: window.location.href,
+      },
+    }
 
-  return (
-    <script
-      type="application/ld+json"
-      // Serialised data, not markup: JSON.stringify escapes the payload and the
-      // script type is never executed as JavaScript.
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(payload) }}
-    />
-  )
+    let node = document.head.querySelector<HTMLScriptElement>(
+      'script[type="application/ld+json"][data-seo]',
+    )
+    if (!node) {
+      node = document.createElement('script')
+      node.type = 'application/ld+json'
+      node.setAttribute('data-seo', '')
+      document.head.appendChild(node)
+    }
+    node.textContent = JSON.stringify(payload)
+
+    // Remove on unmount so a server-injected block never lingers, stale, onto a
+    // non-product page reached by SPA navigation.
+    return () => node?.remove()
+  }, [product, price, inStock])
 }
 
 function ProductDetailSkeleton() {

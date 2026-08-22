@@ -16,7 +16,7 @@ export interface ProductCardProps {
 
 export function ProductCard({ product, priority = false, sizes }: ProductCardProps) {
   return (
-    <article className="group flex h-full flex-col overflow-hidden rounded-lg border border-border bg-card">
+    <article className="card-hover group flex h-full flex-col overflow-hidden rounded-lg border border-border bg-card shadow-xs">
       {/*
         One anchor per card, covering the image and the title together.
         Two separate links to the same product — the shape the reference used —
@@ -25,20 +25,25 @@ export function ProductCard({ product, priority = false, sizes }: ProductCardPro
       */}
       <Link
         to={`/products/${encodeURIComponent(product.slug)}`}
+        viewTransition
         className="relative block focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
       >
-        <ProductImage
-          image={product.images?.[0]}
-          alt={product.images?.[0]?.alt_text || product.name}
-          priority={priority}
-          sizes={sizes}
-          className="transition-opacity duration-200 ease-out group-hover:opacity-90"
-        />
+        {/* The zoom lives on a dedicated clipping wrapper so the scaled image
+         * never bleeds into the title row below it. */}
+        <div className="overflow-hidden">
+          <ProductImage
+            image={product.images?.[0]}
+            alt={product.images?.[0]?.alt_text || product.name}
+            priority={priority}
+            sizes={sizes}
+            className="transition-transform duration-[var(--duration-slow)] ease-out group-hover:scale-[1.04]"
+          />
+        </div>
         {/* `start-2` and not `left-2`: the badge mirrors with the document. */}
         <span className="absolute start-2 top-2">
           <DiscountBadge price={product.price} compareAtPrice={product.compare_at_price} />
         </span>
-        <h3 className="line-clamp-2 px-3 pt-3 text-base font-medium leading-snug group-hover:text-primary">
+        <h3 className="line-clamp-2 px-3 pt-3 text-base font-medium leading-snug transition-colors duration-[var(--duration-fast)] group-hover:text-primary">
           {product.name}
         </h3>
       </Link>

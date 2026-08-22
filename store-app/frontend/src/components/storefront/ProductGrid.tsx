@@ -31,7 +31,10 @@ export function ProductGrid({ products, layout = 'grid', className }: ProductGri
   }
 
   return (
-    <ul className={cn(GRID, className)}>
+    // `stagger`: CSS-only entrance choreography — each card rises in 40 ms
+    // after the previous one. Replays per page/filter change, which is the
+    // feedback that makes pagination feel responsive.
+    <ul className={cn(GRID, 'stagger', className)}>
       {products.map((product, index) => (
         <li key={product.id} className="h-full">
           <ProductCard product={product} priority={index === 0} />

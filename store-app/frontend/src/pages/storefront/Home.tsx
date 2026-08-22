@@ -53,10 +53,14 @@ export default function HomePage() {
     <>
       {/* One h1 per page. The widgets carry h2 headings beneath it. */}
       <h1 className="sr-only">نسائم ليبيا — عطور وأطقم هدايا</h1>
-      {widgets.map((widget, index) => (
-        // The first widget holds the LCP image, so it is never lazy-loaded.
-        <WidgetRenderer key={widget.id} widget={widget} priority={index === 0} />
-      ))}
+      {/* `stagger`: each widget rises in as the page composes. The shells own
+       * their width, so the wrapper stays style-free. */}
+      <div className="stagger">
+        {widgets.map((widget, index) => (
+          // The first widget holds the LCP image, so it is never lazy-loaded.
+          <WidgetRenderer key={widget.id} widget={widget} priority={index === 0} />
+        ))}
+      </div>
     </>
   )
 }

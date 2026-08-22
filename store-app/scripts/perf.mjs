@@ -22,9 +22,12 @@ const BASE = process.env.PERF_BASE_URL || 'http://localhost:5184'
 const ROUTES = process.argv.slice(2)
 const RUNS = Number(process.env.PERF_RUNS || 3)
 
-// From `05-frontend-spec.md`.
+// From `05-frontend-spec.md` and the Phase 9 gate (`09-phases.md`): mobile
+// Lighthouse ≥ 90 Performance / ≥ 95 Accessibility / 100 SEO.
 const BUDGETS = {
   performance: 90, // Lighthouse score, mobile
+  accessibility: 95,
+  seo: 100,
   lcp: 2500, // ms
   cls: 0.05,
 }
@@ -36,12 +39,14 @@ const LIGHTHOUSE = 'node_modules/.bin/lighthouse'
 function runOnce(url) {
   const command =
     `${LIGHTHOUSE} "${url}" --quiet --output=json --output-path=stdout ` +
-    `--only-categories=performance --preset=perf ` +
+    `--only-categories=performance,accessibility,seo --preset=perf ` +
     `--chrome-flags="--headless=new --no-sandbox"`
   const raw = execSync(command, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
   const report = JSON.parse(raw)
   return {
     performance: Math.round(report.categories.performance.score * 100),
+    accessibility: Math.round(report.categories.accessibility.score * 100),
+    seo: Math.round(report.categories.seo.score * 100),
     lcp: report.audits['largest-contentful-paint'].numericValue,
     cls: report.audits['cumulative-layout-shift'].numericValue,
     tbt: report.audits['total-blocking-time'].numericValue,
@@ -75,12 +80,16 @@ for (const route of routes) {
   }
 
   const performance = median(results.map((r) => r.performance))
+  const accessibility = median(results.map((r) => r.accessibility))
+  const seo = median(results.map((r) => r.seo))
   const lcp = median(results.map((r) => r.lcp))
   const cls = median(results.map((r) => r.cls))
   const tbt = median(results.map((r) => r.tbt))
 
   const checks = [
     ['performance', performance, BUDGETS.performance, performance >= BUDGETS.performance, '≥'],
+    ['accessibility', accessibility, BUDGETS.accessibility, accessibility >= BUDGETS.accessibility, '≥'],
+    ['seo', seo, BUDGETS.seo, seo >= BUDGETS.seo, '≥'],
     ['LCP (ms)', Math.round(lcp), BUDGETS.lcp, lcp <= BUDGETS.lcp, '≤'],
     ['CLS', Number(cls.toFixed(3)), BUDGETS.cls, cls <= BUDGETS.cls, '≤'],
   ]

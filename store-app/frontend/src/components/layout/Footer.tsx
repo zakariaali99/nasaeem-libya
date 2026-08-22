@@ -14,7 +14,7 @@ export function Footer() {
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <img src="/brand/logo.svg" alt="" width={32} height={32} className="size-8" />
-            <span className="text-lg font-bold">نسائم ليبيا</span>
+            <span className="font-display text-lg font-bold tracking-wide">نسائم ليبيا</span>
           </div>
           <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
             نسائم ليبيا لاستيراد العطور — مصراتة. بيع بالجملة والتجزئة، وتوصيل إلى جميع
@@ -29,9 +29,10 @@ export function Footer() {
               <li key={link.to}>
                 <Link
                   to={link.to}
+                  viewTransition
                   // min-w-11: a two-word Arabic link is only ~32 px wide, and
                   // the 44 px floor is a floor in both dimensions.
-                  className="inline-flex h-11 min-w-11 items-center text-sm text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                  className="inline-flex h-11 min-w-11 items-center text-sm text-muted-foreground transition-colors duration-[var(--duration-fast)] hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 >
                   {link.label}
                 </Link>

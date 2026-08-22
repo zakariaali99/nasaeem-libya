@@ -11,13 +11,28 @@ import { cn } from '@/lib/utils'
 
 export function Header() {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [elevated, setElevated] = useState(false)
   const { data: user } = useMe()
   const { data: categories } = useCategories()
   const { data: cart } = useCart()
   const cartCount = cart?.item_count ?? 0
 
+  /* Scroll-aware elevation: the bar lifts off the page once content moves
+   * under it. One passive listener; the state flip is a no-op past the mark. */
+  useEffect(() => {
+    const onScroll = () => setElevated(window.scrollY > 8)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
+    <header
+      className={cn(
+        'sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur-md transition-shadow duration-[var(--duration-base)] ease-out',
+        elevated ? 'shadow-sm' : 'shadow-none',
+      )}
+    >
       <div className="mx-auto flex w-full max-w-6xl items-center gap-2 px-4 py-2">
         <button
           type="button"
@@ -31,10 +46,11 @@ export function Header() {
 
         <Link
           to="/"
+          viewTransition
           className="flex h-11 shrink-0 items-center gap-2 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         >
           <img src="/brand/logo.svg" alt="" width={36} height={36} className="size-9" />
-          <span className="text-lg font-bold">نسائم ليبيا</span>
+          <span className="font-display text-lg font-bold tracking-wide">نسائم ليبيا</span>
         </Link>
 
         <div className="hidden min-w-0 flex-1 lg:block">
@@ -57,9 +73,11 @@ export function Header() {
             <ShoppingBag className="size-6" aria-hidden="true" />
             {cartCount > 0 ? (
               // `end-1` and not `right-1`: the badge mirrors with the document.
+              // Keyed by count so every change replays the arrival animation.
               <span
+                key={cartCount}
                 aria-hidden="true"
-                className="absolute end-1 top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1 text-xs font-bold text-primary-foreground tabular-nums"
+                className="animate-badge-pop absolute end-1 top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1 text-xs font-bold text-primary-foreground tabular-nums"
               >
                 {formatNumber(cartCount)}
               </span>
@@ -68,26 +86,31 @@ export function Header() {
         </nav>
       </div>
 
-      {/* Categories: a horizontal rail on desktop, a disclosure on mobile. */}
-      <nav
-        className={cn(
-          'mx-auto w-full max-w-6xl px-4 pb-2',
-          menuOpen ? 'block' : 'hidden lg:block',
-        )}
-        aria-label="التصنيفات"
-      >
-        <ul className="flex gap-1 overflow-x-auto max-lg:flex-col">
-          <li>
-            <CategoryLink to="/products">كل المنتجات</CategoryLink>
-          </li>
-          {(categories ?? []).map((category) => (
-            <li key={category.id}>
-              <CategoryLink to={`/categories/${encodeURIComponent(category.slug)}`}>
-                {category.name}
-              </CategoryLink>
-            </li>
-          ))}
-        </ul>
+      {/* Categories: a horizontal rail on desktop, an animated disclosure on
+       * mobile. The grid-rows animation lives in CSS — no measurement, no
+       * layout jitter, and it collapses to "always open" from lg up. */}
+      <nav className="mx-auto w-full max-w-6xl px-2" aria-label="التصنيفات">
+        <div className="disclosure-grid" data-open={menuOpen}>
+          <div>
+            <ul className="flex gap-1 overflow-x-auto pb-2 max-lg:flex-col">
+              <li>
+                <CategoryLink to="/products" onClick={() => setMenuOpen(false)}>
+                  كل المنتجات
+                </CategoryLink>
+              </li>
+              {(categories ?? []).map((category) => (
+                <li key={category.id}>
+                  <CategoryLink
+                    to={`/categories/${encodeURIComponent(category.slug)}`}
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    {category.name}
+                  </CategoryLink>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
       </nav>
     </header>
   )
@@ -107,10 +130,11 @@ function IconLink({
   return (
     <Link
       to={to}
+      viewTransition
       aria-label={label}
       title={label}
       className={cn(
-        'inline-flex size-11 items-center justify-center rounded-md text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+        'inline-flex size-11 items-center justify-center rounded-md text-foreground transition-colors duration-[var(--duration-fast)] hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
         className,
       )}
     >
@@ -119,11 +143,21 @@ function IconLink({
   )
 }
 
-function CategoryLink({ to, children }: { to: string; children: React.ReactNode }) {
+function CategoryLink({
+  to,
+  children,
+  onClick,
+}: {
+  to: string
+  children: React.ReactNode
+  onClick?: () => void
+}) {
   return (
     <Link
       to={to}
-      className="inline-flex h-11 shrink-0 items-center whitespace-nowrap rounded-md px-3 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      viewTransition
+      onClick={onClick}
+      className="inline-flex h-11 shrink-0 items-center whitespace-nowrap rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors duration-[var(--duration-fast)] hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
     >
       {children}
     </Link>
@@ -169,7 +203,7 @@ export function SearchBox({ autoFocus = false }: { autoFocus?: boolean }) {
       <button
         type="submit"
         aria-label="ابحث"
-        className="absolute start-0 inline-flex size-11 items-center justify-center rounded-full text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        className="absolute start-0 inline-flex size-11 items-center justify-center rounded-full text-muted-foreground transition-colors duration-[var(--duration-fast)] hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       >
         <Search className="size-5" aria-hidden="true" />
       </button>

@@ -52,7 +52,8 @@ export function AnnouncementBar({ widget }: { widget: Widget }) {
         {linkLabel && linkUrl ? (
           <Link
             to={linkUrl}
-            className="inline-flex h-11 items-center px-3 text-sm font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            viewTransition
+            className="inline-flex h-11 items-center px-3 text-sm font-semibold text-primary underline-offset-4 transition-colors hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           >
             {linkLabel}
           </Link>

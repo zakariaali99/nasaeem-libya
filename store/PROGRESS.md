@@ -1505,3 +1505,123 @@ in commit `47780ad`, unwired, and are not counted here.
 ### Remaining after Phase 8
 
 Phase 6 remainder (payments/delivery wiring + screens 36–44) and Phase 9.
+
+---
+
+## Phase 9 — partial — 2026-08-22
+
+Quality, accessibility, SEO and deployment. The SEO/prerender leg, the
+accessibility/route/keyboard harness and the deployment configuration are done
+and verified; the performance-budget leg and the live-server deploy are not, and
+the **44-routes gate is blocked by the paused Phase 6** (payments & delivery).
+Recorded honestly rather than checked off.
+
+### Decision — the one open architectural choice (SEO)
+
+`01-architecture.md` and `IMPLEMENTATION.md` left the SEO approach open: a Django
+template endpoint emitting meta + JSON-LD, **or** a build-time prerender. Chosen:
+**the Django template endpoint** (`apps/storefront/spa.py`). It needs no second
+toolchain, stays correct as prices change, and keeps "no Node in production"
+trivially true. nginx now serves real files off disk and falls every HTML
+navigation through to gunicorn, which returns the built `index.html` with
+per-product `<title>`, `<meta>`, Open Graph and JSON-LD injected before
+`</head>`. `/robots.txt` and `/sitemap.xml` are Django routes.
+
+### Gate status
+
+- [x] **`curl` of a product URL returns the name and price in the HTML source**
+
+      DEBUG=True … runserver :8031  (serving the BUILT dist/index.html)
+      curl -s /products/estiara-stag-white
+      → <title>Estiara Stag White | نسائم ليبيا</title>
+        <meta property="product:price:amount" content="115.00">
+        one <script type="application/ld+json"> Product block
+      Arabic-slug product proven too (name «زمايا إتقان جولد» present in source;
+      canonical/og/JSON-LD URLs percent-encoded to valid ASCII).
+
+- [x] **Valid JSON-LD** — Product + Offer, absolute image URLs, availability
+      from real stock, `</script>` in a name escaped to `<`. 15 backend
+      tests in `apps/storefront/test_spa.py`. Client `useProductJsonLd` reuses
+      the server's `[data-seo]` node so a hydrated page carries exactly ONE
+      block, kept current across SPA navigation (e2e `seo.spec.ts`).
+
+- [x] **Contrast ≥ 4.5 body / 3 UI, both themes** — `check-contrast.mjs` → all
+      token pairs pass (min 3.01 input-on-background, UI tier).
+
+- [x] **Every interactive element ≥ 44×44** — Playwright `touch-targets.spec.ts`
+      sweeps the public storefront. One real defect found and fixed: the product
+      breadcrumb links were 26 px tall; now `min-h-11 inline-flex` tap targets.
+      sr-only affordances (the skip link, 1×1 until focused) are exempt.
+
+- [x] **No raw colours / no physical-direction classes / `dir="rtl"` once** —
+      `gates.sh` → 12/12 (the breadcrumb fix uses `px-2`/`-my-2`, logical).
+
+- [x] **Forcing `dir="ltr"` breaks no layout** — `ltr-forced.spec.ts` flips
+      `dir` to ltr on six routes; heading visible, zero horizontal overflow.
+
+- [x] **No horizontal overflow** — `no-overflow.spec.ts`, 10 public routes.
+
+- [x] **Keyboard-only pass register → browse → cart → checkout** —
+      `keyboard-journey.spec.ts` registers a fresh customer by keyboard, opens a
+      product, adds to cart and reaches `/checkout/<uuid>` — no mouse click.
+
+- [~] **All 44 routes render with real data** — enumerated in
+      `frontend/e2e/routes.ts` and driven in `all-routes.spec.ts`: **31 built
+      routes pass** (public + customer + owner), two customer order routes skip
+      when the test customer has no order (covered by the keyboard journey).
+      **13 routes are `test.fixme` — the paused Phase 6 screens** (7, 18, 22, 34,
+      36–44: gateway return, API docs, new-variant matrix, discount edit, courier
+      + payment-method config). This gate cannot pass until Phase 6 resumes.
+
+- [~] **Lighthouse mobile ≥ 90 Perf / ≥ 95 A11y / 100 SEO** — `perf.mjs`
+      extended to score all three categories. Measured (1 run, `vite preview`,
+      loaded host) on `/`, `/products`, `/products/<slug>`, `/cart`:
+
+        Performance   75–84   (budget ≥ 90)   — FAIL, real work remaining
+        Accessibility 93–100  (budget ≥ 95)   — /products 93, others 100
+        SEO           92       (budget = 100)  — the robots-txt audit only,
+                                                 an artifact of `vite preview`
+                                                 not serving Django's /robots.txt;
+                                                 production serves it → 100
+        LCP           3.4–4.5 s (budget ≤ 2.5) — FAIL
+        CLS           0.238 on /, else ≤ 0.06  — homepage layout shift, real
+
+      Performance/LCP/CLS optimisation is genuine remaining Phase 9 work and is
+      environment-sensitive; it must be measured against the real nginx origin.
+
+- [x] **Deployed with nginx + gunicorn + systemd, no Node, no container** —
+      configuration complete and updated: `deploy/nginx.conf` proxies HTML to the
+      SEO shell, `gunicorn.service` unchanged, README documents `SITE_URL` and
+      the Phase 9 gate commands. The live-server deploy + `ps aux | grep -c node`
+      == 0 is a manual infra step on the target host.
+
+- [x] **Full pytest green** — 245 passed (230 → 245: +15 shell tests).
+      Full Playwright suite — 57 passed, 15 skipped (13 Phase-6 fixme + 2 no-data).
+
+### Built in Phase 9
+
+- Backend: `apps/storefront/spa.py` (SEO shell + robots + sitemap), wired as the
+  catch-all in `config/urls.py`; `SITE_URL`/`CURRENCY` settings; 15 tests.
+- Frontend: `useProductJsonLd` head-manager (dedupes with the server node);
+  breadcrumb tap-target fix; Playwright harness (config, global-setup with
+  keyboard-usable auth, `routes.ts`, and specs all-routes/touch-targets/
+  no-overflow/ltr-forced/seo/keyboard-journey); vitest excludes `e2e/`.
+- Tooling: `perf.mjs` now scores accessibility + SEO, not performance alone.
+- Deploy: nginx SEO-shell routing; `.env.example` + README updates.
+
+### Two defects found while driving it
+
+1. **Product breadcrumb links were 26 px tall** — below the 44 px touch-target
+   floor. The touch-target sweep caught it; fixed with `min-h-11`.
+2. **JSON-LD would have doubled and gone stale** — my server injection plus the
+   pre-existing body-rendered `<ProductJsonLd>` meant two blocks on load, and the
+   head one going stale on SPA navigation to another product. Reworked into an
+   effect that owns a single `[data-seo]` head node.
+
+### Remaining after Phase 9 (partial)
+
+- Performance budget: Perf ≥ 90 / LCP ≤ 2.5 s / homepage CLS ≤ 0.05 — real
+  optimisation work, measured against the production origin.
+- Live deployment to the server and the `ps aux | grep -c node` == 0 proof.
+- The 44-routes gate and Lighthouse SEO=100 both land once **Phase 6**
+  (payments & delivery, screens 36–44) resumes and is deployed.

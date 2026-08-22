@@ -206,6 +206,26 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = Path(config("MEDIA_ROOT", default=str(BASE_DIR / "media")))
 
+# --------------------------------------------------------------------------
+# SEO shell
+#
+# Rule 1 forbids a Node runtime, so crawlers cannot be handed a JS-rendered
+# page. Django instead serves the built SPA `index.html` and injects per-route
+# <title>, <meta>, Open Graph and JSON-LD before </head> — see apps.storefront.spa.
+#
+# SITE_URL is the canonical origin used in absolute URLs (og:url, canonical,
+# image src, sitemap). SPA_INDEX_CANDIDATES is searched in order; the built
+# dist file wins in production, the source shell is the dev fallback.
+# --------------------------------------------------------------------------
+SITE_URL = config("SITE_URL", default="https://nasaeem.ly").rstrip("/")
+CURRENCY = config("CURRENCY", default="LYD")
+
+_FRONTEND_DIR = BASE_DIR.parent / "frontend"
+SPA_INDEX_CANDIDATES = [
+    _FRONTEND_DIR / "dist" / "index.html",
+    _FRONTEND_DIR / "index.html",
+]
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LOGGING = {

@@ -32,11 +32,36 @@
   unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
 }
 
+/*
+ * Reem Kufi, self-hosted — the display voice. Geometric kufi gives headings
+ * and the logo an authored identity while Cairo keeps carrying body text.
+ * Same rules as Cairo: copied into public/fonts/ by scripts/sync-fonts.sh,
+ * unicode-range split so Arabic glyphs never fall back to a system face.
+ */
+@font-face {
+  font-family: "Reem Kufi";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/fonts/reem-kufi-arabic.woff2") format("woff2-variations");
+  unicode-range: U+0600-06FF,U+0750-077F,U+0870-088E,U+0890-0891,U+0897-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC;
+}
+
+@font-face {
+  font-family: "Reem Kufi";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/fonts/reem-kufi-latin.woff2") format("woff2-variations");
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme static {
   /* type */
   --font-sans: "Cairo", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Reem Kufi", "Cairo", ui-sans-serif, system-ui, sans-serif;
 
   /* type scale — 12 / 14 / 16 / 18 / 20 / 24 / 30 / 36 / 48. Nothing else. */
   --text-xs: 0.75rem;
@@ -59,39 +84,43 @@
    * The live green fails AA for white text (3.30:1). Hue and chroma are kept
    * exactly; lightness drops 0.63 -> 0.545, which clears 4.5:1 at 4.51 and is
    * visually the same green. Secondary is the logo's dark sage.
+   *
+   * Modern-minimal evolution: the neutral ramp carries a whisper of the same
+   * sage hue instead of lab greys, so surfaces feel warm without ever reading
+   * as "colored". Primary stays untouched — it is the anchor.
    */
   --color-primary: oklch(0.545 0.155 129);
   --color-primary-foreground: oklch(0.99 0 0);
   --color-secondary: oklch(0.40 0.012 140);
   --color-secondary-foreground: oklch(0.99 0 0);
 
-  /* surfaces */
-  --color-background: oklch(1 0 0);
-  --color-foreground: oklch(0.15 0 0);
+  /* surfaces — sage-tinted near-neutrals */
+  --color-background: oklch(0.985 0.005 120);
+  --color-foreground: oklch(0.16 0.012 145);
   --color-card: oklch(1 0 0);
-  --color-card-foreground: oklch(0.15 0 0);
+  --color-card-foreground: oklch(0.16 0.012 145);
   --color-popover: oklch(1 0 0);
-  --color-popover-foreground: oklch(0.15 0 0);
-  --color-muted: oklch(0.97 0 0);
-  --color-muted-foreground: oklch(0.45 0 0);
-  --color-accent: oklch(0.97 0 0);
-  --color-accent-foreground: oklch(0.15 0 0);
+  --color-popover-foreground: oklch(0.16 0.012 145);
+  --color-muted: oklch(0.96 0.008 120);
+  --color-muted-foreground: oklch(0.44 0.015 145);
+  --color-accent: oklch(0.955 0.012 122);
+  --color-accent-foreground: oklch(0.30 0.03 145);
   /*
    * `border` is decorative (card edges, dividers) and is deliberately below
    * 3:1 — WCAG 1.4.11 governs boundaries that are the ONLY way to identify a
    * control. `input` IS that boundary for form fields, so it is held to 3:1 and
    * checked by scripts/check-contrast.mjs. Do not use `border` on an input.
    */
-  --color-border: oklch(0.92 0 0);
-  --color-input: oklch(0.66 0.01 240);
+  --color-border: oklch(0.91 0.012 120);
+  --color-input: oklch(0.64 0.02 145);
   --color-ring: oklch(0.545 0.155 129);
 
   /* commerce semantics — required, and absent from stock shadcn */
-  --color-price: oklch(0.15 0 0);
+  --color-price: oklch(0.16 0.012 145);
   --color-price-sale: oklch(0.55 0.19 25);
   --color-discount: oklch(0.55 0.19 25);
   --color-in-stock: oklch(0.60 0.15 150);
-  --color-low-stock: oklch(0.67 0.15 70);
+  --color-low-stock: oklch(0.65 0.155 70);
   --color-out-of-stock: oklch(0.55 0.02 0);
   --color-success: oklch(0.60 0.15 150);
   --color-warning: oklch(0.66 0.15 80);
@@ -107,30 +136,73 @@
   --radius-xl: 1rem;
   --radius-2xl: 1.5rem;
 
+  /*
+   * elevation — soft, large-blur, low-opacity; the tint follows the shadow of
+   * warm daylight rather than dead grey. Dark mode redefines these below.
+   */
+  --shadow-xs: 0 1px 2px 0 oklch(0.25 0.03 145 / 0.05);
+  --shadow-sm: 0 1px 3px 0 oklch(0.25 0.03 145 / 0.06), 0 1px 2px -1px oklch(0.25 0.03 145 / 0.04);
+  --shadow-md: 0 4px 12px -2px oklch(0.25 0.03 145 / 0.08), 0 2px 6px -2px oklch(0.25 0.03 145 / 0.05);
+  --shadow-lg: 0 16px 32px -8px oklch(0.25 0.03 145 / 0.12), 0 6px 14px -6px oklch(0.25 0.03 145 / 0.07);
+
   /* motion — 150 / 200 / 300ms, ease-out entering, ease-in leaving */
   --duration-fast: 150ms;
   --duration-base: 200ms;
   --duration-slow: 300ms;
+
+  /* easings — the comment above finally has values to point at */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.64, 0, 0.78, 0);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* entrance choreography */
+  --animate-fade-rise: fade-rise var(--duration-slow) var(--ease-out) both;
+}
+
+/* keyframes for the animate tokens above (v4 emits them alongside utilities) */
+@keyframes fade-rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes badge-pop {
+  0% { transform: scale(0.4); }
+  55% { transform: scale(1.28); }
+  100% { transform: scale(1); }
+}
+
+@keyframes shimmer-sweep {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
 }
 
 /*
  * Dark mode is WIRED, not decorative: a theme provider sets `.dark` on <html>.
  * Only the tokens are redefined here. The reference shipped 246 `dark:` classes
  * with no provider at all — every one of them unreachable.
+ *
+ * Neutrals move from blue-grey to the same sage family as light mode, one
+ * coherent material in both themes.
  */
 .dark {
-  --color-background: oklch(0.15 0.01 240);
-  --color-foreground: oklch(0.97 0 0);
-  --color-card: oklch(0.19 0.01 240);
-  --color-card-foreground: oklch(0.97 0 0);
-  --color-popover: oklch(0.19 0.01 240);
-  --color-popover-foreground: oklch(0.97 0 0);
-  --color-muted: oklch(0.26 0.01 240);
-  --color-muted-foreground: oklch(0.72 0 0);
-  --color-accent: oklch(0.26 0.01 240);
-  --color-accent-foreground: oklch(0.97 0 0);
-  --color-border: oklch(0.30 0.01 240);
-  --color-input: oklch(0.48 0.01 240);
+  --color-background: oklch(0.155 0.010 155);
+  --color-foreground: oklch(0.965 0.004 120);
+  --color-card: oklch(0.195 0.012 155);
+  --color-card-foreground: oklch(0.965 0.004 120);
+  --color-popover: oklch(0.195 0.012 155);
+  --color-popover-foreground: oklch(0.965 0.004 120);
+  --color-muted: oklch(0.26 0.012 155);
+  --color-muted-foreground: oklch(0.72 0.010 150);
+  --color-accent: oklch(0.26 0.016 150);
+  --color-accent-foreground: oklch(0.90 0.03 130);
+  --color-border: oklch(0.295 0.012 155);
+  --color-input: oklch(0.50 0.012 155);
   --color-ring: oklch(0.72 0.130 129);
 
   --color-primary: oklch(0.78 0.155 129);
@@ -138,11 +210,11 @@
   --color-secondary: oklch(0.86 0.055 124);
   --color-secondary-foreground: oklch(0.22 0.02 140);
 
-  --color-price: oklch(0.97 0 0);
+  --color-price: oklch(0.965 0.004 120);
   --color-price-sale: oklch(0.72 0.17 25);
   --color-discount: oklch(0.72 0.17 25);
   --color-in-stock: oklch(0.75 0.16 150);
-  --color-low-stock: oklch(0.80 0.14 70);
+  --color-low-stock: oklch(0.82 0.14 70);
   --color-out-of-stock: oklch(0.65 0.02 0);
   --color-success: oklch(0.75 0.16 150);
   --color-warning: oklch(0.82 0.14 80);
@@ -150,6 +222,12 @@
   --color-destructive: oklch(0.70 0.19 27);
   --color-destructive-foreground: oklch(0.15 0.02 27);
   --color-rating: oklch(0.84 0.16 85);
+
+  /* darkness needs deeper, denser shadows to read as elevation */
+  --shadow-xs: 0 1px 2px 0 oklch(0 0 0 / 0.30);
+  --shadow-sm: 0 1px 3px 0 oklch(0 0 0 / 0.35), 0 1px 2px -1px oklch(0 0 0 / 0.28);
+  --shadow-md: 0 4px 12px -2px oklch(0 0 0 / 0.42), 0 2px 6px -2px oklch(0 0 0 / 0.32);
+  --shadow-lg: 0 16px 32px -8px oklch(0 0 0 / 0.50), 0 6px 14px -6px oklch(0 0 0 / 0.38);
 }
 
 @layer base {
@@ -170,20 +248,136 @@
     font-synthesis-weight: none;
   }
 
+  /*
+   * The display voice: kufi for headings, Cairo for everything that wants
+   * reading comfort. Applied once here so no component has to remember.
+   */
+  h1, h2, h3 {
+    font-family: var(--font-display);
+    letter-spacing: 0;
+  }
+
   /* Visible focus on everything. Never outline:none without a replacement. */
   :focus-visible {
     outline: 2px solid var(--color-ring);
     outline-offset: 2px;
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
-      animation-duration: 0.01ms !important;
-      animation-iteration-count: 1 !important;
-      transition-duration: 0.01ms !important;
-      scroll-behavior: auto !important;
+  /*
+   * View Transitions API — cross-document-quality page morphs at zero JS cost,
+   * driven by react-router's viewTransition. Direction-neutral vertical drift
+   * (RTL-safe by construction). Browsers without support simply skip it.
+   */
+  ::view-transition-old(root) {
+    animation: vt-out var(--duration-fast) var(--ease-in) both;
+  }
+
+  ::view-transition-new(root) {
+    animation: vt-in var(--duration-slow) var(--ease-out) both;
+  }
+}
+
+@keyframes vt-out {
+  to { opacity: 0; }
+}
+
+@keyframes vt-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-2));
+  }
+}
+
+@layer components {
+  /* Staggered entrance for lists/grids: give the container .stagger. */
+  .stagger > * {
+    animation: fade-rise var(--duration-slow) var(--ease-out) both;
+  }
+
+  .stagger > *:nth-child(1) { animation-delay: 0ms; }
+  .stagger > *:nth-child(2) { animation-delay: 40ms; }
+  .stagger > *:nth-child(3) { animation-delay: 80ms; }
+  .stagger > *:nth-child(4) { animation-delay: 120ms; }
+  .stagger > *:nth-child(5) { animation-delay: 160ms; }
+  .stagger > *:nth-child(6) { animation-delay: 200ms; }
+  .stagger > *:nth-child(7) { animation-delay: 240ms; }
+  .stagger > *:nth-child(8) { animation-delay: 280ms; }
+  .stagger > *:nth-child(n + 9) { animation-delay: 320ms; }
+
+  /* Card lift — hover/focus elevation for interactive cards. */
+  .card-hover {
+    transition-property: transform, box-shadow, border-color;
+    transition-duration: var(--duration-base);
+    transition-timing-function: var(--ease-out);
+  }
+
+  .card-hover:hover,
+  .card-hover:focus-within {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+
+  /* Shimmer loading surface — replaces bare opacity pulsing. */
+  .skeleton-shimmer {
+    background-image: linear-gradient(
+      100deg,
+      transparent 30%,
+      var(--color-background) 50%,
+      transparent 70%
+    );
+    background-size: 200% 100%;
+    animation: shimmer-sweep 1.6s linear infinite;
+  }
+
+  /* Cart-count arrival. Remount the badge with key={count} to replay it. */
+  .animate-badge-pop {
+    animation: badge-pop var(--duration-base) var(--ease-spring) both;
+  }
+
+  /* Height-animated disclosure (grid-rows trick — no JS measurement). */
+  .disclosure-grid {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows var(--duration-base) var(--ease-out);
+  }
+
+  .disclosure-grid[data-open="true"] {
+    grid-template-rows: 1fr;
+  }
+
+  .disclosure-grid > * {
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  /* From lg up the rail is permanent — never collapsed, never animated. */
+  @media (min-width: 64rem) {
+    .disclosure-grid,
+    .disclosure-grid[data-open="false"] {
+      grid-template-rows: 1fr;
     }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  ::view-transition-old(root),
+  ::view-transition-new(root),
+  ::view-transition-old(root) {
+    animation: none !important;
+  }
+
+  .card-hover:hover,
+  .card-hover:focus-within {
+    transform: none;
   }
 }

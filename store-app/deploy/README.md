@@ -52,14 +52,42 @@ cd ../frontend && npm ci && npm run build
 sudo systemctl restart nasaim && sudo systemctl reload nginx
 ```
 
+## The SEO shell — why nginx proxies HTML to Django
+
+Rule 1 forbids a Node runtime, so a crawler cannot be handed a JS-rendered page.
+Instead nginx serves real files off disk (the hashed assets, fonts, media) and
+falls through **every HTML navigation** to Django, which returns the built
+`index.html` with per-product `<title>`, `<meta>`, Open Graph and JSON-LD
+injected before `</head>` (`apps/storefront/spa.py`). `curl` of a product URL
+therefore contains the name and price with no JavaScript run. `/robots.txt` and
+`/sitemap.xml` are Django routes too. `SITE_URL` in `.env` is the canonical
+origin stamped into those absolute URLs.
+
 ## Post-deploy verification — each of these can fail
 
 ```bash
-curl -fsS https://nasaeem.ly/api/health/ | grep -q '"status":"ok"'   # 503 if PG or Redis is down
-ps aux | grep -c '[n]ode'                                            # must print 0
-test ! -f /srv/nasaim/Dockerfile                                     # Rule 2
-curl -fsS https://nasaeem.ly/products/<slug> | grep -q '<title>'      # SPA fallback + SEO
+curl -fsS https://nasaeem.ly/api/health/ | grep -q '"status":"ok"'    # 503 if PG or Redis is down
+ps aux | grep -c '[n]ode'                                             # must print 0
+test ! -f /srv/nasaim/Dockerfile                                      # Rule 2
+curl -fsS https://nasaeem.ly/products/<slug> | grep -q '<slug-name>'   # product name in HTML source (SEO shell)
+curl -fsS https://nasaeem.ly/products/<slug> | grep -q 'application/ld+json'  # JSON-LD present
+curl -fsS https://nasaeem.ly/robots.txt | grep -q 'Sitemap:'          # valid robots.txt (Lighthouse SEO)
 ```
+
+## Phase 9 quality gate — run against the deployed host
+
+```bash
+bash store-app/scripts/gates.sh                       # static: colours, direction, types, Django checks
+node store-app/scripts/check-contrast.mjs             # WCAG AA contrast, both themes
+cd store-app/frontend && npm run e2e                  # 44-route render, touch targets, no-overflow, forced-LTR, keyboard journey, JSON-LD
+PERF_BASE_URL=https://nasaeem.ly node store-app/scripts/perf.mjs / /products /products/<slug> /cart
+```
+
+`perf.mjs` needs Lighthouse (`npm i --no-save lighthouse`) and a Chrome binary;
+it is a measuring tool, never part of the running system. Measure Performance/
+LCP/CLS against the **production** origin — `vite preview` cannot serve the
+Django `/robots.txt`, so a preview run reports SEO 92 (the robots-txt audit)
+where production reports 100.
 
 ## Local development ports
 

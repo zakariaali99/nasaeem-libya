@@ -63,6 +63,9 @@ export default defineConfig(({ mode }) => {
       environment: 'jsdom',
       globals: true,
       setupFiles: ['./src/test-setup.ts'],
+      // Playwright specs under e2e/ use their own runner; vitest must not try to
+      // collect them (their `test` is Playwright's, not vitest's).
+      exclude: ['e2e/**', 'node_modules/**', 'dist/**'],
     },
   }
 })

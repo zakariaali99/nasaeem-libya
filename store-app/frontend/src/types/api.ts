@@ -232,6 +232,8 @@ export interface WidgetData {
   buttonUrl?: string
   alignment?: 'start' | 'center' | 'end'
   backgroundImageUrl?: string
+  desktopImageUrl?: string
+  mobileImageUrl?: string
   // announcement_bar
   message?: string
   linkLabel?: string

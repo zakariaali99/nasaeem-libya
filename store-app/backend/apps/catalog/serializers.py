@@ -20,6 +20,7 @@ from .models import (
     ProductVariant,
     VariantOption,
     VariantValue,
+    WishlistItem,
 )
 from .services import rendition_urls, unique_slug
 
@@ -272,3 +273,12 @@ class InventoryAdjustSerializer(serializers.Serializer):
         if value == 0:
             raise serializers.ValidationError("قيمة التعديل يجب ألا تساوي صفراً")
         return value
+
+
+class WishlistItemSerializer(serializers.ModelSerializer):
+    product = ProductListSerializer(read_only=True)
+
+    class Meta:
+        model = WishlistItem
+        fields = ["id", "product", "created_at"]
+

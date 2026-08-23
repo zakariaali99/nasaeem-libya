@@ -2,6 +2,7 @@ import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 
 import { ConfirmDialog } from '@/components/admin/ConfirmDialog'
+import { ImageUploadField } from '@/components/admin/ImageUploadField'
 import { PageHeader } from '@/components/layout/AdminLayout'
 import { Alert } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -119,17 +120,13 @@ export default function AdminCategoriesPage() {
                 />
               )}
             </Field>
-            <Field id="cat-image" label="رابط الصورة" hint="مثال: /brands/armaf.svg">
-              {(field) => (
-                <Input
-                  {...field}
-                  dir="ltr"
-                  className="text-start"
-                  value={form.image_url}
-                  onChange={(event) => setForm((f) => ({ ...f, image_url: event.target.value }))}
-                />
-              )}
-            </Field>
+            <ImageUploadField
+              label="شعار أو صورة التصنيف"
+              hint="اختر ملف الصورة من جهازك (PNG, SVG, JPG, WebP)"
+              value={form.image_url}
+              onChange={(url) => setForm((f) => ({ ...f, image_url: url }))}
+              aspectRatio="square"
+            />
           </div>
           <div className="mt-6 flex justify-end gap-3">
             <Button

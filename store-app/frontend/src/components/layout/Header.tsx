@@ -1,25 +1,35 @@
-import { Menu, Search, ShoppingBag, User } from 'lucide-react'
+import {
+  Heart,
+  LayoutDashboard,
+  Menu,
+  Search,
+  ShoppingBag,
+  User,
+} from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
-import { CategoriesDrawer } from '@/components/storefront/CategoriesDrawer'
 import { CartDrawer } from '@/components/storefront/CartDrawer'
+import { CategoriesDrawer } from '@/components/storefront/CategoriesDrawer'
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
-import { useCart } from '@/lib/queries/cart'
-import { useCategories } from '@/lib/queries/catalog'
-import { useMe } from '@/lib/queries/auth'
 import { formatNumber } from '@/lib/format'
+import { useMe } from '@/lib/queries/auth'
+import { useCart } from '@/lib/queries/cart'
+import { useWishlistIds } from '@/lib/queries/wishlist'
 import { cn } from '@/lib/utils'
+import { isAdminRole } from '@/types/api'
 
 export function Header() {
   const [elevated, setElevated] = useState(false)
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
   const { data: user } = useMe()
-  const { data: categories } = useCategories()
   const { data: cart } = useCart()
-  const cartCount = cart?.item_count ?? 0
+  const { data: wishlistIds } = useWishlistIds()
 
-  /* Scroll-aware elevation: the bar lifts off the page once content moves
-   * under it. One passive listener; the state flip is a no-op past the mark. */
+  const cartCount = cart?.item_count ?? 0
+  const wishlistCount = wishlistIds?.length ?? 0
+
+  /* Scroll-aware elevation */
   useEffect(() => {
     const onScroll = () => setElevated(window.scrollY > 8)
     onScroll()
@@ -30,92 +40,136 @@ export function Header() {
   return (
     <header
       className={cn(
-        'sticky top-0 z-40 border-b border-border bg-card/85 backdrop-blur-md transition-shadow duration-[var(--duration-base)] ease-out',
-        elevated ? 'shadow-sm' : 'shadow-none',
+        'sticky top-0 z-40 border-b border-border/80 bg-card/95 backdrop-blur-md transition-shadow duration-[var(--duration-base)] ease-out',
+        elevated ? 'shadow-md shadow-primary/5' : 'shadow-none',
       )}
     >
-      <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-2.5">
-        <CategoriesDrawer>
-          <button
-            type="button"
-            className="inline-flex size-11 shrink-0 items-center justify-center rounded-full text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-            aria-label="فتح قائمة التصنيفات"
-          >
-            <Menu className="size-6" aria-hidden="true" />
-          </button>
-        </CategoriesDrawer>
-
-        <Link
-          to="/"
-          viewTransition
-          className="flex h-11 shrink-0 items-center gap-2.5 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-        >
-          <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 border border-primary/20">
-            <img src="/brand/logo.svg" alt="" width={24} height={24} className="size-6" />
-          </div>
-          <span className="font-display text-lg font-bold tracking-wide text-foreground">نسائم ليبيا</span>
-        </Link>
-
-        <div className="hidden min-w-0 flex-1 max-w-md mx-auto lg:block">
-          <SearchBox />
-        </div>
-
-        <nav className="ms-auto flex items-center gap-1.5" aria-label="حسابي وسلتي">
-          <ThemeToggle />
-          <IconLink to="/search" label="البحث" className="lg:hidden">
-            <Search className="size-5" aria-hidden="true" />
-          </IconLink>
-          <IconLink to={user ? '/me' : '/login'} label={user ? 'حسابي' : 'تسجيل الدخول'}>
-            <User className="size-5" aria-hidden="true" />
-          </IconLink>
-          <CartDrawer>
+      {/* Main Top Header Bar */}
+      <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-2.5 sm:py-3">
+        {/* Mobile Search Overlay */}
+        {mobileSearchOpen ? (
+          <div className="flex w-full items-center gap-2 lg:hidden animate-fade-rise">
+            <div className="flex-1">
+              <SearchBox autoFocus onSubmitted={() => setMobileSearchOpen(false)} />
+            </div>
             <button
               type="button"
-              aria-label={cartCount > 0 ? `سلة التسوّق — ${cartCount} عنصر` : 'سلة التسوّق'}
-              className="relative inline-flex size-11 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              onClick={() => setMobileSearchOpen(false)}
+              className="px-3 py-2 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors"
             >
-              <ShoppingBag className="size-5" aria-hidden="true" />
-              {cartCount > 0 ? (
-                <span
-                  key={cartCount}
-                  aria-hidden="true"
-                  className="animate-badge-pop absolute end-1.5 top-1.5 inline-flex min-w-4 h-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground tabular-nums"
-                >
-                  {formatNumber(cartCount)}
-                </span>
-              ) : null}
+              إلغاء
             </button>
-          </CartDrawer>
-        </nav>
-      </div>
-
-      {/* Quick category pills rail */}
-      <nav className="mx-auto w-full max-w-6xl px-4 pb-2 border-t border-border/40 pt-1.5 hidden md:block" aria-label="التصنيفات السريعة">
-        <ul className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-          <li>
-            <CategoryLink to="/products">
-              كل المنتجات
-            </CategoryLink>
-          </li>
-          {(categories ?? []).slice(0, 7).map((category) => (
-            <li key={category.id}>
-              <CategoryLink to={`/categories/${encodeURIComponent(category.slug)}`}>
-                {category.name}
-              </CategoryLink>
-            </li>
-          ))}
-          <li>
+          </div>
+        ) : (
+          <>
             <CategoriesDrawer>
               <button
                 type="button"
-                className="inline-flex h-8 items-center rounded-full px-3 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
+                className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl text-foreground hover:bg-muted/70 focus-visible:outline-2 focus-visible:outline-ring transition-colors"
+                aria-label="فتح قائمة التصنيفات"
               >
-                + المزيد من الأقسام
+                <Menu className="size-5" aria-hidden="true" />
               </button>
             </CategoriesDrawer>
-          </li>
-        </ul>
-      </nav>
+
+            {/* Brand Logo & Name */}
+            <Link
+              to="/"
+              viewTransition
+              className="flex h-10 shrink-0 items-center gap-2.5 rounded-xl focus-visible:outline-2 focus-visible:outline-ring group"
+            >
+              <div className="flex size-9 items-center justify-center rounded-xl bg-primary/10 border border-primary/20 shadow-2xs group-hover:border-primary/50 transition-all">
+                <img src="/brand/logo.svg" alt="" width={24} height={24} className="size-6 transition-transform group-hover:scale-105" />
+              </div>
+              <div className="flex flex-col">
+                <span className="font-display text-lg sm:text-xl font-extrabold tracking-wide text-foreground leading-none">
+                  نسائم ليبيا
+                </span>
+                <span className="text-[10px] text-muted-foreground font-semibold tracking-wider">
+                  عطور فاخرة وأصلية
+                </span>
+              </div>
+            </Link>
+
+            {/* Desktop Center Search Bar */}
+            <div className="hidden min-w-0 flex-1 max-w-md mx-auto lg:block">
+              <SearchBox />
+            </div>
+
+            {/* Right Action Icons */}
+            <nav className="ms-auto flex items-center gap-1 sm:gap-1.5" aria-label="حسابي وسلتي">
+              {/* Admin quick switch if logged in as staff */}
+              {isAdminRole(user?.role) && (
+                <Link
+                  to="/admin"
+                  className="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/20 transition-all shadow-2xs"
+                  title="الانتقال للوحة التحكم"
+                >
+                  <LayoutDashboard className="size-3.5" />
+                  <span>لوحة الإدارة</span>
+                </Link>
+              )}
+
+              <ThemeToggle />
+
+              {/* Mobile Search Button */}
+              <button
+                type="button"
+                onClick={() => setMobileSearchOpen(true)}
+                className="inline-flex size-10 items-center justify-center rounded-xl text-foreground hover:bg-muted/70 lg:hidden transition-colors"
+                aria-label="البحث"
+              >
+                <Search className="size-5" aria-hidden="true" />
+              </button>
+
+              {/* Wishlist Link */}
+              <Link
+                to="/wishlist"
+                viewTransition
+                aria-label={wishlistCount > 0 ? `المفضلة — ${wishlistCount} عنصر` : 'قائمة المفضلة'}
+                title="قائمة المفضلة"
+                className="relative inline-flex size-10 items-center justify-center rounded-xl text-foreground transition-colors hover:bg-muted/70 focus-visible:outline-2 focus-visible:outline-ring"
+              >
+                <Heart className="size-5 text-muted-foreground hover:text-rose-500 transition-colors" aria-hidden="true" />
+                {wishlistCount > 0 && (
+                  <span
+                    key={wishlistCount}
+                    aria-hidden="true"
+                    className="animate-badge-pop absolute end-1 top-1 inline-flex min-w-4 h-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white font-mono"
+                  >
+                    {formatNumber(wishlistCount)}
+                  </span>
+                )}
+              </Link>
+
+              {/* Account Link */}
+              <IconLink to={user ? '/me' : '/login'} label={user ? 'حسابي' : 'تسجيل الدخول'}>
+                <User className="size-5" aria-hidden="true" />
+              </IconLink>
+
+              {/* Cart Drawer Trigger */}
+              <CartDrawer>
+                <button
+                  type="button"
+                  aria-label={cartCount > 0 ? `سلة التسوّق — ${cartCount} عنصر` : 'سلة التسوّق'}
+                  className="relative inline-flex size-10 items-center justify-center rounded-xl text-foreground transition-colors hover:bg-muted/70 focus-visible:outline-2 focus-visible:outline-ring"
+                >
+                  <ShoppingBag className="size-5 text-foreground" aria-hidden="true" />
+                  {cartCount > 0 ? (
+                    <span
+                      key={cartCount}
+                      aria-hidden="true"
+                      className="animate-badge-pop absolute end-1 top-1 inline-flex min-w-4 h-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground font-mono shadow-xs"
+                    >
+                      {formatNumber(cartCount)}
+                    </span>
+                  ) : null}
+                </button>
+              </CartDrawer>
+            </nav>
+          </>
+        )}
+      </div>
     </header>
   )
 }
@@ -138,7 +192,7 @@ function IconLink({
       aria-label={label}
       title={label}
       className={cn(
-        'inline-flex size-11 items-center justify-center rounded-md text-foreground transition-colors duration-[var(--duration-fast)] hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+        'inline-flex size-10 items-center justify-center rounded-xl text-foreground transition-colors hover:bg-muted/70 focus-visible:outline-2 focus-visible:outline-ring',
         className,
       )}
     >
@@ -147,30 +201,13 @@ function IconLink({
   )
 }
 
-function CategoryLink({
-  to,
-  children,
-  onClick,
+export function SearchBox({
+  autoFocus = false,
+  onSubmitted,
 }: {
-  to: string
-  children: React.ReactNode
-  onClick?: () => void
+  autoFocus?: boolean
+  onSubmitted?: () => void
 }) {
-  return (
-    <Link
-      to={to}
-      viewTransition
-      onClick={onClick}
-      className="inline-flex h-11 shrink-0 items-center whitespace-nowrap rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors duration-[var(--duration-fast)] hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-    >
-      {children}
-    </Link>
-  )
-}
-
-/** The header search box. Submitting navigates to `/search?q=` — the results
- * page owns the query, so a search is shareable and survives a refresh. */
-export function SearchBox({ autoFocus = false }: { autoFocus?: boolean }) {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const [term, setTerm] = useState(params.get('q') ?? '')
@@ -187,11 +224,14 @@ export function SearchBox({ autoFocus = false }: { autoFocus?: boolean }) {
       onSubmit={(event) => {
         event.preventDefault()
         const value = term.trim()
-        if (value) navigate(`/search?q=${encodeURIComponent(value)}`)
+        if (value) {
+          navigate(`/search?q=${encodeURIComponent(value)}`)
+          onSubmitted?.()
+        }
       }}
     >
       <label htmlFor="site-search" className="sr-only">
-        ابحث عن منتج
+        ابحث عن عطر أو ماركة
       </label>
       <input
         id="site-search"
@@ -201,15 +241,15 @@ export function SearchBox({ autoFocus = false }: { autoFocus?: boolean }) {
         value={term}
         autoFocus={autoFocus}
         onChange={(event) => setTerm(event.target.value)}
-        placeholder="ابحث عن عطر أو علامة تجارية…"
-        className="h-11 w-full rounded-full border border-input bg-background pe-4 ps-11 text-base text-foreground placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        placeholder="ابحث عن عطر، زيت عطري، أو ماركة فاخرة…"
+        className="h-10 w-full rounded-full border border-input bg-card pe-4 ps-10 text-xs sm:text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring shadow-2xs transition-all focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
       />
       <button
         type="submit"
         aria-label="ابحث"
-        className="absolute start-0 inline-flex size-11 items-center justify-center rounded-full text-muted-foreground transition-colors duration-[var(--duration-fast)] hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        className="absolute start-0 inline-flex size-10 items-center justify-center rounded-full text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
       >
-        <Search className="size-5" aria-hidden="true" />
+        <Search className="size-4 text-primary" aria-hidden="true" />
       </button>
     </form>
   )

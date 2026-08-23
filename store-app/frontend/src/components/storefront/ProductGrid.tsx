@@ -9,8 +9,8 @@ export interface ProductGridProps {
   className?: string
 }
 
-/** 2 columns on mobile, 4 on desktop — `06-routes-and-pages.md`. */
-const GRID = 'grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4'
+/** 2 columns on mobile, 3 on tablet, 4 on desktop, 5 on wide screens, 6 on ultra-wide */
+const GRID = 'grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'
 
 export function ProductGrid({ products, layout = 'grid', className }: ProductGridProps) {
   if (layout === 'slider') {

@@ -165,15 +165,21 @@ def normalise_widget_data(widget_type: str, data: dict | None) -> dict:
 
     if widget_type == WidgetType.HERO_CTA:
         alignment = data.get("alignment")
+        desktop_img = _first(
+            data, "desktopImageUrl", "desktop_image_url", "backgroundImageUrl", "background_image_url", "imageUrl"
+        )
+        mobile_img = _first(
+            data, "mobileImageUrl", "mobile_image_url"
+        )
         return {
             "title": data.get("title", "") or "",
             "subtitle": data.get("subtitle", "") or "",
             "buttonLabel": _first(data, "buttonLabel", "button_label"),
             "buttonUrl": _first(data, "buttonUrl", "button_url"),
             "alignment": alignment if alignment in ("start", "center", "end") else "center",
-            "backgroundImageUrl": _first(
-                data, "backgroundImageUrl", "background_image_url", "imageUrl"
-            ),
+            "desktopImageUrl": desktop_img,
+            "mobileImageUrl": mobile_img,
+            "backgroundImageUrl": desktop_img,
         }
 
     if widget_type == WidgetType.ANNOUNCEMENT_BAR:

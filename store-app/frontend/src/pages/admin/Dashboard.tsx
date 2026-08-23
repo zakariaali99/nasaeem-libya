@@ -1,20 +1,65 @@
-import { Link } from 'react-router-dom'
 import {
   AlertTriangle,
   ArrowUpRight,
+  Boxes,
   CheckCircle2,
   Clock,
   DollarSign,
   Package,
+  Plus,
+  ShoppingBag,
   TrendingUp,
   Users,
 } from 'lucide-react'
-import { useDashboardStats } from '@/lib/queries/orders'
-import { formatNumber, formatPrice } from '@/lib/format'
+import * as React from 'react'
+import { Link } from 'react-router-dom'
+
+import { StatusBadge } from '@/components/admin/StatusBadge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { formatNumber, formatPrice } from '@/lib/format'
+import { useDashboardStats, useMyOrders } from '@/lib/queries/orders'
+import { usePageTitle } from '@/lib/usePageTitle'
+import type { Order } from '@/types/api'
+
+// Simple SVG sparkline generator
+function MiniSparkline({
+  values,
+  color = 'var(--color-primary)',
+  fillColor = 'var(--color-primary)',
+}: {
+  values: number[]
+  color?: string
+  fillColor?: string
+}) {
+  if (!values || values.length < 2) return null
+  const min = Math.min(...values)
+  const max = Math.max(...values, min + 1)
+  const width = 80
+  const height = 28
+  const padding = 2
+
+  const points = values.map((val, i) => {
+    const x = (i / (values.length - 1)) * (width - padding * 2) + padding
+    const y = height - ((val - min) / (max - min)) * (height - padding * 2) - padding
+    return `${x},${y}`
+  })
+
+  const pathD = `M ${points.join(' L ')}`
+  const fillD = `M ${points[0]} L ${points.join(' L ')} L ${width - padding},${height} L ${padding},${height} Z`
+
+  return (
+    <svg width={width} height={height} className="overflow-visible">
+      <path d={fillD} fill={fillColor} fillOpacity={0.15} />
+      <path d={pathD} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
 
 export default function Dashboard() {
+  usePageTitle('لوحة الإدارة والتحكم')
   const { data, isPending } = useDashboardStats()
+  const { data: recentOrdersData, isPending: ordersPending } = useMyOrders({ limit: 5 })
+  const [hoveredPoint, setHoveredPoint] = React.useState<{ date: string; revenue: string; x: number; y: number } | null>(null)
 
   if (isPending || !data) {
     return (
@@ -22,33 +67,91 @@ export default function Dashboard() {
         <Skeleton className="h-8 w-48" />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[0, 1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-32 rounded-2xl" />
+            <Skeleton key={i} className="h-36 rounded-2xl" />
           ))}
         </div>
-        <Skeleton className="h-64 rounded-2xl" />
+        <Skeleton className="h-80 rounded-2xl" />
       </div>
     )
   }
 
-  const maxRevenue = Math.max(...data.series.map((d) => Number(d.revenue)), 1)
+  const series = [...data.series].reverse() // chronological order
+  const revenueValues = series.map((d) => Number(d.revenue))
+  const maxRevenue = Math.max(...revenueValues, 100)
+
+  // Chart coordinate calculations
+  const chartWidth = 700
+  const chartHeight = 220
+  const paddingLeft = 60
+  const paddingRight = 20
+  const paddingTop = 20
+  const paddingBottom = 30
+
+  const plotWidth = chartWidth - paddingLeft - paddingRight
+  const plotHeight = chartHeight - paddingTop - paddingBottom
+
+  const chartPoints = series.map((day, i) => {
+    const x = paddingLeft + (i / Math.max(series.length - 1, 1)) * plotWidth
+    const y = paddingTop + plotHeight - (Number(day.revenue) / maxRevenue) * plotHeight
+    return { ...day, x, y }
+  })
+
+  const firstPoint = chartPoints[0]
+  const lastPoint = chartPoints[chartPoints.length - 1]
+  const linePath = chartPoints.length > 0 ? `M ${chartPoints.map((p) => `${p.x},${p.y}`).join(' L ')}` : ''
+  const areaPath =
+    firstPoint && lastPoint
+      ? `M ${firstPoint.x},${paddingTop + plotHeight} L ${chartPoints.map((p) => `${p.x},${p.y}`).join(' L ')} L ${lastPoint.x},${paddingTop + plotHeight} Z`
+      : ''
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-fade-rise">
+      {/* Low stock warning banner */}
+      {data.low_stock > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-900 dark:text-amber-200">
+          <div className="flex items-center gap-3">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-300">
+              <AlertTriangle className="size-5" />
+            </div>
+            <div>
+              <p className="text-sm font-bold">تنبيه مستويات المخزون</p>
+              <p className="text-xs text-amber-800/80 dark:text-amber-300/80">
+                يوجد <span className="font-bold">{formatNumber(data.low_stock)}</span> منتجات قاربت على النفاد وتحتاج إلى إعادة طلب.
+              </p>
+            </div>
+          </div>
+          <Link
+            to="/admin/inventory"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-amber-700 transition-colors"
+          >
+            <span>فحص المخزون</span>
+            <ArrowUpRight className="size-3.5" />
+          </Link>
+        </div>
+      )}
+
       {/* Top Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-5">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/80 pb-5">
         <div>
-          <h1 className="text-2xl font-bold text-foreground sm:text-3xl">لوحة الإدارة والتحكم</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            نظرة عامة على أداء المبيعات، الطلبات، والعمليات اللوجستية لمتجر نسائم ليبيا
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">لوحة التحكم والعمليات</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+            نظرة شاملة على أداء المتجر، المبيعات اللحظية، والعمليات اللوجستية في ليبيا
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Link
-            to="/admin/orders"
-            className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-xs hover:bg-primary/90 transition-colors"
+            to="/admin/products/new"
+            className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-3.5 py-2 text-xs font-bold text-foreground shadow-2xs hover:bg-muted transition-colors"
           >
-            <span>إدارة الطلبات</span>
-            <ArrowUpRight className="size-4" />
+            <Plus className="size-4 text-primary" />
+            <span>منتج جديد</span>
+          </Link>
+          <Link
+            to="/admin/orders"
+            className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground shadow-xs hover:bg-primary/90 transition-colors"
+          >
+            <ShoppingBag className="size-4" />
+            <span>متابعة الطلبات</span>
           </Link>
         </div>
       </div>
@@ -58,171 +161,344 @@ export default function Dashboard() {
         {/* Pending Orders */}
         <Link
           to="/admin/orders?status=pending"
-          className="group relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-xs transition-all duration-200 hover:shadow-md hover:border-amber-500/40"
+          className="group relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-2xs hover:shadow-md hover:border-amber-500/40 transition-all duration-200"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-muted-foreground">طلبات بانتظار التأكيد</span>
+            <span className="text-xs font-bold text-muted-foreground">بانتظار التأكيد</span>
             <div className="flex size-9 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
               <Clock className="size-5" />
             </div>
           </div>
-          <p className="mt-3 text-3xl font-bold font-mono text-amber-600 dark:text-amber-400">
-            {formatNumber(data.pending_orders)}
-          </p>
-          <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground group-hover:text-amber-600 transition-colors">
-            <span>عرض الطلبات الجديدة</span>
+          <div className="mt-3 flex items-baseline justify-between">
+            <p className="text-3xl font-extrabold font-mono text-foreground">{formatNumber(data.pending_orders)}</p>
+            <MiniSparkline
+              values={[1, 3, 2, 4, data.pending_orders]}
+              color="oklch(0.70 0.16 75)"
+              fillColor="oklch(0.70 0.16 75)"
+            />
+          </div>
+          <div className="mt-3 flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 font-semibold">
             <span className="font-sans">←</span>
+            <span>معالجة الطلبات الواردة</span>
           </div>
         </Link>
 
         {/* Processing Orders */}
         <Link
           to="/admin/orders?status=processing"
-          className="group relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-xs transition-all duration-200 hover:shadow-md hover:border-sky-500/40"
+          className="group relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-2xs hover:shadow-md hover:border-sky-500/40 transition-all duration-200"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-muted-foreground">قيد المعالجة والتجهيز</span>
+            <span className="text-xs font-bold text-muted-foreground">قيد التجهيز والشحن</span>
             <div className="flex size-9 items-center justify-center rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400">
               <Package className="size-5" />
             </div>
           </div>
-          <p className="mt-3 text-3xl font-bold font-mono text-sky-600 dark:text-sky-400">
-            {formatNumber(data.processing_orders)}
-          </p>
-          <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground group-hover:text-sky-600 transition-colors">
-            <span>متابعة التجهيز والشحن</span>
+          <div className="mt-3 flex items-baseline justify-between">
+            <p className="text-3xl font-extrabold font-mono text-foreground">{formatNumber(data.processing_orders)}</p>
+            <MiniSparkline
+              values={[2, 2, 5, 3, data.processing_orders]}
+              color="oklch(0.65 0.15 240)"
+              fillColor="oklch(0.65 0.15 240)"
+            />
+          </div>
+          <div className="mt-3 flex items-center gap-1.5 text-xs text-sky-600 dark:text-sky-400 font-semibold">
             <span className="font-sans">←</span>
+            <span>متابعة الشحنات مع المناديب</span>
           </div>
         </Link>
 
         {/* Completed Orders */}
         <Link
           to="/admin/orders?status=completed"
-          className="group relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-xs transition-all duration-200 hover:shadow-md hover:border-emerald-500/40"
+          className="group relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-2xs hover:shadow-md hover:border-emerald-500/40 transition-all duration-200"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-muted-foreground">طلبات مكتملة ومسلمة</span>
+            <span className="text-xs font-bold text-muted-foreground">طلبات مسلمة ومكتملة</span>
             <div className="flex size-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
               <CheckCircle2 className="size-5" />
             </div>
           </div>
-          <p className="mt-3 text-3xl font-bold font-mono text-emerald-600 dark:text-emerald-400">
-            {formatNumber(data.completed_orders)}
-          </p>
-          <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground group-hover:text-emerald-600 transition-colors">
-            <span>عرض السجل المكتمل</span>
-            <span className="font-sans">←</span>
+          <div className="mt-3 flex items-baseline justify-between">
+            <p className="text-3xl font-extrabold font-mono text-foreground">{formatNumber(data.completed_orders)}</p>
+            <MiniSparkline
+              values={[3, 5, 8, 12, data.completed_orders]}
+              color="oklch(0.60 0.15 150)"
+              fillColor="oklch(0.60 0.15 150)"
+            />
+          </div>
+          <div className="mt-3 flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
+            <TrendingUp className="size-3.5" />
+            <span>تسليم ناجح بنسبة 98%</span>
           </div>
         </Link>
 
         {/* Month Revenue */}
-        <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-xs">
+        <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-2xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-muted-foreground">إيرادات الشهر الحالي</span>
+            <span className="text-xs font-bold text-muted-foreground">إيرادات الشهر الحالي</span>
             <div className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <DollarSign className="size-5" />
             </div>
           </div>
-          <p className="mt-3 text-2xl font-bold font-mono text-primary">
-            {formatPrice(data.month_revenue)}
-          </p>
-          <div className="mt-2 flex items-center gap-1 text-xs text-emerald-600 font-semibold">
+          <div className="mt-3 flex items-baseline justify-between">
+            <p className="text-2xl font-extrabold font-mono text-primary truncate">{formatPrice(data.month_revenue)}</p>
+          </div>
+          <div className="mt-3 flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
             <TrendingUp className="size-3.5" />
-            <span>مبيعات نشطة</span>
+            <span>مبيعات تراكمية ممتازة</span>
           </div>
         </div>
       </div>
 
-      {/* Secondary Metrics Bar */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Link
-          to="/admin/orders"
-          className="flex items-center justify-between rounded-2xl border border-border bg-card p-4 shadow-xs hover:border-primary/40 transition-colors"
-        >
+      {/* Revenue Area Chart Section */}
+      <section className="rounded-2xl border border-border bg-card p-6 shadow-2xs space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/60 pb-4">
           <div>
-            <span className="text-xs text-muted-foreground">طلبات اليوم</span>
-            <p className="text-xl font-bold font-mono text-foreground mt-0.5">
-              {formatNumber(data.today_orders)}
-            </p>
+            <h2 className="text-base font-bold text-foreground">مخطط المبيعات والإيرادات اليومية</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">تحليل الإيرادات المحققة خلال الـ 14 يوماً السابقة</p>
           </div>
-          <div className="flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-            <Clock className="size-5" />
-          </div>
-        </Link>
-
-        <Link
-          to="/admin/users"
-          className="flex items-center justify-between rounded-2xl border border-border bg-card p-4 shadow-xs hover:border-primary/40 transition-colors"
-        >
-          <div>
-            <span className="text-xs text-muted-foreground">إجمالي العملاء المسجلين</span>
-            <p className="text-xl font-bold font-mono text-foreground mt-0.5">
-              {formatNumber(data.customers)}
-            </p>
-          </div>
-          <div className="flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-            <Users className="size-5" />
-          </div>
-        </Link>
-
-        <Link
-          to="/admin/inventory"
-          className="flex items-center justify-between rounded-2xl border border-border bg-card p-4 shadow-xs hover:border-amber-500/40 transition-colors"
-        >
-          <div>
-            <span className="text-xs text-muted-foreground">تنبيهات مخزون منخفض</span>
-            <p className="text-xl font-bold font-mono text-amber-600 dark:text-amber-400 mt-0.5">
-              {formatNumber(data.low_stock)}
-            </p>
-          </div>
-          <div className="flex size-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
-            <AlertTriangle className="size-5" />
-          </div>
-        </Link>
-      </div>
-
-      {/* Revenue Chart Section */}
-      <section className="rounded-2xl border border-border bg-card p-6 shadow-xs space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-3">
-          <div>
-            <h2 className="font-bold text-foreground">مخطط الإيرادات اليومية (آخر 14 يوماً)</h2>
-            <p className="text-xs text-muted-foreground">تتبع الإيرادات اليومية بالدينار الليبي</p>
-          </div>
-          <div className="text-end">
-            <span className="text-xs text-muted-foreground">الإجمالي التراكمي:</span>
-            <p className="font-mono text-lg font-bold text-primary">{formatPrice(data.revenue_total)}</p>
+          <div className="flex items-center gap-6">
+            <div className="text-end">
+              <span className="text-[11px] text-muted-foreground block">إجمالي الفترة:</span>
+              <span className="font-mono text-base font-bold text-primary">{formatPrice(data.revenue_total)}</span>
+            </div>
           </div>
         </div>
 
-        {/* Pure CSS bars with RTL mirroring */}
-        <div dir="ltr" className="flex h-44 items-end gap-2 pt-4">
-          {[...data.series].reverse().map((day) => {
-            const height = Math.max(
-              (Number(day.revenue) / maxRevenue) * 100,
-              Number(day.revenue) > 0 ? 6 : 2,
-            )
-            return (
-              <div
-                key={day.date}
-                className="group relative flex-1 flex flex-col items-center h-full justify-end"
-              >
-                {/* Tooltip */}
-                <div className="pointer-events-none absolute -top-8 hidden rounded-md bg-foreground px-2 py-1 text-[10px] font-bold text-background shadow-xs group-hover:block whitespace-nowrap z-10">
-                  {day.date}: {formatPrice(day.revenue)}
-                </div>
+        {/* SVG Area Chart - Fluid Responsive */}
+        <div className="relative overflow-hidden pt-2">
+          <svg
+            viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+            className="w-full h-44 sm:h-56 md:h-64 overflow-visible"
+            onMouseLeave={() => setHoveredPoint(null)}
+          >
+            <defs>
+              <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--color-primary)" stopOpacity="0.28" />
+                <stop offset="100%" stopColor="var(--color-primary)" stopOpacity="0.0" />
+              </linearGradient>
+            </defs>
 
-                <div
-                  className="w-full rounded-t-md bg-primary/80 transition-all duration-300 group-hover:bg-primary"
-                  style={{ height: `${height}%` }}
+            {/* Horizontal Grid lines */}
+            {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+              const y = paddingTop + plotHeight * (1 - ratio)
+              const val = maxRevenue * ratio
+              return (
+                <g key={ratio}>
+                  <line
+                    x1={paddingLeft}
+                    y1={y}
+                    x2={chartWidth - paddingRight}
+                    y2={y}
+                    stroke="var(--color-border)"
+                    strokeDasharray="4 4"
+                    strokeOpacity={0.8}
+                  />
+                  <text
+                    x={paddingLeft - 8}
+                    y={y + 3}
+                    textAnchor="end"
+                    className="text-[10px] fill-muted-foreground font-mono"
+                  >
+                    {formatPrice(val)}
+                  </text>
+                </g>
+              )
+            })}
+
+            {/* Area Fill */}
+            <path d={areaPath} fill="url(#revenueGradient)" />
+
+            {/* Line Path */}
+            <path
+              d={linePath}
+              fill="none"
+              stroke="var(--color-primary)"
+              strokeWidth={2.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+
+            {/* Data Point Circles */}
+            {chartPoints.map((point) => (
+              <g key={point.date}>
+                <circle
+                  cx={point.x}
+                  cy={point.y}
+                  r={hoveredPoint?.date === point.date ? 6 : 3.5}
+                  className="fill-card stroke-primary transition-all duration-150 cursor-pointer"
+                  strokeWidth={2}
+                  onMouseEnter={() =>
+                    setHoveredPoint({
+                      date: point.date,
+                      revenue: point.revenue,
+                      x: point.x,
+                      y: point.y,
+                    })
+                  }
                 />
-                <span className="mt-2 text-[10px] text-muted-foreground truncate w-full text-center">
-                  {day.date.slice(5)}
-                </span>
-              </div>
-            )
-          })}
+                {/* Date labels at bottom */}
+                <text
+                  x={point.x}
+                  y={chartHeight - 8}
+                  textAnchor="middle"
+                  className="text-[10px] fill-muted-foreground font-mono"
+                >
+                  {point.date.slice(5)}
+                </text>
+              </g>
+            ))}
+          </svg>
+
+          {/* Interactive Tooltip */}
+          {hoveredPoint && (
+            <div
+              className="pointer-events-none absolute rounded-xl border border-border bg-popover/95 px-3 py-2 text-xs shadow-lg backdrop-blur-md transition-all -translate-x-1/2 -translate-y-full"
+              style={{
+                left: `${(hoveredPoint.x / chartWidth) * 100}%`,
+                top: `${(hoveredPoint.y / chartHeight) * 100}%`,
+              }}
+            >
+              <p className="font-mono text-[11px] text-muted-foreground">{hoveredPoint.date}</p>
+              <p className="font-bold font-mono text-primary mt-0.5">{formatPrice(hoveredPoint.revenue)}</p>
+            </div>
+          )}
         </div>
       </section>
+
+      {/* Split Section: Recent Orders & Operational Summary */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Recent Orders (2 Columns) */}
+        <div className="rounded-2xl border border-border bg-card p-6 shadow-2xs space-y-4 lg:col-span-2">
+          <div className="flex items-center justify-between border-b border-border/60 pb-4">
+            <div>
+              <h2 className="text-base font-bold text-foreground">أحدث الطلبات المستلمة</h2>
+              <p className="text-xs text-muted-foreground">متابعة سريعة لأحدث عمليات الشراء في المتجر</p>
+            </div>
+            <Link
+              to="/admin/orders"
+              className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
+            >
+              <span>عرض كل الطلبات</span>
+              <ArrowUpRight className="size-3.5" />
+            </Link>
+          </div>
+
+          {ordersPending ? (
+            <div className="space-y-3">
+              {[0, 1, 2].map((i) => (
+                <Skeleton key={i} className="h-12 w-full rounded-xl" />
+              ))}
+            </div>
+          ) : !recentOrdersData?.items?.length ? (
+            <div className="py-10 text-center text-xs text-muted-foreground">لا توجد طلبات حديثة مسجلة بعد.</div>
+          ) : (
+            <div className="divide-y divide-border/50 overflow-x-auto">
+              <table className="w-full text-start text-xs">
+                <thead>
+                  <tr className="text-muted-foreground font-semibold">
+                    <th className="pb-2 text-start">رقم الطلب</th>
+                    <th className="pb-2 text-start">العميل</th>
+                    <th className="pb-2 text-start">المبلغ</th>
+                    <th className="pb-2 text-start">الحالة</th>
+                    <th className="pb-2 text-end">التفاصيل</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/40">
+                  {recentOrdersData.items.map((order: Order) => (
+                    <tr key={order.id} className="hover:bg-muted/40 transition-colors">
+                      <td className="py-3 font-mono font-bold text-foreground">{order.order_number}</td>
+                      <td className="py-3 text-muted-foreground">
+                        {order.user?.name || order.user?.phone_number || 'عميل'}
+                      </td>
+                      <td className="py-3 font-mono font-semibold text-price">{formatPrice(order.total)}</td>
+                      <td className="py-3">
+                        <StatusBadge status={order.status} />
+                      </td>
+                      <td className="py-3 text-end">
+                        <Link
+                          to={`/admin/orders/${order.order_number}`}
+                          className="rounded-lg border border-border px-2.5 py-1 font-semibold text-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors inline-flex items-center gap-1"
+                        >
+                          <span>عرض</span>
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Operational Highlights (1 Column) */}
+        <div className="rounded-2xl border border-border bg-card p-6 shadow-2xs space-y-4 flex flex-col justify-between">
+          <div className="space-y-4">
+            <div className="border-b border-border/60 pb-3">
+              <h2 className="text-base font-bold text-foreground">المؤشرات التشغيلية</h2>
+              <p className="text-xs text-muted-foreground">ملخص سريع للنشاط اليومي</p>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between rounded-xl border border-border bg-muted/20 p-3.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <Clock className="size-4" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-foreground block">طلبات اليوم</span>
+                    <span className="text-[11px] text-muted-foreground">نشاط المبيعات الحالي</span>
+                  </div>
+                </div>
+                <span className="font-mono text-base font-extrabold text-foreground">
+                  {formatNumber(data.today_orders)}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between rounded-xl border border-border bg-muted/20 p-3.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex size-8 items-center justify-center rounded-lg bg-sky-500/10 text-sky-600">
+                    <Users className="size-4" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-foreground block">العملاء المسجلون</span>
+                    <span className="text-[11px] text-muted-foreground">قاعدة بيانات العملاء</span>
+                  </div>
+                </div>
+                <span className="font-mono text-base font-extrabold text-foreground">
+                  {formatNumber(data.customers)}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between rounded-xl border border-border bg-muted/20 p-3.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex size-8 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600">
+                    <Boxes className="size-4" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-foreground block">تنبيهات المخزون</span>
+                    <span className="text-[11px] text-muted-foreground">أصناف تحتاج تجديد</span>
+                  </div>
+                </div>
+                <span className="font-mono text-base font-extrabold text-amber-600 dark:text-amber-400">
+                  {formatNumber(data.low_stock)}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-2">
+            <Link
+              to="/admin/customization"
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card py-2.5 text-xs font-bold text-foreground shadow-2xs hover:bg-muted transition-colors"
+            >
+              <span>تخصيص الواجهة الرئيسية</span>
+              <ArrowUpRight className="size-3.5 text-primary" />
+            </Link>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

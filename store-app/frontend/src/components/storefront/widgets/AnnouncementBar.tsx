@@ -1,4 +1,4 @@
-import { Bell, Gift, Info, Megaphone, Sparkles, Star, Tag, X } from 'lucide-react'
+import { ArrowLeft, Bell, Gift, Info, Megaphone, Sparkles, Star, Tag, X } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
@@ -28,7 +28,7 @@ export function AnnouncementBar({ widget }: { widget: Widget }) {
 
   if (dismissed || !message) return null
 
-  const Icon = ICONS[(icon as keyof typeof ICONS) ?? 'megaphone'] ?? Megaphone
+  const Icon = ICONS[(icon as keyof typeof ICONS) ?? 'megaphone'] ?? Sparkles
 
   const close = () => {
     setDismissed(true)
@@ -40,34 +40,47 @@ export function AnnouncementBar({ widget }: { widget: Widget }) {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-primary/25 bg-primary/10 px-4 py-3 text-foreground">
-      <span className="flex size-10 shrink-0 items-center justify-center rounded-md bg-background text-primary">
-        <Icon className="size-5" aria-hidden="true" />
-      </span>
-      <div className="min-w-0 flex-1">
-        {title ? <p className="text-sm font-bold">{title}</p> : null}
-        <p className="text-sm leading-relaxed">{message}</p>
-      </div>
-      <div className="flex items-center gap-1">
-        {linkLabel && linkUrl ? (
-          <Link
-            to={linkUrl}
-            viewTransition
-            className="inline-flex h-11 items-center px-3 text-sm font-semibold text-primary underline-offset-4 transition-colors hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-          >
-            {linkLabel}
-          </Link>
-        ) : null}
-        {dismissible ? (
-          <button
-            type="button"
-            onClick={close}
-            aria-label="إغلاق الإعلان"
-            className="inline-flex size-11 items-center justify-center rounded-md text-muted-foreground hover:bg-background focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-          >
-            <X className="size-5" aria-hidden="true" />
-          </button>
-        ) : null}
+    <div className="relative overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/15 via-primary/5 to-primary/15 p-3.5 sm:px-5 sm:py-3 shadow-xs text-foreground animate-fade-rise">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/20 text-primary border border-primary/30 shadow-2xs">
+            <Icon className="size-4" aria-hidden="true" />
+          </div>
+          <div className="min-w-0 flex-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            {title && (
+              <span className="text-xs sm:text-sm font-extrabold text-foreground tracking-tight">
+                {title}:
+              </span>
+            )}
+            <span className="text-xs sm:text-sm text-foreground/90 font-medium">
+              {message}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0 ms-auto">
+          {linkLabel && linkUrl ? (
+            <Link
+              to={linkUrl}
+              viewTransition
+              className="inline-flex items-center gap-1 rounded-xl bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground shadow-2xs hover:bg-primary/90 transition-all hover:gap-1.5"
+            >
+              <span>{linkLabel}</span>
+              <ArrowLeft className="size-3.5 rtl:rotate-0" />
+            </Link>
+          ) : null}
+
+          {dismissible ? (
+            <button
+              type="button"
+              onClick={close}
+              aria-label="إغلاق الإعلان"
+              className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors"
+            >
+              <X className="size-3.5" aria-hidden="true" />
+            </button>
+          ) : null}
+        </div>
       </div>
     </div>
   )

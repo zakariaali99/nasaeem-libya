@@ -277,3 +277,28 @@ class InventoryLog(models.Model):
 
     def delete(self, *args, **kwargs):
         raise ValueError("سجل المخزون لا يمكن حذفه")
+
+
+class WishlistItem(TimestampedModel):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="wishlist_items",
+        verbose_name="المستخدم",
+    )
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="wishlist_items",
+        verbose_name="المنتج",
+    )
+
+    class Meta:
+        verbose_name = "عنصر المفضلة"
+        verbose_name_plural = "قائمة المفضلة"
+        unique_together = [("user", "product")]
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.user} - {self.product.name}"
+

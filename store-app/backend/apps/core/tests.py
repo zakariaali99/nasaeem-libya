@@ -79,3 +79,22 @@ class TestGeography:
         UserAddress.objects.create(user=customer, region=region, address="شارع النصر")
         with pytest.raises(ProtectedError):
             region.delete()
+
+
+class TestAdminUnifiedSearch:
+    def test_admin_unified_search_returns_results(self, client, owner, customer):
+        client.force_login(owner)
+        res = client.get("/api/admin/search/?q=عميل")
+        assert res.status_code == 200
+        data = res.json()["data"]
+        assert "products" in data
+        assert "orders" in data
+        assert "users" in data
+        assert "pages" in data
+        assert any(u["phone_number"] == customer.phone_number for u in data["users"])
+
+    def test_customer_cannot_access_admin_search(self, client, customer):
+        client.force_login(customer)
+        res = client.get("/api/admin/search/?q=test")
+        assert res.status_code == 403
+

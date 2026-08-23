@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
 import { GripVertical, Trash2 } from 'lucide-react'
+import { ImageUploadField } from '@/components/admin/ImageUploadField'
 import { WidgetRenderer } from '@/components/storefront/widgets'
 import { Button } from '@/components/ui/button'
 import { Field } from '@/components/ui/field'
@@ -34,16 +35,32 @@ const TYPE_LABELS: Record<string, string> = {
 
 /** Field keys match `services.normalise_widget_data` exactly — the server
  * canonicalises on write, so the editor speaks the same names it saves. */
-const FIELD_SPECS: Record<string, { key: string; label: string; kind?: 'number' | 'textarea' | 'url' }[]> = {
-  announcement_bar: [{ key: 'message', label: 'النص' }, { key: 'title', label: 'عنوان صغير' }, { key: 'linkLabel', label: 'نص الرابط' }, { key: 'linkUrl', label: 'الرابط', kind: 'url' }],
-  hero_cta: [{ key: 'title', label: 'العنوان' }, { key: 'subtitle', label: 'العنوان الفرعي' }, { key: 'backgroundImageUrl', label: 'صورة الخلفية', kind: 'url' }, { key: 'buttonLabel', label: 'نص الزر' }, { key: 'buttonUrl', label: 'رابط الزر', kind: 'url' }],
+const FIELD_SPECS: Record<string, { key: string; label: string; kind?: 'number' | 'textarea' | 'image' }[]> = {
+  announcement_bar: [
+    { key: 'message', label: 'نص الإعلان' },
+    { key: 'title', label: 'عنوان الإعلان (اختياري)' },
+    { key: 'linkLabel', label: 'نص الزر/الرابط' },
+    { key: 'linkUrl', label: 'رابط التوجيه' },
+  ],
+  hero_cta: [
+    { key: 'title', label: 'العنوان الرئيسي للبانر' },
+    { key: 'subtitle', label: 'العنوان الفرعي' },
+    { key: 'desktopImageUrl', label: 'صورة الحاسوب والشاشات الكبيرة (Desktop Image)', kind: 'image' },
+    { key: 'mobileImageUrl', label: 'صورة الهاتف والموبايل (Mobile Phone Image)', kind: 'image' },
+    { key: 'buttonLabel', label: 'نص زر الإجراء' },
+    { key: 'buttonUrl', label: 'رابط زر الإجراء' },
+  ],
   carousel: [],
   category_list: [{ key: 'title', label: 'العنوان' }],
   product_list: [{ key: 'title', label: 'العنوان' }],
   collection_showcase: [],
   text_block: [{ key: 'content', label: 'النص', kind: 'textarea' }],
   photo_link_grid: [{ key: 'title', label: 'العنوان' }],
-  image: [{ key: 'imageUrl', label: 'رابط الصورة', kind: 'url' }, { key: 'linkUrl', label: 'الرابط', kind: 'url' }, { key: 'altText', label: 'النص البديل' }],
+  image: [
+    { key: 'imageUrl', label: 'ملف الصورة', kind: 'image' },
+    { key: 'linkUrl', label: 'رابط التوجيه عند النقر' },
+    { key: 'altText', label: 'النص البديل' },
+  ],
   spacer: [],
   recently_viewed: [{ key: 'title', label: 'العنوان' }],
   buy_again: [{ key: 'title', label: 'العنوان' }],
@@ -361,30 +378,66 @@ export default function WidgetBuilder() {
                 </Button>
               </div>
 
-              {(FIELD_SPECS[current.type] ?? []).map((spec) => (
-                <Field key={spec.key} label={spec.label} id={`f-${spec.key}`}
-                  hint={!['announcement_bar', 'hero_cta', 'carousel', 'category_list', 'product_list', 'collection_showcase', 'photo_link_grid', 'image', 'spacer', 'text_block'].includes(current.type) ? 'يملؤه النظام من سجلّ التصفح والطلبات عند العرض' : undefined}>
-                  {(props) => spec.kind === 'textarea' ? (
-                    <textarea
-                      {...props}
-                      rows={3}
-                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      value={String(current.data[spec.key] ?? '')}
-                      onChange={(e) => updateField(spec.key, e.target.value)}
+              {(FIELD_SPECS[current.type] ?? []).map((spec) => {
+                if (spec.kind === 'image') {
+                  const currentValue = String(
+                    current.data[spec.key] ??
+                      (spec.key === 'desktopImageUrl' ? current.data.backgroundImageUrl ?? '' : ''),
+                  )
+                  return (
+                    <ImageUploadField
+                      key={spec.key}
+                      label={spec.label}
+                      value={currentValue}
+                      aspectRatio={spec.key === 'desktopImageUrl' ? 'banner' : spec.key === 'mobileImageUrl' ? 'video' : 'auto'}
+                      onChange={(url) => {
+                        updateField(spec.key, url)
+                        if (spec.key === 'desktopImageUrl') {
+                          updateField('backgroundImageUrl', url)
+                        }
+                      }}
                     />
-                  ) : (
-                    <Input
-                      {...props}
-                      type={spec.kind === 'number' ? 'number' : 'text'}
-                      value={String(current.data[spec.key] ?? '')}
-                      onChange={(e) => updateField(
-                        spec.key,
-                        spec.kind === 'number' ? Number(e.target.value || 0) : e.target.value,
-                      )}
-                    />
-                  )}
-                </Field>
-              ))}
+                  )
+                }
+
+                return (
+                  <Field
+                    key={spec.key}
+                    label={spec.label}
+                    id={`f-${spec.key}`}
+                    hint={
+                      !['announcement_bar', 'hero_cta', 'carousel', 'category_list', 'product_list', 'collection_showcase', 'photo_link_grid', 'image', 'spacer', 'text_block'].includes(current.type)
+                        ? 'يملؤه النظام من سجلّ التصفح والطلبات عند العرض'
+                        : undefined
+                    }
+                  >
+                    {(props) =>
+                      spec.kind === 'textarea' ? (
+                        <textarea
+                          {...props}
+                          rows={3}
+                          className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs sm:text-sm"
+                          value={String(current.data[spec.key] ?? '')}
+                          onChange={(e) => updateField(spec.key, e.target.value)}
+                        />
+                      ) : (
+                        <Input
+                          {...props}
+                          type={spec.kind === 'number' ? 'number' : 'text'}
+                          value={String(current.data[spec.key] ?? '')}
+                          onChange={(e) =>
+                            updateField(
+                              spec.key,
+                              spec.kind === 'number' ? Number(e.target.value || 0) : e.target.value,
+                            )
+                          }
+                          className="rounded-xl text-xs sm:text-sm"
+                        />
+                      )
+                    }
+                  </Field>
+                )
+              })}
 
               {(CHOICE_SPECS[current.type] ?? []).map((spec) => (
                 <Field key={spec.key} label={spec.label} id={`c-${spec.key}`}>

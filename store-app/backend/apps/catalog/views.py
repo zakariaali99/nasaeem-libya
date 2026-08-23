@@ -14,7 +14,7 @@ from django.db.models import Prefetch, Q
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.parsers import FormParser, MultiPartParser
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -31,6 +31,7 @@ from .models import (
     ProductVariant,
     VariantOption,
     VariantValue,
+    WishlistItem,
 )
 from .serializers import (
     CategorySerializer,
@@ -43,6 +44,7 @@ from .serializers import (
     ProductWriteSerializer,
     VariantOptionSerializer,
     VariantValueSerializer,
+    WishlistItemSerializer,
 )
 
 SORTS = {
@@ -619,3 +621,58 @@ class ImageUploadView(APIView):
              "message": "تم رفع الصورة"},
             status=status.HTTP_201_CREATED,
         )
+
+
+class WishlistListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        items = (
+            WishlistItem.objects.filter(user=request.user)
+            .select_related("product")
+            .prefetch_related("product__images", "product__categories", "product__collections", "product__variants")
+        )
+        return Response({"data": WishlistItemSerializer(items, many=True).data})
+
+
+class WishlistToggleView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        product_id = request.data.get("product_id")
+        if not product_id:
+            return Response({"message": "معرّف المنتج مطلوب"}, status=status.HTTP_400_BAD_REQUEST)
+        product = Product.objects.filter(id=product_id, is_active=True).first()
+        if not product:
+            return Response({"message": "المنتج غير موجود"}, status=status.HTTP_404_NOT_FOUND)
+
+        item = WishlistItem.objects.filter(user=request.user, product=product).first()
+        if item:
+            item.delete()
+            is_wishlisted = False
+            message = "تمت الإزالة من المفضلة"
+        else:
+            WishlistItem.objects.create(user=request.user, product=product)
+            is_wishlisted = True
+            message = "تمت الإضافة إلى المفضلة"
+
+        count = WishlistItem.objects.filter(user=request.user).count()
+        return Response({
+            "data": {
+                "is_wishlisted": is_wishlisted,
+                "count": count,
+                "product_id": str(product.id),
+            },
+            "message": message,
+        })
+
+
+class WishlistIdsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        product_ids = list(
+            WishlistItem.objects.filter(user=request.user).values_list("product_id", flat=True)
+        )
+        return Response({"data": [str(pid) for pid in product_ids]})
+

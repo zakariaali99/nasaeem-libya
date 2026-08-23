@@ -5,73 +5,116 @@ import { DataTable, type Column } from '@/components/admin/DataTable'
 import { PageHeader } from '@/components/layout/AdminLayout'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Select } from '@/components/ui/select'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import { useInventoryLogs } from '@/lib/queries/catalog'
 import { usePageTitle } from '@/lib/usePageTitle'
 import { useUrlState } from '@/lib/useUrlState'
 import type { InventoryLog } from '@/types/api'
 
-const REASONS = [
-  ['', 'كل الأسباب'],
-  ['restock', 'إعادة تخزين'],
-  ['sale', 'بيع'],
-  ['reservation', 'حجز'],
-  ['release', 'إلغاء حجز'],
-  ['return', 'مرتجع'],
-  ['correction', 'تصحيح'],
-  ['manual', 'تعديل يدوي'],
-] as const
-
 export default function AdminInventoryLogsPage() {
-  usePageTitle('سجل المخزون — لوحة التحكم')
+  usePageTitle('سجل حركات المخزون — لوحة التحكم')
   const { get, set } = useUrlState()
   const page = Number(get('page') || 1)
   const reason = get('reason')
 
   const query = useInventoryLogs({ page, reason: reason || undefined })
 
+  const filterChips = [
+    {
+      id: 'all',
+      label: 'كل الحركات',
+      active: !reason,
+      onClick: () => set({ reason: '', page: 1 }),
+    },
+    {
+      id: 'restock',
+      label: 'إعادة تخزين',
+      active: reason === 'restock',
+      onClick: () => set({ reason: 'restock', page: 1 }),
+    },
+    {
+      id: 'sale',
+      label: 'مبيعات',
+      active: reason === 'sale',
+      onClick: () => set({ reason: 'sale', page: 1 }),
+    },
+    {
+      id: 'return',
+      label: 'مرتجع',
+      active: reason === 'return',
+      onClick: () => set({ reason: 'return', page: 1 }),
+    },
+    {
+      id: 'reservation',
+      label: 'حجز للطلبات',
+      active: reason === 'reservation',
+      onClick: () => set({ reason: 'reservation', page: 1 }),
+    },
+  ]
+
   const columns: Column<InventoryLog>[] = [
     {
       key: 'created_at',
-      header: 'التاريخ',
-      cell: (row) => <span className="text-muted-foreground">{formatDateTime(row.created_at)}</span>,
+      header: 'تاريخ الحركة',
+      cell: (row) => (
+        <span className="font-mono text-xs text-muted-foreground">{formatDateTime(row.created_at)}</span>
+      ),
     },
     {
       key: 'product',
-      header: 'المنتج',
+      header: 'المنتج والمتغير',
       cell: (row) => (
         <div>
-          <p className="font-medium text-foreground">{row.product_name}</p>
-          {row.variant_sku ? <p className="text-xs text-muted-foreground">{row.variant_sku}</p> : null}
+          <p className="font-bold text-foreground text-xs sm:text-sm">{row.product_name}</p>
+          {row.variant_sku ? <p className="font-mono text-[11px] text-muted-foreground">{row.variant_sku}</p> : null}
         </div>
       ),
     },
     {
       key: 'change',
-      header: 'التغيير',
+      header: 'التغيير بالكمية',
       cell: (row) =>
         row.change > 0 ? (
-          <Badge tone="success">+{formatNumber(row.change)}</Badge>
+          <Badge tone="success" className="font-mono text-xs font-bold">
+            +{formatNumber(row.change)}
+          </Badge>
         ) : (
-          <Badge tone="danger">{formatNumber(row.change)}</Badge>
+          <Badge tone="danger" className="font-mono text-xs font-bold">
+            {formatNumber(row.change)}
+          </Badge>
         ),
     },
-    { key: 'reason', header: 'السبب', cell: (row) => row.reason_label },
-    { key: 'user', header: 'بواسطة', cell: (row) => row.user_name || 'النظام' },
-    { key: 'note', header: 'ملاحظة', cell: (row) => row.note || '—' },
+    {
+      key: 'reason',
+      header: 'السبب والنوع',
+      cell: (row) => (
+        <span className="text-xs font-semibold text-foreground bg-muted/50 px-2 py-0.5 rounded-md border border-border/50">
+          {row.reason_label}
+        </span>
+      ),
+    },
+    {
+      key: 'user',
+      header: 'المسؤول',
+      cell: (row) => <span className="text-xs text-muted-foreground">{row.user_name || 'النظام التلقائي'}</span>,
+    },
+    {
+      key: 'note',
+      header: 'الملاحظة والبيان',
+      cell: (row) => <span className="text-xs text-muted-foreground">{row.note || '—'}</span>,
+    },
   ]
 
   return (
-    <>
+    <div className="space-y-6 animate-fade-rise">
       <PageHeader
-        title="سجل المخزون"
-        description="سجل غير قابل للتعديل لكل حركة مخزون — من غيّر، وكم، ولماذا."
-        actions={
-          <Button asChild variant="outline">
+        title="سجل حركات وتدقيق المخزون"
+        description="سجل غير قابل للتعديل يوثق جميع عمليات الإضافة، الخصم، المبيعات، وتعديلات الجرد."
+        action={
+          <Button asChild variant="outline" size="sm" className="rounded-xl font-bold shadow-2xs gap-1.5 h-10 px-4">
             <Link to="/admin/inventory">
-              <ArrowRight aria-hidden="true" />
-              العودة للمخزون
+              <ArrowRight className="size-4 rtl:rotate-0" aria-hidden="true" />
+              <span>العودة لجدول المخزون</span>
             </Link>
           </Button>
         }
@@ -82,29 +125,16 @@ export default function AdminInventoryLogsPage() {
         rows={query.data?.items ?? []}
         rowKey={(row) => row.id}
         isLoading={query.isLoading}
-        error={query.error ? { message: 'تعذّر تحميل السجل' } : null}
+        error={query.error ? { message: 'تعذّر تحميل سجل المخزون' } : null}
         onRetry={() => query.refetch()}
         page={page}
         pages={query.data?.meta?.pages ?? 1}
         total={query.data?.meta?.total}
         onPageChange={(next) => set({ page: next })}
-        toolbar={
-          <Select
-            value={reason}
-            onChange={(event) => set({ reason: event.target.value })}
-            aria-label="تصفية حسب السبب"
-            className="w-48"
-          >
-            {REASONS.map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </Select>
-        }
-        emptyTitle="لا توجد حركات بعد"
-        emptyDescription="ستظهر هنا كل تعديلات المخزون تلقائياً."
+        filterChips={filterChips}
+        emptyTitle="لا توجد حركات مسجلة"
+        emptyDescription="ستظهر هنا كل تعديلات المخزون ومبيعات المتجر تلقائياً."
       />
-    </>
+    </div>
   )
 }

@@ -39,6 +39,7 @@ const CheckoutRedirectPage = lazy(() => import('@/pages/storefront/CheckoutRedir
 const MyOrdersPage = lazy(() => import('@/pages/storefront/MyOrders'))
 const MyOrderDetailPage = lazy(() => import('@/pages/storefront/MyOrderDetail'))
 const MyAddressesPage = lazy(() => import('@/pages/storefront/MyAddresses'))
+const WishlistPage = lazy(() => import('@/pages/storefront/WishlistPage'))
 const ApiDocsPage = lazy(() => import('@/pages/storefront/ApiDocs'))
 
 // Admin — 26 of the 44 routes. Lazy so a customer never downloads any of it.
@@ -106,6 +107,7 @@ const router = createBrowserRouter([
           { path: '/search', element: <SearchPage /> },
           { path: '/categories/:slug', element: <CategoryListingPage /> },
           { path: '/collections/:slug', element: <CollectionListingPage /> },
+          { path: '/wishlist', element: withSuspense(<WishlistPage />) },
           { path: '/cart', element: withSuspense(<CartPage />) },
           { path: '/developers/api', element: withSuspense(<ApiDocsPage />) },
           { path: '/checkout/redirect', element: withSuspense(<CheckoutRedirectPage />) },

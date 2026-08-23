@@ -1,4 +1,4 @@
-import { ShoppingBag, Truck } from 'lucide-react'
+import { Heart, Share2, ShoppingBag } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
@@ -23,6 +23,7 @@ import { ApiError } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { useAddToCart } from '@/lib/queries/cart'
 import { useProduct, useProducts } from '@/lib/queries/catalog'
+import { useToggleWishlist, useWishlistIds } from '@/lib/queries/wishlist'
 import { rememberViewed } from '@/lib/recentlyViewed'
 import { usePageTitle } from '@/lib/usePageTitle'
 import type { Product, ProductVariant } from '@/types/api'
@@ -193,30 +194,39 @@ function ProductView({
             </p>
           ) : null}
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3 pt-2">
             <QuantityStepper
               value={quantity}
               onChange={setQuantity}
               max={max ?? undefined}
               disabled={!inStock || needsChoice}
             />
-            <Button size="lg" onClick={addLine} disabled={!canAdd} loading={addToCart.isPending}>
+            <Button
+              size="lg"
+              onClick={addLine}
+              disabled={!canAdd}
+              loading={addToCart.isPending}
+              className="flex-1 min-w-44 rounded-xl font-bold gap-2 shadow-xs"
+            >
               <ShoppingBag aria-hidden="true" />
               {addLabel}
             </Button>
+            <ProductDetailWishlistButton productId={product.id} />
+            <ProductDetailShareButton title={product.name} />
           </div>
 
           {added ? (
             // fade-rise: purposeful state-change feedback, not decoration.
             <div className="animate-fade-rise">
               <Alert tone="success" role="status">
-                تمت الإضافة إلى السلة.{' '}
+                تمت الإضافة إلى السلة بنجاح.{' '}
                 <Link to="/cart" className="font-semibold underline">
-                  عرض السلة
+                  عرض سلة المشتريات
                 </Link>
               </Alert>
             </div>
           ) : null}
+
           {addToCart.isError ? (
             <Alert tone="error" role="alert">
               {addToCart.error instanceof ApiError
@@ -225,10 +235,21 @@ function ProductView({
             </Alert>
           ) : null}
 
-          <p className="flex items-center gap-2 rounded-md border border-border bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
-            <Truck className="size-5 shrink-0" aria-hidden="true" />
-            التوصيل إلى جميع المدن الليبية، وتُحتسب رسوم التوصيل حسب المنطقة عند إتمام الطلب.
-          </p>
+          {/* Luxury trust strip */}
+          <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border/80 text-center">
+            <div className="rounded-xl border border-border bg-muted/20 p-2.5 space-y-1">
+              <span className="block text-xs font-bold text-foreground">💯 عطر أصلي</span>
+              <span className="text-[10px] text-muted-foreground">مضمون 100%</span>
+            </div>
+            <div className="rounded-xl border border-border bg-muted/20 p-2.5 space-y-1">
+              <span className="block text-xs font-bold text-foreground">🚚 شحن سريع</span>
+              <span className="text-[10px] text-muted-foreground">لكافة مدن ليبيا</span>
+            </div>
+            <div className="rounded-xl border border-border bg-muted/20 p-2.5 space-y-1">
+              <span className="block text-xs font-bold text-foreground">🛡️ دفع آمن</span>
+              <span className="text-[10px] text-muted-foreground">إلكتروني أو كاش</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -245,25 +266,28 @@ function ProductView({
       <RelatedProducts product={product} />
 
 
-      {/* Sticky summary on mobile — the price stays reachable while scrolling
-          the description. It sits above the bottom navigation. */}
-      <div className="fixed inset-x-0 bottom-14 z-30 border-t border-border bg-background/95 p-3 backdrop-blur lg:hidden">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <Price price={price} compareAtPrice={compareAt} />
-            <StockBadge
-              trackQuantity={product.track_quantity}
-              availableStock={availableStock}
-              inStock={inStock}
-            />
+      {/* Sticky summary on mobile — luxury styled with safe-area padding and one-touch add */}
+      <div className="fixed inset-x-0 bottom-14 z-30 border-t border-border/80 bg-card/95 p-3 px-4 backdrop-blur-md lg:hidden shadow-lg">
+        <div className="flex items-center justify-between gap-3 max-w-lg mx-auto">
+          <div className="min-w-0">
+            <Price price={price} compareAtPrice={compareAt} size="sm" />
+            <span className="block text-[10px] text-muted-foreground truncate font-medium">
+              {inStock ? 'متوفر للتوصيل الفوري' : 'غير متوفر حالياً'}
+            </span>
           </div>
-          <Button onClick={addLine} disabled={!canAdd} loading={addToCart.isPending}>
-            <ShoppingBag aria-hidden="true" />
-            {needsChoice ? 'اختر الخيار' : 'أضف إلى السلة'}
+          <Button
+            size="sm"
+            onClick={addLine}
+            disabled={!canAdd}
+            loading={addToCart.isPending}
+            className="rounded-xl font-bold h-11 px-5 gap-1.5 shadow-sm text-xs"
+          >
+            <ShoppingBag className="size-4" aria-hidden="true" />
+            <span>{needsChoice ? 'حدد الخيارات' : addLabel}</span>
           </Button>
         </div>
       </div>
-      <div className="h-20 lg:hidden" aria-hidden="true" />
+      <div className="h-16 lg:hidden" aria-hidden="true" />
     </div>
   )
 }
@@ -403,15 +427,69 @@ function ProductDetailSkeleton() {
         جارٍ تحميل المنتج…
       </span>
       <div className="grid gap-8 lg:grid-cols-2">
-        <Skeleton className="aspect-square w-full" />
+        <Skeleton className="aspect-square w-full rounded-2xl" />
         <div className="space-y-4">
-          <Skeleton className="h-9 w-3/4" />
-          <Skeleton className="h-7 w-1/3" />
-          <Skeleton className="h-5 w-1/4" />
-          <Skeleton className="h-11 w-2/3" />
-          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-9 w-3/4 rounded-xl" />
+          <Skeleton className="h-7 w-1/3 rounded-xl" />
+          <Skeleton className="h-5 w-1/4 rounded-xl" />
+          <Skeleton className="h-12 w-full rounded-xl" />
         </div>
       </div>
     </div>
+  )
+}
+
+function ProductDetailWishlistButton({ productId }: { productId: string }) {
+  const { data: wishlistIds } = useWishlistIds()
+  const toggle = useToggleWishlist()
+  const isWishlisted = Boolean(wishlistIds?.includes(productId))
+
+  return (
+    <button
+      type="button"
+      onClick={() => toggle.mutate(productId)}
+      aria-label={isWishlisted ? 'إزالة من المفضلة' : 'إضافة إلى المفضلة'}
+      title={isWishlisted ? 'في المفضلة' : 'أضف للمفضلة'}
+      className={`inline-flex size-11 items-center justify-center rounded-xl border transition-all ${
+        isWishlisted
+          ? 'border-rose-500 bg-rose-500/10 text-rose-500'
+          : 'border-border bg-card text-muted-foreground hover:border-rose-400 hover:text-rose-500'
+      }`}
+    >
+      <Heart className={`size-5 ${isWishlisted ? 'fill-rose-500' : ''}`} />
+    </button>
+  )
+}
+
+function ProductDetailShareButton({ title }: { title: string }) {
+  const [copied, setCopied] = useState(false)
+
+  const handleShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title,
+          url: window.location.href,
+        })
+        return
+      } catch {
+        // Fallback to clipboard
+      }
+    }
+    await navigator.clipboard.writeText(window.location.href)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleShare}
+      aria-label="مشاركة رابط المنتج"
+      title={copied ? 'تم نسخ الرابط!' : 'مشاركة المنتج'}
+      className="inline-flex size-11 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+    >
+      <Share2 className="size-5" />
+    </button>
   )
 }

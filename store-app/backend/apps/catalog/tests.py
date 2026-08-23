@@ -679,3 +679,32 @@ class TestArabicNormalisationIsWhatFindsThese:
         the test above is the one that proves the normalisation is doing work."""
         response = api.get(reverse("product-list"), {"search": "المعتق"})
         assert [p["name"] for p in response.json()["data"]] == ["دهن العود الكمبودي المعتَّق الممتاز"]
+
+
+class TestWishlist:
+    def test_wishlist_toggle_adds_and_removes(self, client, customer, product):
+        client.force_login(customer)
+        # 1. Toggle add
+        res1 = client.post("/api/wishlist/toggle/", {"product_id": str(product.id)}, format="json")
+        assert res1.status_code == 200
+        assert res1.json()["data"]["is_wishlisted"] is True
+        assert res1.json()["data"]["count"] == 1
+
+        # 2. Get list
+        res_list = client.get("/api/wishlist/")
+        assert res_list.status_code == 200
+        items = res_list.json()["data"]
+        assert len(items) == 1
+        assert items[0]["product"]["id"] == str(product.id)
+
+        # 3. Get IDs
+        res_ids = client.get("/api/wishlist/ids/")
+        assert res_ids.status_code == 200
+        assert res_ids.json()["data"] == [str(product.id)]
+
+        # 4. Toggle remove
+        res2 = client.post("/api/wishlist/toggle/", {"product_id": str(product.id)}, format="json")
+        assert res2.status_code == 200
+        assert res2.json()["data"]["is_wishlisted"] is False
+        assert res2.json()["data"]["count"] == 0
+

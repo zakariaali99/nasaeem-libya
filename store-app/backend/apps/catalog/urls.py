@@ -27,4 +27,9 @@ urlpatterns = [
     path("admin/inventory/logs/", views.InventoryLogsView.as_view(), name="inventory-logs"),
 
     path("images/", views.ImageUploadView.as_view(), name="image-upload"),
+
+    path("wishlist/", views.WishlistListView.as_view(), name="wishlist-list"),
+    path("wishlist/toggle/", views.WishlistToggleView.as_view(), name="wishlist-toggle"),
+    path("wishlist/ids/", views.WishlistIdsView.as_view(), name="wishlist-ids"),
 ]
+

@@ -11,6 +11,7 @@ import { ApiError } from '@/lib/api'
 import { useLogin } from '@/lib/queries/auth'
 import { type LoginInput, loginSchema } from '@/lib/schemas/auth'
 import { usePageTitle } from '@/lib/usePageTitle'
+import { isAdminRole } from '@/types/api'
 
 export default function LoginPage() {
   usePageTitle('تسجيل الدخول', 'سجّل الدخول إلى حسابك في نسائم ليبيا')
@@ -25,11 +26,17 @@ export default function LoginPage() {
   } = useForm<LoginInput>({ resolver: zodResolver(loginSchema) })
 
   const onSubmit = handleSubmit(async (values) => {
-    await login.mutateAsync(values)
+    const user = await login.mutateAsync(values)
     // Only ever redirect to an in-app path — an open redirect here would be a
     // gift to a phisher.
     const next = params.get('next')
-    navigate(next && next.startsWith('/') && !next.startsWith('//') ? next : '/me', { replace: true })
+    if (next && next.startsWith('/') && !next.startsWith('//')) {
+      navigate(next, { replace: true })
+    } else if (isAdminRole(user?.role)) {
+      navigate('/admin', { replace: true })
+    } else {
+      navigate('/me', { replace: true })
+    }
   })
 
   const serverMessage = login.error instanceof ApiError ? login.error.message : null

@@ -1,4 +1,10 @@
-import { AlertTriangle, Check } from 'lucide-react'
+import {
+  AlertTriangle,
+  CreditCard,
+  MapPin,
+  ShieldCheck,
+  Truck,
+} from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
@@ -19,7 +25,7 @@ import { usePageTitle } from '@/lib/usePageTitle'
 export default function CheckoutPage() {
   const { orderId = '' } = useParams()
   const navigate = useNavigate()
-  usePageTitle('إتمام الطلب', 'أدخل عنوان التوصيل واختر طريقة الدفع.')
+  usePageTitle('إتمام الطلب والدفع — نسائم ليبيا', 'أدخل عنوان التوصيل واختر طريقة الدفع.')
 
   const { data: order, isPending, isError, error, refetch } = useOrder(orderId)
   const confirm = useConfirmCheckout()
@@ -52,8 +58,6 @@ export default function CheckoutPage() {
     if (methods?.length && !method) setMethod(methods[0]!.code)
   }, [methods, method])
 
-  // Changing city invalidates the chosen region — leaving a region from the
-  // previous city selected is how an order gets shipped to the wrong place.
   useEffect(() => {
     setRegionId('')
   }, [cityId])
@@ -112,7 +116,6 @@ export default function CheckoutPage() {
         customer_notes: notes,
       })
 
-      // Electronic gateways initiate payment and redirect
       if (['moamalat', 'plutu', 'sadad_pay', 'binance_pay'].includes(payment)) {
         try {
           const initResult = await initiatePayment.mutateAsync({
@@ -126,7 +129,6 @@ export default function CheckoutPage() {
           navigate(`/checkout/redirect?order_id=${encodeURIComponent(order.id)}`)
           return
         } catch {
-          // If gateway initiation fails, fall through to redirect page for retry
           navigate(`/checkout/redirect?order_id=${encodeURIComponent(order.id)}`)
           return
         }
@@ -149,21 +151,43 @@ export default function CheckoutPage() {
   ).toFixed(2)
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-6">
-      <h1 className="mb-1 text-2xl font-bold sm:text-3xl">إتمام الطلب</h1>
-      <p className="mb-6 text-sm text-muted-foreground">
-        راجع طلبك وأدخل عنوان التوصيل. يُعرض رقم الطلب بعد التأكيد.
-      </p>
+    <div className="mx-auto w-full max-w-6xl px-4 py-8 animate-fade-rise space-y-6">
+      {/* Checkout Steps Progress Bar */}
+      <div className="flex items-center justify-center gap-2 sm:gap-4 py-2 border-b border-border/80">
+        <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
+          <span className="flex size-6 items-center justify-center rounded-full bg-muted text-muted-foreground font-mono">1</span>
+          <span>السلة</span>
+        </div>
+        <div className="h-0.5 w-6 sm:w-12 bg-primary" />
+        <div className="flex items-center gap-2 text-xs font-bold text-primary">
+          <span className="flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground font-mono">2</span>
+          <span>العنوان والدفع</span>
+        </div>
+        <div className="h-0.5 w-6 sm:w-12 bg-border" />
+        <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+          <span className="flex size-6 items-center justify-center rounded-full bg-muted text-muted-foreground font-mono">3</span>
+          <span>تأكيد الطلب</span>
+        </div>
+      </div>
 
-      <form className="grid gap-8 lg:grid-cols-[1fr_20rem]" onSubmit={submit} noValidate>
+      <div className="space-y-1">
+        <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">إتمام الطلب وتحديد التوصيل</h1>
+        <p className="text-xs sm:text-sm text-muted-foreground">
+          رقم الطلب المؤقت: <span className="font-mono font-bold text-foreground">#{order.order_number}</span>
+        </p>
+      </div>
+
+      <form className="grid gap-8 lg:grid-cols-[1fr_24rem] xl:grid-cols-[1fr_26rem] items-start" onSubmit={submit} noValidate>
         <div className="space-y-6">
-          <section className="space-y-4 rounded-lg border border-border bg-card p-4">
-            <h2 className="text-lg font-semibold">عنوان التوصيل</h2>
+          {/* Shipping Address Section */}
+          <section className="space-y-4 rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-xs">
+            <div className="flex items-center gap-2.5 border-b border-border/80 pb-3">
+              <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <MapPin className="size-4" />
+              </div>
+              <h2 className="text-base sm:text-lg font-bold text-foreground">عنوان ومكان التوصيل</h2>
+            </div>
 
-            {/* The empty-city failure the reference shipped: an empty <select>
-                with no explanation, and a customer who could not order. A fetch
-                failure is NOT the same problem — it must not be reported as
-                "the store has no cities". */}
             {citiesError ? (
               <ErrorState error={citiesFetchError} onRetry={() => refetchCities()} />
             ) : !citiesPending && cities.length === 0 ? (
@@ -173,12 +197,13 @@ export default function CheckoutPage() {
                   'لا توجد مدن توصيل مُعرّفة في المتجر حالياً، يرجى التواصل معنا لإتمام الطلب'}
               </Alert>
             ) : (
-              <>
-                <Field label="المدينة" htmlFor="city">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="المدينة *" htmlFor="city">
                   <Select
                     id="city"
                     value={cityId}
                     onChange={(event) => setCityId(event.target.value)}
+                    className="h-11 rounded-xl"
                     required
                   >
                     <option value="">اختر المدينة</option>
@@ -190,9 +215,9 @@ export default function CheckoutPage() {
                   </Select>
                 </Field>
 
-                <Field label="المنطقة" htmlFor="region" error={fieldErrors.region_id?.[0]}>
+                <Field label="المنطقة والحي *" htmlFor="region" error={fieldErrors.region_id?.[0]}>
                   {cityId && regions.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-xs text-muted-foreground pt-3">
                       {regionData?.message ?? 'لا توجد مناطق توصيل لهذه المدينة حالياً'}
                     </p>
                   ) : (
@@ -202,51 +227,62 @@ export default function CheckoutPage() {
                       onChange={(event) => setRegionId(event.target.value)}
                       disabled={!cityId}
                       aria-invalid={Boolean(fieldErrors.region_id)}
+                      className="h-11 rounded-xl"
                       required
                     >
                       <option value="">{cityId ? 'اختر المنطقة' : 'اختر المدينة أولاً'}</option>
                       {regions.map((region) => (
                         <option key={region.id} value={region.id}>
-                          {region.name} — {formatPrice(region.delivery_fee)}
+                          {region.name} — توصيل {formatPrice(region.delivery_fee)}
                         </option>
                       ))}
                     </Select>
                   )}
                 </Field>
-              </>
+              </div>
             )}
 
-            <Field label="العنوان بالتفصيل" htmlFor="address" error={fieldErrors.address?.[0]}>
+            <Field label="العنوان بالتفصيل *" htmlFor="address" error={fieldErrors.address?.[0]}>
               <Textarea
                 id="address"
-                rows={3}
+                rows={2}
                 value={address}
                 onChange={(event) => setAddress(event.target.value)}
-                placeholder="الشارع، أقرب نقطة دالة، رقم المبنى"
+                placeholder="الشارع، أقرب نقطة دالة، رقم العمارة أو المنزل..."
                 aria-invalid={Boolean(fieldErrors.address)}
+                className="rounded-xl text-xs sm:text-sm"
                 required
               />
             </Field>
 
-            <Field label="ملاحظات (اختياري)" htmlFor="notes">
+            <Field label="ملاحظات إضافية للتوصيل (اختياري)" htmlFor="notes">
               <Textarea
                 id="notes"
                 rows={2}
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
-                placeholder="أي تعليمات إضافية للتوصيل"
+                placeholder="الوقت المفضل للتسليم أو أي توجيهات للمندوب..."
+                className="rounded-xl text-xs sm:text-sm"
               />
             </Field>
           </section>
 
-          <section className="space-y-4 rounded-lg border border-border bg-card p-4">
-            <h2 className="text-lg font-semibold">طريقة التوصيل</h2>
+          {/* Delivery Courier Section */}
+          <section className="space-y-4 rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-xs">
+            <div className="flex items-center gap-2.5 border-b border-border/80 pb-3">
+              <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Truck className="size-4" />
+              </div>
+              <h2 className="text-base sm:text-lg font-bold text-foreground">شركة التوصيل والشحن</h2>
+            </div>
+
             {methods?.length ? (
-              <Field label="شركة التوصيل" htmlFor="method">
+              <Field label="اختر شركة التوصيل" htmlFor="method">
                 <Select
                   id="method"
                   value={method}
                   onChange={(event) => setMethod(event.target.value)}
+                  className="h-11 rounded-xl"
                 >
                   {methods.map((option) => (
                     <option key={option.id} value={option.code}>
@@ -256,84 +292,133 @@ export default function CheckoutPage() {
                 </Select>
               </Field>
             ) : (
-              <p className="text-sm text-muted-foreground">
-                لم تُفعّل أي شركة توصيل بعد؛ سنتواصل معك لترتيب التوصيل.
+              <p className="text-xs text-muted-foreground">
+                التوصيل المباشر عبر أسطول نسائم ليبيا إلى عنوانك.
               </p>
             )}
           </section>
 
-          <section className="space-y-3 rounded-lg border border-border bg-card p-4">
-            <h2 className="text-lg font-semibold">طريقة الدفع</h2>
-            {availablePaymentMethods && availablePaymentMethods.length > 0 ? (
-              availablePaymentMethods.map((m) => (
-                <PaymentChoice
-                  key={m.id}
-                  value={m.method_code}
-                  checked={payment === m.method_code}
-                  onChange={setPayment}
-                  title={m.display_name}
-                  description={m.description || ''}
-                />
-              ))
-            ) : (
-              <>
-                <PaymentChoice
-                  value="manual_payment"
-                  checked={payment === 'manual_payment'}
-                  onChange={setPayment}
-                  title="تحويل بنكي"
-                  description="سنرسل لك تفاصيل الحساب، وتُرفق إيصال التحويل بعد الدفع."
-                />
-                <PaymentChoice
-                  value="bank_cards_on_delivery"
-                  checked={payment === 'bank_cards_on_delivery'}
-                  onChange={setPayment}
-                  title="بطاقة عند الاستلام"
-                  description="الدفع بالبطاقة عبر جهاز المندوب عند التسليم."
-                />
-              </>
-            )}
+          {/* Payment Methods Section */}
+          <section className="space-y-4 rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-xs">
+            <div className="flex items-center gap-2.5 border-b border-border/80 pb-3">
+              <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <CreditCard className="size-4" />
+              </div>
+              <h2 className="text-base sm:text-lg font-bold text-foreground">طريقة الدفع</h2>
+            </div>
+
+            <div className="space-y-2.5">
+              {availablePaymentMethods && availablePaymentMethods.length > 0 ? (
+                availablePaymentMethods.map((m) => (
+                  <PaymentChoice
+                    key={m.id}
+                    value={m.method_code}
+                    checked={payment === m.method_code}
+                    onChange={setPayment}
+                    title={m.display_name}
+                    description={m.description || ''}
+                  />
+                ))
+              ) : (
+                <>
+                  <PaymentChoice
+                    value="manual_payment"
+                    checked={payment === 'manual_payment'}
+                    onChange={setPayment}
+                    title="تحويل مصرفي مباشر"
+                    description="إرسال إيصال التحويل عبر التطبيق بعد تأكيد الطلب."
+                  />
+                  <PaymentChoice
+                    value="bank_cards_on_delivery"
+                    checked={payment === 'bank_cards_on_delivery'}
+                    onChange={setPayment}
+                    title="الدفع بالبطاقة عند الاستلام (POS)"
+                    description="الدفع بالبطاقة المصرفية عبر جهاز نقاط البيع لدى مندوب التوصيل."
+                  />
+                </>
+              )}
+            </div>
           </section>
         </div>
 
-        <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
-          <ul className="space-y-2 rounded-lg border border-border bg-card p-4 text-sm">
-            {order.items.map((item) => (
-              <li key={item.id} className="flex justify-between gap-3">
-                <span className="min-w-0">
-                  <span className="line-clamp-1">{item.product_name}</span>
-                  <span className="text-muted-foreground">
-                    {item.variant_label ? `${item.variant_label} · ` : ''}×{item.quantity}
-                  </span>
-                </span>
-                <span className="shrink-0 tabular-nums">{formatPrice(item.total_price)}</span>
-              </li>
-            ))}
-          </ul>
+        {/* Order Summary Sidebar */}
+        <aside className="space-y-5 lg:sticky lg:top-24 lg:self-start">
+          <div className="rounded-2xl border border-border bg-card p-5 shadow-xs space-y-4">
+            <h3 className="text-sm font-bold text-foreground border-b border-border/80 pb-2">
+              ملخص الأصناف في الطلب
+            </h3>
+            
+            <ul className="space-y-2.5 text-xs max-h-48 overflow-y-auto">
+              {order.items.map((item) => (
+                <li key={item.id} className="flex justify-between gap-3 border-b border-border/40 pb-2 last:border-0 last:pb-0">
+                  <div className="min-w-0">
+                    <span className="font-bold text-foreground line-clamp-1">{item.product_name}</span>
+                    <span className="text-muted-foreground font-mono">
+                      {item.variant_label ? `${item.variant_label} · ` : ''}×{item.quantity}
+                    </span>
+                  </div>
+                  <span className="shrink-0 font-mono font-bold text-price">{formatPrice(item.total_price)}</span>
+                </li>
+              ))}
+            </ul>
 
-          <OrderSummary
-            subtotal={order.subtotal}
-            discountTotal={order.discount_total}
-            shippingTotal={shipping}
-            total={total}
-            shippingNote="اختر المنطقة لحساب رسوم التوصيل"
-          />
+            <div className="border-t border-border/80 pt-3">
+              <OrderSummary
+                subtotal={order.subtotal}
+                discountTotal={order.discount_total}
+                shippingTotal={shipping}
+                total={total}
+                shippingNote="رسوم التوصيل محتسبة للمنطقة المحددة"
+              />
+            </div>
 
-          {formError ? (
-            <Alert tone="error" role="alert">
-              {formError}
-            </Alert>
-          ) : null}
+            {formError ? (
+              <p role="alert" className="text-xs font-semibold text-destructive">
+                {formError}
+              </p>
+            ) : null}
 
-          <Button type="submit" size="lg" block loading={confirm.isPending}>
-            <Check aria-hidden="true" />
-            تأكيد الطلب
-          </Button>
-          <Button asChild variant="ghost" block>
-            <Link to="/cart">العودة إلى السلة</Link>
-          </Button>
+            <Button
+              type="submit"
+              size="lg"
+              block
+              loading={confirm.isPending || initiatePayment.isPending}
+              className="rounded-xl font-bold text-sm h-12 shadow-sm"
+            >
+              تأكيد الطلب الآن
+            </Button>
+
+            <div className="border-t border-border/80 pt-3 text-center space-y-1">
+              <div className="flex items-center justify-center gap-1 text-[11px] font-semibold text-muted-foreground">
+                <ShieldCheck className="size-3.5 text-emerald-500" />
+                <span>ضمان نسائم ليبيا الذهبي للأصالة والجودة</span>
+              </div>
+            </div>
+          </div>
         </aside>
       </form>
+
+      {/* Mobile Sticky Checkout Bar */}
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 p-3 px-4 backdrop-blur-md shadow-2xl lg:hidden pb-safe">
+        <div className="flex items-center justify-between gap-3 max-w-lg mx-auto">
+          <div>
+            <span className="text-[10px] text-muted-foreground block font-medium">الإجمالي النهائي:</span>
+            <span className="font-mono text-base font-extrabold text-price">{formatPrice(total)}</span>
+          </div>
+          <Button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault()
+              submit(e)
+            }}
+            loading={confirm.isPending || initiatePayment.isPending}
+            className="rounded-xl font-bold h-11 px-6 text-xs shadow-md gap-1.5"
+          >
+            <span>تأكيد الطلب</span>
+          </Button>
+        </div>
+      </div>
+      <div className="h-16 lg:hidden" aria-hidden="true" />
     </div>
   )
 }
@@ -352,19 +437,27 @@ function PaymentChoice({
   description: string
 }) {
   return (
-    <label className="flex cursor-pointer items-start gap-3 rounded-md border border-input p-3 has-checked:border-primary has-checked:bg-primary/5">
+    <label
+      className={`flex cursor-pointer items-start gap-3.5 rounded-2xl border p-4 transition-all shadow-2xs ${
+        checked
+          ? 'border-primary bg-primary/5 shadow-xs ring-1 ring-primary/30'
+          : 'border-border bg-card hover:border-primary/40'
+      }`}
+    >
       <input
         type="radio"
         name="payment_method"
         value={value}
         checked={checked}
         onChange={() => onChange(value)}
-        className="mt-1 size-5 accent-primary"
+        className="mt-0.5 size-4 accent-primary"
       />
-      <span>
-        <span className="block font-medium">{title}</span>
-        <span className="block text-sm text-muted-foreground">{description}</span>
-      </span>
+      <div className="min-w-0 flex-1">
+        <span className="block text-xs sm:text-sm font-bold text-foreground">{title}</span>
+        {description && (
+          <span className="block text-[11px] text-muted-foreground mt-0.5">{description}</span>
+        )}
+      </div>
     </label>
   )
 }
@@ -381,13 +474,13 @@ function Field({
   children: React.ReactNode
 }) {
   return (
-    <div className="space-y-1">
-      <label htmlFor={htmlFor} className="text-sm font-medium">
+    <div className="space-y-1.5">
+      <label htmlFor={htmlFor} className="text-xs font-bold text-foreground">
         {label}
       </label>
       {children}
       {error ? (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-[11px] font-semibold text-destructive">
           {error}
         </p>
       ) : null}
@@ -397,17 +490,15 @@ function Field({
 
 function CheckoutSkeleton() {
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-6" aria-busy="true">
-      <span className="sr-only" role="status">
-        جارٍ تحميل الطلب…
-      </span>
-      <Skeleton className="mb-6 h-9 w-48" />
-      <div className="grid gap-8 lg:grid-cols-[1fr_20rem]">
+    <div className="mx-auto w-full max-w-5xl px-4 py-8 space-y-6" aria-busy="true">
+      <Skeleton className="h-8 w-48 rounded-xl" />
+      <div className="grid gap-8 lg:grid-cols-[1fr_22rem]">
         <div className="space-y-4">
-          <Skeleton className="h-72 w-full" />
-          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-64 w-full rounded-2xl" />
+          <Skeleton className="h-32 w-full rounded-2xl" />
+          <Skeleton className="h-44 w-full rounded-2xl" />
         </div>
-        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-72 w-full rounded-2xl" />
       </div>
     </div>
   )

@@ -17,13 +17,14 @@ from django.utils import timezone
 
 class Role(models.TextChoices):
     CUSTOMER = "customer", "عميل"
+    SUPPORT = "support", "خدمة العملاء"
     STAFF = "staff", "موظف"
     MANAGER = "manager", "مشرف"
     ADMIN = "admin", "مدير"
     OWNER = "owner", "مالك"
 
 
-ADMIN_ROLES = frozenset({Role.STAFF, Role.MANAGER, Role.ADMIN, Role.OWNER})
+ADMIN_ROLES = frozenset({Role.SUPPORT, Role.STAFF, Role.MANAGER, Role.ADMIN, Role.OWNER})
 
 
 class UserManager(BaseUserManager):
@@ -83,6 +84,26 @@ class User(AbstractBaseUser, PermissionsMixin):
     legacy_id = models.CharField(
         max_length=64, null=True, blank=True, unique=True, editable=False, default=None
     )
+    # VIP Loyalty & Points Engine
+    loyalty_points = models.PositiveIntegerField("نقاط الولاء", default=0)
+    lifetime_spend = models.DecimalField(
+        "إجمالي المشتريات (د.ل)", max_digits=12, decimal_places=2, default=Decimal("0.00")
+    )
+    vip_tier = models.CharField(
+        "مستوى VIP",
+        max_length=20,
+        choices=[
+            ("SILVER", "المستوى الفضي"),
+            ("GOLD", "المستوى الذهبي"),
+            ("DIAMOND", "المستوى الماسي"),
+        ],
+        default="SILVER",
+    )
+    # Anti-Fraud & COD Blacklist Engine
+    is_cod_blacklisted = models.BooleanField("محظور من الدفع عند الاستلام", default=False)
+    cod_rejections_count = models.PositiveIntegerField("عدد مرات رفض طلبات COD", default=0)
+    cod_blacklist_reason = models.CharField("سبب حظر الدفع عند الاستلام", max_length=255, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -99,6 +120,21 @@ class User(AbstractBaseUser, PermissionsMixin):
     def __str__(self):
         return f"{self.name or 'مستخدم'} ({self.phone_number})"
 
+    def recalculate_vip_tier(self):
+        """Recalculate VIP tier according to cumulative spend."""
+        if self.lifetime_spend >= Decimal("2500.00"):
+            self.vip_tier = "DIAMOND"
+        elif self.lifetime_spend >= Decimal("1000.00"):
+            self.vip_tier = "GOLD"
+        else:
+            self.vip_tier = "SILVER"
+        self.save(update_fields=["vip_tier", "updated_at"])
+        return self.vip_tier
+
+    @property
+    def is_admin_role(self):
+        return self.role in ADMIN_ROLES
+
     @property
     def is_banned(self):
         """A ban with no expiry is permanent; one with a future expiry is live."""
@@ -108,9 +144,36 @@ class User(AbstractBaseUser, PermissionsMixin):
             return True
         return self.ban_expires_at > timezone.now()
 
-    @property
-    def is_admin_role(self):
-        return self.role in ADMIN_ROLES
+
+class LoyaltyTransaction(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="loyalty_transactions", verbose_name="العميل"
+    )
+    order = models.ForeignKey(
+        "orders.Order", on_delete=models.SET_NULL, null=True, blank=True, related_name="loyalty_transactions", verbose_name="الطلب"
+    )
+    points_change = models.IntegerField("تغير النقاط")
+    transaction_type = models.CharField(
+        "نوع الحركة",
+        max_length=30,
+        choices=[
+            ("ORDER_EARNED", "اكتساب من طلب"),
+            ("REVIEW_BONUS", "مكافأة تقييم موثق"),
+            ("CHECKOUT_REDEEMED", "خصم عند الشراء"),
+            ("MANUAL_ADJUSTMENT", "تعديل يدوي"),
+        ],
+    )
+    description = models.CharField("الوصف", max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "حركة نقاط ولاء"
+        verbose_name_plural = "سجل حركات الولاء"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.user.phone_number}: {self.points_change:+d} ({self.get_transaction_type_display()})"
 
 
 class City(models.Model):

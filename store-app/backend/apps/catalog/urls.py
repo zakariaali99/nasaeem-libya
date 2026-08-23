@@ -28,6 +28,13 @@ urlpatterns = [
 
     path("images/", views.ImageUploadView.as_view(), name="image-upload"),
 
+    path("search/predictive/", views.PredictiveSearchView.as_view(), name="search-predictive"),
+    path("fragrance-finder/", views.FragranceFinderView.as_view(), name="fragrance-finder"),
+
+    path("products/<str:slug>/reviews/", views.ProductReviewsView.as_view(), name="product-reviews"),
+    path("admin/reviews/", views.AdminReviewsView.as_view(), name="admin-reviews-list"),
+    path("admin/reviews/<uuid:pk>/", views.AdminReviewsView.as_view(), name="admin-reviews-detail"),
+
     path("wishlist/", views.WishlistListView.as_view(), name="wishlist-list"),
     path("wishlist/toggle/", views.WishlistToggleView.as_view(), name="wishlist-toggle"),
     path("wishlist/ids/", views.WishlistIdsView.as_view(), name="wishlist-ids"),

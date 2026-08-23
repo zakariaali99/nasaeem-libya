@@ -10,6 +10,7 @@ bug, and `assertNumQueries` in the tests is what keeps it one.
 
 from decimal import Decimal, InvalidOperation
 
+from django.core.cache import cache
 from django.db.models import Prefetch, Q
 from django.shortcuts import get_object_or_404
 from rest_framework import status
@@ -28,6 +29,7 @@ from .models import (
     Collection,
     InventoryLog,
     Product,
+    ProductReview,
     ProductVariant,
     VariantOption,
     VariantValue,
@@ -40,6 +42,7 @@ from .serializers import (
     InventoryLogSerializer,
     ProductDetailSerializer,
     ProductListSerializer,
+    ProductReviewSerializer,
     ProductVariantSerializer,
     ProductWriteSerializer,
     VariantOptionSerializer,
@@ -188,10 +191,19 @@ class ProductDetailView(APIView):
 
     def get(self, request, lookup):
         admin = bool(request.user.is_authenticated and getattr(request.user, "is_admin_role", False))
+        cache_key = f"store:product:{lookup}"
+        if not admin:
+            cached_data = cache.get(cache_key)
+            if cached_data is not None:
+                return Response({"data": cached_data})
+
         product = self.get_object(lookup, admin=admin)
         if product is None:
             return Response({"message": "المنتج غير موجود"}, status=status.HTTP_404_NOT_FOUND)
-        return Response({"data": ProductDetailSerializer(product, context={"request": request}).data})
+        serialized_data = ProductDetailSerializer(product, context={"request": request}).data
+        if not admin:
+            cache.set(cache_key, serialized_data, 21600)
+        return Response({"data": serialized_data})
 
     def patch(self, request, lookup):
         product = self.get_object(lookup, admin=True)
@@ -202,6 +214,9 @@ class ProductDetailView(APIView):
         )
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        cache.delete(f"store:product:{lookup}")
+        if product.slug:
+            cache.delete(f"store:product:{product.slug}")
         return Response({"data": serializer.data, "message": "تم تحديث المنتج"})
 
     def delete(self, request, lookup):
@@ -210,6 +225,9 @@ class ProductDetailView(APIView):
             return Response({"message": "المنتج غير موجود"}, status=status.HTTP_404_NOT_FOUND)
         from django.db.models import ProtectedError
 
+        cache.delete(f"store:product:{lookup}")
+        if product.slug:
+            cache.delete(f"store:product:{product.slug}")
         try:
             product.delete()
         except ProtectedError:
@@ -227,8 +245,14 @@ class CategoryListView(APIView):
         return [AllowAny()] if self.request.method == "GET" else [IsAdminRole()]
 
     def get(self, request):
+        admin = bool(request.user.is_authenticated and getattr(request.user, "is_admin_role", False))
+        if not admin:
+            cached = cache.get("store:categories:tree")
+            if cached is not None:
+                return Response({"data": cached, "meta": {"total": len(cached)}})
+
         queryset = Category.objects.all()
-        if not (request.user.is_authenticated and getattr(request.user, "is_admin_role", False)):
+        if not admin:
             queryset = queryset.filter(is_active=True)
 
         categories = list(queryset.order_by("name"))
@@ -240,12 +264,15 @@ class CategoryListView(APIView):
 
         roots = by_parent.get(None, [])
         serializer = CategorySerializer(roots, many=True, context={"request": request})
+        if not admin:
+            cache.set("store:categories:tree", serializer.data, 86400)
         return Response({"data": serializer.data, "meta": {"total": len(categories)}})
 
     def post(self, request):
         serializer = CategorySerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        cache.delete("store:categories:tree")
         return Response({"data": serializer.data, "message": "تم إنشاء التصنيف"},
                         status=status.HTTP_201_CREATED)
 
@@ -279,6 +306,7 @@ class CategoryDetailView(APIView):
                                         context={"request": request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        cache.delete("store:categories:tree")
         return Response({"data": serializer.data, "message": "تم تحديث التصنيف"})
 
     def delete(self, request, lookup):
@@ -288,6 +316,7 @@ class CategoryDetailView(APIView):
         if category.is_system:
             return Response({"message": "لا يمكن حذف تصنيف نظامي"}, status=status.HTTP_400_BAD_REQUEST)
         category.delete()
+        cache.delete("store:categories:tree")
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -675,4 +704,159 @@ class WishlistIdsView(APIView):
             WishlistItem.objects.filter(user=request.user).values_list("product_id", flat=True)
         )
         return Response({"data": [str(pid) for pid in product_ids]})
+
+
+class PredictiveSearchView(APIView):
+    """Instant predictive search endpoint for popovers with Arabic normalization & transliteration."""
+
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        from .search_service import perform_predictive_search
+        query = request.query_params.get("q", "")
+        results = perform_predictive_search(query)
+        return Response({"data": results})
+
+
+class FragranceFinderView(APIView):
+    """AI Fragrance Finder: questionnaire recommendations with luxury reasoning."""
+
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        from .search_service import find_fragrance_recommendations
+        gender = request.data.get("gender", "ALL")
+        vibe = request.data.get("vibe", "ORIENTAL")
+        occasion = request.data.get("occasion", "EVENING")
+        budget = request.data.get("budget")
+        max_budget = float(budget) if budget else None
+
+        recommendations = find_fragrance_recommendations(
+            gender=gender,
+            vibe=vibe,
+            occasion=occasion,
+            max_budget=max_budget,
+        )
+        return Response({"data": recommendations})
+
+
+class ProductReviewsView(APIView):
+    """Product reviews listing and verified buyer submission with +50 points loyalty reward."""
+
+    def get_permissions(self):
+        return [AllowAny()] if self.request.method == "GET" else [IsAuthenticated()]
+
+    def get(self, request, slug):
+        product = Product.objects.filter(slug=slug).first()
+        if product is None:
+            return Response({"message": "المنتج غير موجود"}, status=status.HTTP_404_NOT_FOUND)
+
+        reviews = product.reviews.filter(is_approved=True)
+        total = reviews.count()
+        if total > 0:
+            avg_rating = round(sum(r.rating for r in reviews) / total, 1)
+        else:
+            avg_rating = 5.0
+
+        breakdown = {
+            "5": reviews.filter(rating=5).count(),
+            "4": reviews.filter(rating=4).count(),
+            "3": reviews.filter(rating=3).count(),
+            "2": reviews.filter(rating=2).count(),
+            "1": reviews.filter(rating=1).count(),
+        }
+
+        serializer = ProductReviewSerializer(reviews, many=True)
+        return Response({
+            "data": {
+                "reviews": serializer.data,
+                "average_rating": avg_rating,
+                "total_reviews": total,
+                "rating_breakdown": breakdown,
+            }
+        })
+
+    def post(self, request, slug):
+        from apps.core.models import LoyaltyTransaction
+        from apps.orders.models import OrderItem, OrderStatus
+
+        product = Product.objects.filter(slug=slug).first()
+        if product is None:
+            return Response({"message": "المنتج غير موجود"}, status=status.HTTP_404_NOT_FOUND)
+
+        rating = int(request.data.get("rating", 5))
+        if rating < 1 or rating > 5:
+            return Response({"message": "التقييم يجب أن يكون بين 1 و 5 نجوم"}, status=status.HTTP_400_BAD_REQUEST)
+
+        comment = str(request.data.get("comment", "")).strip()
+        if not comment:
+            return Response({"message": "يرجى كتابة نص التقييم وتجربتك مع العطر"}, status=status.HTTP_400_BAD_REQUEST)
+
+        title = str(request.data.get("title", "")).strip()
+        photo_url = str(request.data.get("photo_url", "")).strip()
+
+        # Check if buyer purchased this product in an active or completed order
+        is_verified = OrderItem.objects.filter(
+            order__user=request.user, product=product
+        ).exclude(order__status=OrderStatus.CANCELLED).exists()
+
+        review = ProductReview.objects.create(
+            product=product,
+            user=request.user,
+            rating=rating,
+            title=title,
+            comment=comment,
+            photo_url=photo_url,
+            is_verified_buyer=is_verified,
+            is_approved=True,
+            points_awarded=True,
+        )
+
+        # 50 Loyalty Points Bonus
+        request.user.loyalty_points += 50
+        request.user.save(update_fields=["loyalty_points", "updated_at"])
+        LoyaltyTransaction.objects.create(
+            user=request.user,
+            points_change=50,
+            transaction_type="REVIEW_BONUS",
+            description=f"مكافأة تقييم وتصوير تجربة عطر {product.name}",
+        )
+
+        return Response(
+            {
+                "data": ProductReviewSerializer(review).data,
+                "message": "شكراً لك! تم نشر تقييمك وإضافة 50 نقطة مكافأة إلى رصيدك الملكي 🎁",
+                "bonus_points": 50,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class AdminReviewsView(APIView):
+    """Admin moderation for customer product reviews."""
+
+    permission_classes = [IsAdminRole]
+
+    def get(self, request):
+        reviews = ProductReview.objects.select_related("product", "user").all()
+        serializer = ProductReviewSerializer(reviews, many=True)
+        return Response({"data": serializer.data, "meta": {"total": reviews.count()}})
+
+    def patch(self, request, pk):
+        review = ProductReview.objects.filter(id=pk).first()
+        if review is None:
+            return Response({"message": "التقييم غير موجود"}, status=status.HTTP_404_NOT_FOUND)
+
+        if "is_approved" in request.data:
+            review.is_approved = bool(request.data["is_approved"])
+            review.save(update_fields=["is_approved", "updated_at"])
+
+        return Response({"data": ProductReviewSerializer(review).data, "message": "تم تحديث حالة التقييم"})
+
+    def delete(self, request, pk):
+        review = ProductReview.objects.filter(id=pk).first()
+        if review is None:
+            return Response({"message": "التقييم غير موجود"}, status=status.HTTP_404_NOT_FOUND)
+        review.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 

@@ -53,8 +53,7 @@ class SadadPayGateway(PaymentGateway):
         return WebhookResult(
             success=status == PaymentStatus.COMPLETED,
             order_number=str(payload.get("orderId") or ""),
-            payment_reference=str(payload.get("paymentId") or ""),
-            transaction_id=payload.get("transactionId"),
+            transaction_id=str(payload.get("paymentId") or ""),
             status=status,
             message="تم معالجة إشعار الدفع بنجاح" if status != PaymentStatus.PENDING else "حالة غير معروفة",
             raw=payload,

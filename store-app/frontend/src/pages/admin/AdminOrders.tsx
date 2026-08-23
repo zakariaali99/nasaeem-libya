@@ -3,18 +3,26 @@ import {
   CheckCircle2,
   Clock,
   FilterX,
+  Loader2,
+  PackageCheck,
+  Printer,
   ShoppingBag,
+  Trash2,
   Truck,
   User,
+  X,
+  Zap,
 } from 'lucide-react'
+import * as React from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { DataTable } from '@/components/admin/DataTable'
+import { QuickOrderModal } from '@/components/admin/QuickOrderModal'
 import { StatusBadge } from '@/components/admin/StatusBadge'
 import { PageHeader } from '@/components/layout/AdminLayout'
 import { Button } from '@/components/ui/button'
 import { formatNumber, formatPrice } from '@/lib/format'
-import { useMyOrders } from '@/lib/queries/orders'
+import { useBulkOrderAction, useMyOrders } from '@/lib/queries/orders'
 import { usePageTitle } from '@/lib/usePageTitle'
 import { useUrlState } from '@/lib/useUrlState'
 import type { Order } from '@/types/api'
@@ -28,6 +36,9 @@ export default function AdminOrders() {
   const currentShipping = params.get('shipping')
   const currentSearch = params.get('search')
 
+  const [quickOrderOpen, setQuickOrderOpen] = React.useState(false)
+  const [bulkFeedback, setBulkFeedback] = React.useState<string | null>(null)
+
   const query = useMyOrders({
     search: currentSearch || undefined,
     status: currentStatus || undefined,
@@ -35,8 +46,25 @@ export default function AdminOrders() {
     limit: 20,
   })
 
+  const bulkAction = useBulkOrderAction()
+
   const orders = query.data?.items ?? []
   const totalOrders = query.data?.meta?.total ?? 0
+
+  const handleBulkAction = async (action: 'mark_processing' | 'mark_shipped' | 'mark_completed' | 'mark_cancelled', targetIds: string[]) => {
+    if (!targetIds || targetIds.length === 0) return
+    try {
+      const res = await bulkAction.mutateAsync({
+        order_ids: targetIds,
+        action,
+      })
+      setBulkFeedback(res.message)
+      setTimeout(() => setBulkFeedback(null), 4000)
+    } catch {
+      setBulkFeedback('حدث خطأ أثناء تنفيذ العملية الجماعية')
+      setTimeout(() => setBulkFeedback(null), 4000)
+    }
+  }
 
   // Calculate quick metrics
   const pendingCount = orders.filter((o) => o.status === 'pending').length
@@ -165,7 +193,29 @@ export default function AdminOrders() {
       <PageHeader
         title="إدارة الطلبات والمبيعات"
         description="متابعة طلبات العطور الواردة، تحديث الحالات التشغيلية، ومعالجة الشحنات"
+        action={
+          <Button
+            onClick={() => setQuickOrderOpen(true)}
+            className="h-10 px-4 text-xs font-bold gap-2 rounded-xl bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 transition-colors"
+          >
+            <Zap className="size-4" />
+            <span>إضافة طلب يدوي سريع (⚡)</span>
+          </Button>
+        }
       />
+
+      {bulkFeedback && (
+        <div className="rounded-xl border border-primary/30 bg-primary/10 p-3.5 text-xs font-bold text-primary animate-fade-rise flex items-center justify-between">
+          <span>{bulkFeedback}</span>
+          <button
+            type="button"
+            onClick={() => setBulkFeedback(null)}
+            className="text-primary hover:opacity-80"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+      )}
 
       {/* KPI Metric Summary Ribbon */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -220,6 +270,77 @@ export default function AdminOrders() {
         onSearchChange={(search) => url.set({ search, page: 1 })}
         searchPlaceholder="ابحث برقم الطلب، اسم العميل، أو رقم الهاتف..."
         filterChips={filterChips}
+        bulkActions={(selected, clear) => (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              asChild
+              size="sm"
+              variant="outline"
+              className="h-8 text-xs font-bold rounded-lg border-primary/40 bg-primary/10 text-primary hover:bg-primary/20"
+            >
+              <Link to={`/admin/orders/batch-waybills?ids=${selected.join(',')}`}>
+                <Printer className="size-3.5 me-1" />
+                <span>طباعة البوالص ({selected.length})</span>
+              </Link>
+            </Button>
+
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={bulkAction.isPending}
+              onClick={async () => {
+                await handleBulkAction('mark_processing', selected)
+                clear()
+              }}
+              className="h-8 text-xs font-bold rounded-lg border-sky-500/30 text-sky-600 hover:bg-sky-500/10"
+            >
+              {bulkAction.isPending ? <Loader2 className="size-3 me-1 animate-spin" /> : <Clock className="size-3.5 me-1 text-sky-500" />}
+              <span>قيد التجهيز</span>
+            </Button>
+
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={bulkAction.isPending}
+              onClick={async () => {
+                await handleBulkAction('mark_shipped', selected)
+                clear()
+              }}
+              className="h-8 text-xs font-bold rounded-lg border-primary/30 text-primary hover:bg-primary/10"
+            >
+              {bulkAction.isPending ? <Loader2 className="size-3 me-1 animate-spin" /> : <Truck className="size-3.5 me-1" />}
+              <span>تسليم للمندوب</span>
+            </Button>
+
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={bulkAction.isPending}
+              onClick={async () => {
+                await handleBulkAction('mark_completed', selected)
+                clear()
+              }}
+              className="h-8 text-xs font-bold rounded-lg border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/10"
+            >
+              {bulkAction.isPending ? <Loader2 className="size-3 me-1 animate-spin" /> : <PackageCheck className="size-3.5 me-1 text-emerald-500" />}
+              <span>مكتمل ومسلّم</span>
+            </Button>
+
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={bulkAction.isPending}
+              onClick={async () => {
+                await handleBulkAction('mark_cancelled', selected)
+                clear()
+              }}
+              className="h-8 text-xs font-bold rounded-lg border-destructive/30 text-destructive hover:bg-destructive/10"
+            >
+              <Trash2 className="size-3.5 me-1" />
+              <span>إلغاء</span>
+            </Button>
+          </div>
+        )}
         toolbar={
           hasActiveFilters ? (
             <Button
@@ -237,6 +358,9 @@ export default function AdminOrders() {
         emptyTitle="لا توجد طلبات مطابقة"
         emptyDescription="جرّب تعديل عبارة البحث أو اختيار حالة تصفية أخرى من الأعلى."
       />
+
+      {/* Quick Order Modal */}
+      <QuickOrderModal open={quickOrderOpen} onOpenChange={setQuickOrderOpen} />
     </div>
   )
 }

@@ -42,3 +42,9 @@ def get_gateway(method_code: str) -> PaymentGateway:
 
 def known_codes() -> list[str]:
     return sorted(_REGISTRY)
+
+
+def get_gateway_config(method_code: str) -> dict:
+    from apps.orders.models import PaymentMethodConfiguration
+    cfg = PaymentMethodConfiguration.objects.filter(method_code=method_code).first()
+    return cfg.config_data if cfg else {}

@@ -2,13 +2,20 @@ import { Heart, Share2, ShoppingBag } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
+import { DiscoveryBoxBanner } from '@/components/storefront/DiscoveryBoxBanner'
 import { EmptyState } from '@/components/storefront/EmptyState'
 import { ErrorState } from '@/components/storefront/ErrorState'
-import { Price } from '@/components/storefront/Price'
 import { DiscountBadge } from '@/components/storefront/DiscountBadge'
+import { FragrancePyramid } from '@/components/storefront/FragrancePyramid'
+import { FrequentlyBoughtTogether } from '@/components/storefront/FrequentlyBoughtTogether'
+import { LiveSocialProof } from '@/components/storefront/LiveSocialProof'
+import { Price } from '@/components/storefront/Price'
 import { ProductGallery } from '@/components/storefront/ProductGallery'
 import { ProductGrid } from '@/components/storefront/ProductGrid'
+import { ProductTrustBadges } from '@/components/storefront/ProductTrustBadges'
+import { SensoryPerformanceRadar } from '@/components/storefront/SensoryPerformanceRadar'
 import { StockBadge } from '@/components/storefront/StockBadge'
+import { VerifiedPhotoReviews } from '@/components/storefront/VerifiedPhotoReviews'
 import {
   VariantSelector,
   matchVariant,
@@ -173,6 +180,8 @@ function ProductView({
             ) : null}
           </div>
 
+          <LiveSocialProof product={product} />
+
           <div className="flex flex-wrap items-center gap-3">
             <Price price={price} compareAtPrice={compareAt} size="lg" />
             <DiscountBadge price={price} compareAtPrice={compareAt} />
@@ -235,20 +244,9 @@ function ProductView({
             </Alert>
           ) : null}
 
-          {/* Luxury trust strip */}
-          <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border/80 text-center">
-            <div className="rounded-xl border border-border bg-muted/20 p-2.5 space-y-1">
-              <span className="block text-xs font-bold text-foreground">💯 عطر أصلي</span>
-              <span className="text-[10px] text-muted-foreground">مضمون 100%</span>
-            </div>
-            <div className="rounded-xl border border-border bg-muted/20 p-2.5 space-y-1">
-              <span className="block text-xs font-bold text-foreground">🚚 شحن سريع</span>
-              <span className="text-[10px] text-muted-foreground">لكافة مدن ليبيا</span>
-            </div>
-            <div className="rounded-xl border border-border bg-muted/20 p-2.5 space-y-1">
-              <span className="block text-xs font-bold text-foreground">🛡️ دفع آمن</span>
-              <span className="text-[10px] text-muted-foreground">إلكتروني أو كاش</span>
-            </div>
+          {/* Luxury trust badges */}
+          <div className="pt-2 border-t border-border/80">
+            <ProductTrustBadges />
           </div>
         </div>
       </div>
@@ -261,6 +259,29 @@ function ProductView({
           </p>
         </section>
       ) : null}
+
+      {/* Sensory Olfactory Pyramid & Performance Radar */}
+      <section className="mt-10 space-y-6">
+        <FragrancePyramid details={product.perfume_details} />
+        <SensoryPerformanceRadar details={product.perfume_details} />
+      </section>
+
+      {/* Frequently Bought Together & Bundles */}
+      {product.bundles && product.bundles[0] ? (
+        <section className="mt-10">
+          <FrequentlyBoughtTogether product={product} bundle={product.bundles[0]} />
+        </section>
+      ) : null}
+
+      {/* Discovery Box & 100% Cashback Banner */}
+      <section className="mt-10">
+        <DiscoveryBoxBanner />
+      </section>
+
+      {/* Verified Customer Photo Reviews */}
+      <section className="mt-10">
+        <VerifiedPhotoReviews productSlug={product.slug} productName={product.name} />
+      </section>
 
       <Specs product={product} variant={variant} />
       <RelatedProducts product={product} />

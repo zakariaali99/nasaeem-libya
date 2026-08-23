@@ -6,6 +6,7 @@ the Arabic label is the only thing a user sees.
 """
 
 import uuid
+from decimal import Decimal
 
 from django.conf import settings
 from django.db import models
@@ -120,8 +121,30 @@ class Discount(TimestampedModel):
         verbose_name_plural = "الخصومات"
         ordering = ["-created_at"]
 
+class CartPromotion(TimestampedModel):
+    title = models.CharField("عنوان العرض", max_length=150, default="توصيل مجاني")
+    message = models.CharField(
+        "نص التشجيع",
+        max_length=255,
+        default="أضف {remaining} د.ل للحصول على توصيل مجاني!",
+    )
+    success_message = models.CharField(
+        "رسالة النجاح",
+        max_length=255,
+        default="تهانينا! لقد حصلت على توصيل مجاني لكافة المدن 🚀",
+    )
+    min_order_amount = models.DecimalField(
+        "الحد الأدنى للطلب", max_digits=10, decimal_places=2, default=200.00
+    )
+    is_active = models.BooleanField("مفعّل", default=True, db_index=True)
+
+    class Meta:
+        verbose_name = "عرض السلة والشحن المجاني"
+        verbose_name_plural = "عروض السلة والشحن المجاني"
+        ordering = ["-created_at"]
+
     def __str__(self):
-        return self.code or self.name
+        return f"{self.title} (حد أدنى: {self.min_order_amount} د.ل)"
 
 
 class Cart(TimestampedModel):
@@ -141,6 +164,11 @@ class Cart(TimestampedModel):
     )
     session_id = models.CharField("معرّف الجلسة", max_length=255, blank=True, db_index=True)
     expires_at = models.DateTimeField("تنتهي في", null=True, blank=True, db_index=True)
+    phone_number = models.CharField("رقم الهاتف للمتابعة", max_length=32, blank=True, default="")
+    customer_name = models.CharField("اسم العميل", max_length=255, blank=True, default="")
+    is_recovered = models.BooleanField("تم استرجاعها", default=False, db_index=True)
+    recovery_sms_sent_at = models.DateTimeField("تاريخ إرسال تذكير الاسترجاع", null=True, blank=True)
+    recovery_discount_code = models.CharField("كود الخصم الممنوح", max_length=50, blank=True, default="")
 
     class Meta:
         verbose_name = "سلة"
@@ -245,6 +273,21 @@ class Order(TimestampedModel):
     tracking_url = models.CharField("رابط التتبع", max_length=255, blank=True)
     reference_id = models.CharField("المرجع", max_length=100, blank=True, db_index=True)
     finalised_at = models.DateTimeField("وقت التأكيد", null=True, blank=True)
+
+    # Luxury Gifting Suite
+    is_gift = models.BooleanField("طلب إهداء فاخر", default=False, db_index=True)
+    gift_wrap_type = models.CharField("نوع التغليف", max_length=50, blank=True, default="")
+    gift_wrap_fee = models.DecimalField("رسوم التغليف الإضافية", max_digits=10, decimal_places=2, default=0)
+    gift_sender_name = models.CharField("اسم المُهدي (من)", max_length=150, blank=True, default="")
+    gift_recipient_name = models.CharField("اسم المُهدى إليه (إلى)", max_length=150, blank=True, default="")
+    gift_message = models.TextField("نص رسالة كرت الإهداء", blank=True, default="")
+    hide_invoice_prices = models.BooleanField("إخفاء الأسعار من الفاتورة", default=False)
+
+    # VIP Loyalty & Rewards
+    loyalty_points_earned = models.PositiveIntegerField("نقاط مكتسبة من الطلب", default=0)
+    loyalty_points_redeemed = models.PositiveIntegerField("نقاط مستبدلة في الطلب", default=0)
+    loyalty_discount_amount = models.DecimalField("خصم نقاط الولاء (د.ل)", max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    vip_tier_at_order = models.CharField("مستوى VIP وقت الطلب", max_length=20, default="SILVER")
 
     class Meta:
         verbose_name = "طلب"

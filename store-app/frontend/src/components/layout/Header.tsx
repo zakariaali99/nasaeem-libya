@@ -1,4 +1,5 @@
 import {
+  Compass,
   Heart,
   LayoutDashboard,
   Menu,
@@ -11,6 +12,8 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { CartDrawer } from '@/components/storefront/CartDrawer'
 import { CategoriesDrawer } from '@/components/storefront/CategoriesDrawer'
+import { FragranceFinderQuizModal } from '@/components/storefront/FragranceFinderQuizModal'
+import { InstantSearchModal } from '@/components/storefront/InstantSearchModal'
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
 import { formatNumber } from '@/lib/format'
 import { useMe } from '@/lib/queries/auth'
@@ -22,6 +25,8 @@ import { isAdminRole } from '@/types/api'
 export function Header() {
   const [elevated, setElevated] = useState(false)
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
+  const [searchModalOpen, setSearchModalOpen] = useState(false)
+  const [quizOpen, setQuizOpen] = useState(false)
   const { data: user } = useMe()
   const { data: cart } = useCart()
   const { data: wishlistIds } = useWishlistIds()
@@ -38,91 +43,109 @@ export function Header() {
   }, [])
 
   return (
-    <header
-      className={cn(
-        'sticky top-0 z-40 border-b border-border/80 bg-card/95 backdrop-blur-md transition-shadow duration-[var(--duration-base)] ease-out',
-        elevated ? 'shadow-md shadow-primary/5' : 'shadow-none',
-      )}
-    >
-      {/* Main Top Header Bar */}
-      <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-2.5 sm:py-3">
-        {/* Mobile Search Overlay */}
-        {mobileSearchOpen ? (
-          <div className="flex w-full items-center gap-2 lg:hidden animate-fade-rise">
-            <div className="flex-1">
-              <SearchBox autoFocus onSubmitted={() => setMobileSearchOpen(false)} />
-            </div>
-            <button
-              type="button"
-              onClick={() => setMobileSearchOpen(false)}
-              className="px-3 py-2 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors"
-            >
-              إلغاء
-            </button>
-          </div>
-        ) : (
-          <>
-            <CategoriesDrawer>
+    <>
+      <header
+        className={cn(
+          'sticky top-0 z-40 border-b border-border/80 bg-card/95 backdrop-blur-md transition-shadow duration-[var(--duration-base)] ease-out',
+          elevated ? 'shadow-md shadow-primary/5' : 'shadow-none',
+        )}
+      >
+        {/* Main Top Header Bar */}
+        <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-2.5 sm:py-3">
+          {/* Mobile Search Overlay */}
+          {mobileSearchOpen ? (
+            <div className="flex w-full items-center gap-2 lg:hidden animate-fade-rise">
+              <div className="flex-1">
+                <SearchBox autoFocus onSubmitted={() => setMobileSearchOpen(false)} />
+              </div>
               <button
                 type="button"
-                className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl text-foreground hover:bg-muted/70 focus-visible:outline-2 focus-visible:outline-ring transition-colors"
-                aria-label="فتح قائمة التصنيفات"
+                onClick={() => setMobileSearchOpen(false)}
+                className="px-3 py-2 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors"
               >
-                <Menu className="size-5" aria-hidden="true" />
+                إلغاء
               </button>
-            </CategoriesDrawer>
-
-            {/* Brand Logo & Name */}
-            <Link
-              to="/"
-              viewTransition
-              className="flex min-h-11 shrink-0 items-center gap-2.5 rounded-xl focus-visible:outline-2 focus-visible:outline-ring group"
-            >
-              <div className="flex size-9 items-center justify-center rounded-xl bg-primary/10 border border-primary/20 shadow-2xs group-hover:border-primary/50 transition-all">
-                <img src="/brand/logo.svg" alt="" width={24} height={24} className="size-6 transition-transform group-hover:scale-105" />
-              </div>
-              <div className="flex flex-col">
-                <span className="font-display text-lg sm:text-xl font-extrabold tracking-wide text-foreground leading-none">
-                  نسائم ليبيا
-                </span>
-                <span className="text-[10px] text-muted-foreground font-semibold tracking-wider">
-                  عطور فاخرة وأصلية
-                </span>
-              </div>
-            </Link>
-
-            {/* Desktop Center Search Bar */}
-            <div className="hidden min-w-0 flex-1 max-w-md mx-auto lg:block">
-              <SearchBox />
             </div>
-
-            {/* Right Action Icons */}
-            <nav className="ms-auto flex items-center gap-1 sm:gap-1.5" aria-label="حسابي وسلتي">
-              {/* Admin quick switch if logged in as staff */}
-              {isAdminRole(user?.role) && (
-                <Link
-                  to="/admin"
-                  className="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/20 transition-all shadow-2xs min-h-11"
-                  title="الانتقال للوحة التحكم"
+          ) : (
+            <>
+              <CategoriesDrawer>
+                <button
+                  type="button"
+                  className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl text-foreground hover:bg-muted/70 focus-visible:outline-2 focus-visible:outline-ring transition-colors"
+                  aria-label="فتح قائمة التصنيفات"
                 >
-                  <LayoutDashboard className="size-3.5" />
-                  <span>لوحة الإدارة</span>
-                </Link>
-              )}
+                  <Menu className="size-5" aria-hidden="true" />
+                </button>
+              </CategoriesDrawer>
 
-              <div className="hidden sm:flex">
-                <ThemeToggle />
+              {/* Brand Logo & Name */}
+              <Link
+                to="/"
+                viewTransition
+                className="flex min-h-11 shrink-0 items-center gap-2.5 rounded-xl focus-visible:outline-2 focus-visible:outline-ring group"
+              >
+                <div className="flex size-9 items-center justify-center rounded-xl bg-primary/10 border border-primary/20 shadow-2xs group-hover:border-primary/50 transition-all">
+                  <img src="/brand/logo.svg" alt="" width={24} height={24} className="size-6 transition-transform group-hover:scale-105" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="font-display text-lg sm:text-xl font-extrabold tracking-wide text-foreground leading-none">
+                    نسائم ليبيا
+                  </span>
+                  <span className="text-[10px] text-muted-foreground font-semibold tracking-wider">
+                    عطور فاخرة وأصلية
+                  </span>
+                </div>
+              </Link>
+
+              {/* Desktop Center Search Bar */}
+              <div className="hidden min-w-0 flex-1 max-w-md mx-auto lg:block">
+                <div
+                  onClick={() => setSearchModalOpen(true)}
+                  className="cursor-pointer"
+                >
+                  <SearchBox />
+                </div>
               </div>
 
-              {/* Mobile Search Button */}
-              <button
-                type="button"
-                onClick={() => setMobileSearchOpen(true)}
-                className="inline-flex size-11 items-center justify-center rounded-xl text-foreground hover:bg-muted/70 lg:hidden transition-colors"
-                aria-label="البحث"
-              >
-                <Search className="size-5" aria-hidden="true" />
-              </button>
+              {/* Right Action Icons */}
+              <nav className="ms-auto flex items-center gap-1 sm:gap-1.5" aria-label="حسابي وسلتي">
+                {/* AI Fragrance Finder Trigger Button */}
+                <button
+                  type="button"
+                  onClick={() => setQuizOpen(true)}
+                  className="inline-flex items-center gap-1 sm:gap-1.5 rounded-xl border border-primary/40 bg-primary/10 px-2.5 sm:px-3 py-1.5 text-xs font-black text-primary hover:bg-primary/20 transition-all shadow-2xs min-h-11"
+                  title="مرشد العطور الذكي"
+                >
+                  <Compass className="size-3.5" />
+                  <span className="hidden xs:inline">مرشد العطور</span>
+                  <span>🪄</span>
+                </button>
+
+                {/* Admin quick switch if logged in as staff */}
+                {isAdminRole(user?.role) && (
+                  <Link
+                    to="/admin"
+                    className="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/20 transition-all shadow-2xs min-h-11"
+                    title="الانتقال للوحة التحكم"
+                  >
+                    <LayoutDashboard className="size-3.5" />
+                    <span>لوحة الإدارة</span>
+                  </Link>
+                )}
+
+                <div className="hidden sm:flex">
+                  <ThemeToggle />
+                </div>
+
+                {/* Mobile Search Button */}
+                <button
+                  type="button"
+                  onClick={() => setSearchModalOpen(true)}
+                  className="inline-flex size-11 items-center justify-center rounded-xl text-foreground hover:bg-muted/70 lg:hidden transition-colors"
+                  aria-label="البحث"
+                >
+                  <Search className="size-5" aria-hidden="true" />
+                </button>
 
               {/* Wishlist Link */}
               <Link
@@ -175,6 +198,10 @@ export function Header() {
         )}
       </div>
     </header>
+
+    <InstantSearchModal open={searchModalOpen} onClose={() => setSearchModalOpen(false)} />
+    <FragranceFinderQuizModal open={quizOpen} onClose={() => setQuizOpen(false)} />
+  </>
   )
 }
 

@@ -11,24 +11,27 @@ import {
 import { Button } from '@/components/ui/button'
 import { formatPrice } from '@/lib/format'
 import { useCart, useRemoveCartItem, useUpdateCartItem } from '@/lib/queries/cart'
+import { useActiveCartPromotion } from '@/lib/queries/orders'
 import type { CartLine } from '@/types/api'
 
 interface CartDrawerProps {
   children?: React.ReactNode
 }
 
-const FREE_SHIPPING_THRESHOLD = 200 // 200 LYD for free delivery
-
 export function CartDrawer({ children }: CartDrawerProps) {
   const [open, setOpen] = useState(false)
   const { data: cart, isLoading } = useCart()
+  const { data: promo } = useActiveCartPromotion()
   const updateItem = useUpdateCartItem()
   const removeItem = useRemoveCartItem()
 
   const items = cart?.items ?? []
   const subtotal = Number(cart?.subtotal ?? 0)
-  const remainingForFree = Math.max(0, FREE_SHIPPING_THRESHOLD - subtotal)
-  const progressPercent = Math.min(100, (subtotal / FREE_SHIPPING_THRESHOLD) * 100)
+
+  const isPromoActive = Boolean(promo && promo.is_active)
+  const threshold = promo ? Number(promo.min_order_amount) : 200
+  const remainingForFree = Math.max(0, threshold - subtotal)
+  const progressPercent = threshold > 0 ? Math.min(100, (subtotal / threshold) * 100) : 100
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -63,27 +66,46 @@ export function CartDrawer({ children }: CartDrawerProps) {
             </div>
           </div>
 
-          {/* Free Shipping Progress Meter */}
-          <div className="mt-4 rounded-xl bg-emerald-50/70 p-3 border border-emerald-200/60 dark:bg-emerald-950/30 dark:border-emerald-800/50">
-            <div className="flex items-center gap-2 text-xs font-semibold text-emerald-900 dark:text-emerald-300">
-              <Truck className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-              <span>
-                {remainingForFree > 0 ? (
-                  <>
-                    أضف <strong className="font-bold">{formatPrice(remainingForFree)}</strong> للحصول على توصيل مجاني!
-                  </>
-                ) : (
-                  'تهانينا! لقد حصلت على شحن مجاني لكافة المدن 🚀'
-                )}
-              </span>
+          {/* Dynamic Free Shipping Progress Meter - only shown when promo is enabled */}
+          {isPromoActive && (
+            <div className="mt-4 rounded-xl bg-emerald-50/70 p-3 border border-emerald-200/60 dark:bg-emerald-950/30 dark:border-emerald-800/50">
+              <div className="flex items-center gap-2 text-xs font-semibold text-emerald-900 dark:text-emerald-300">
+                <Truck className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                <span>
+                  {remainingForFree > 0 ? (
+                    promo?.message ? (
+                      promo.message.includes('{remaining}') ? (
+                        promo.message.split('{remaining}').map((part: string, index: number, arr: string[]) => (
+                          <span key={index}>
+                            {part}
+                            {index < arr.length - 1 && (
+                              <strong className="font-bold">{formatPrice(remainingForFree)}</strong>
+                            )}
+                          </span>
+                        ))
+                      ) : (
+                        <>
+                          {promo.message} ({formatPrice(remainingForFree)})
+                        </>
+                      )
+                    ) : (
+                      <>
+                        أضف <strong className="font-bold">{formatPrice(remainingForFree)}</strong> للحصول على توصيل مجاني!
+                      </>
+                    )
+                  ) : (
+                    promo?.success_message || 'تهانينا! لقد حصلت على شحن مجاني لكافة المدن 🚀'
+                  )}
+                </span>
+              </div>
+              <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-emerald-200/50 dark:bg-emerald-900/50">
+                <div
+                  className="h-full rounded-full bg-emerald-600 transition-all duration-500 ease-out"
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
             </div>
-            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-emerald-200/50 dark:bg-emerald-900/50">
-              <div
-                className="h-full rounded-full bg-emerald-600 transition-all duration-500 ease-out"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
-          </div>
+          )}
         </SheetHeader>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-3">

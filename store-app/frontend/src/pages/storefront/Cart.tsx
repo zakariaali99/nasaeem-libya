@@ -2,8 +2,10 @@ import { ArrowRight, Check, Percent, ShieldCheck, ShoppingBag, Trash2, Truck } f
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
+import { DiscoveryBoxBanner } from '@/components/storefront/DiscoveryBoxBanner'
 import { EmptyState } from '@/components/storefront/EmptyState'
 import { ErrorState } from '@/components/storefront/ErrorState'
+import { LoyaltyVipBadge } from '@/components/storefront/LoyaltyVipBadge'
 import { OrderSummary } from '@/components/storefront/OrderSummary'
 import { QuantityStepper } from '@/components/storefront/QuantityStepper'
 import { Button } from '@/components/ui/button'
@@ -110,6 +112,7 @@ export default function CartPage() {
 
         {/* Desktop Sticky Summary */}
         <aside className="space-y-5 lg:sticky lg:top-24 lg:self-start">
+          <LoyaltyVipBadge />
           <DiscountForm currentCode={cart.discount_code} error={cart.discount_error} />
           
           <div className="rounded-2xl border border-border bg-card p-5 shadow-xs space-y-4">
@@ -149,6 +152,10 @@ export default function CartPage() {
             </div>
           </div>
         </aside>
+      </div>
+
+      <div className="pt-4">
+        <DiscoveryBoxBanner />
       </div>
     </div>
   )

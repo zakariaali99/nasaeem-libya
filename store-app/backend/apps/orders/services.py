@@ -28,15 +28,19 @@ from django.utils import timezone
 from apps.catalog.models import Product, ProductVariant
 from apps.core.models import Region
 
+from .notifications import dispatch_realtime_order_alert
+
 from .models import (
     Cart,
     CartItem,
+    CartPromotion,
     DeliveryMethod,
     Discount,
     DiscountType,
     Order,
     OrderItem,
     OrderStatus,
+    PaymentStatus,
     ShippingStatus,
 )
 
@@ -240,13 +244,22 @@ def resolve_region(region_id) -> Region:
     raise CheckoutError("يرجى اختيار منطقة التوصيل", field="region_id")
 
 
-def delivery_fee(region: Region | None) -> Decimal:
-    """The fee comes from the region, falling back to its city."""
+def delivery_fee(region: Region | None, subtotal: Decimal = Decimal("0.00")) -> tuple[Decimal, Decimal]:
+    """The fee comes from the region, falling back to its city.
+    Returns (actual_shipping_fee, delivery_discount_amount).
+    """
     if region is None:
-        return Decimal("0.00")
+        return Decimal("0.00"), Decimal("0.00")
     if region.delivery_fee and region.delivery_fee > 0:
-        return money(region.delivery_fee)
-    return money(region.city.delivery_fee)
+        base_fee = money(region.delivery_fee)
+    else:
+        base_fee = money(region.city.delivery_fee)
+
+    promo = CartPromotion.objects.filter(is_active=True).first()
+    if promo and money(subtotal) >= money(promo.min_order_amount):
+        return Decimal("0.00"), base_fee
+
+    return base_fee, Decimal("0.00")
 
 
 # --------------------------------------------------------------------------
@@ -290,6 +303,12 @@ def checkout(
     customer_notes: str = "",
     billing_address: str = "",
     require_delivery: bool = True,
+    is_gift: bool = False,
+    gift_wrap_type: str = "",
+    gift_sender_name: str = "",
+    gift_recipient_name: str = "",
+    gift_message: str = "",
+    hide_invoice_prices: bool = False,
 ) -> Order:
     lines = list(cart.items.select_related("product", "variant").all())
     if not lines:
@@ -375,14 +394,15 @@ def checkout(
     # ---- delivery ----------------------------------------------------------
     # A draft has no region yet, so no delivery fee yet. `finalise_order()` adds
     # it, and recomputes the total from the same stored numbers.
-    shipping_total = delivery_fee(region)
+    shipping_total, delivery_discount_amount = delivery_fee(region, subtotal=subtotal)
     method = (
         DeliveryMethod.objects.filter(code=delivery_method_code, is_active=True).first()
         if delivery_method_code
         else DeliveryMethod.objects.filter(is_active=True).order_by("name").first()
     )
 
-    total = money(subtotal - discount_total + shipping_total)
+    gift_wrap_fee = Decimal("15.00") if (is_gift and gift_wrap_type == "ROYAL_VELVET") else Decimal("0.00")
+    total = money(subtotal - discount_total + shipping_total + gift_wrap_fee)
 
     # ---- create the order --------------------------------------------------
     order = Order.objects.create(
@@ -393,7 +413,7 @@ def checkout(
         subtotal=subtotal,
         discount_total=discount_total,
         shipping_total=shipping_total,
-        delivery_discount_amount=Decimal("0.00"),
+        delivery_discount_amount=delivery_discount_amount,
         total=total,
         payment_method=payment_method,
         delivery_method=method,
@@ -403,6 +423,13 @@ def checkout(
         shipping_city=region.city if region else None,
         billing_address=(billing_address or address).strip(),
         customer_notes=customer_notes.strip(),
+        is_gift=is_gift,
+        gift_wrap_type=gift_wrap_type,
+        gift_wrap_fee=gift_wrap_fee,
+        gift_sender_name=gift_sender_name.strip(),
+        gift_recipient_name=gift_recipient_name.strip(),
+        gift_message=gift_message.strip(),
+        hide_invoice_prices=hide_invoice_prices,
     )
 
     OrderItem.objects.bulk_create([
@@ -483,7 +510,7 @@ def cart_summary(cart: Cart | None, *, region_id=None, discount_code="") -> dict
         if region_id
         else None
     )
-    shipping_total = delivery_fee(region)
+    shipping_total, delivery_discount_amount = delivery_fee(region, subtotal=subtotal)
 
     return {
         "items": items,
@@ -492,6 +519,7 @@ def cart_summary(cart: Cart | None, *, region_id=None, discount_code="") -> dict
         "discount": discount,
         "discount_error": discount_error,
         "shipping_total": shipping_total,
+        "delivery_discount_amount": delivery_discount_amount,
         "region": region,
         "total": money(subtotal - discount_total + shipping_total),
     }
@@ -526,6 +554,12 @@ def finalise_order(
     payment_method: str = "",
     customer_notes: str = "",
     billing_address: str = "",
+    is_gift: bool = False,
+    gift_wrap_type: str = "",
+    gift_sender_name: str = "",
+    gift_recipient_name: str = "",
+    gift_message: str = "",
+    hide_invoice_prices: bool = False,
 ) -> Order:
     """Apply the delivery and payment choices to a draft order.
 
@@ -546,11 +580,28 @@ def finalise_order(
     order.shipping_address = address.strip()
     order.billing_address = (billing_address or address).strip()
     order.customer_notes = customer_notes.strip()
-    order.shipping_total = delivery_fee(region)
-    order.total = money(order.subtotal - order.discount_total + order.shipping_total)
+    shipping_total, delivery_discount_amount = delivery_fee(region, subtotal=order.subtotal)
+    order.shipping_total = shipping_total
+    order.delivery_discount_amount = delivery_discount_amount
+    gift_wrap_fee = Decimal("15.00") if (is_gift and gift_wrap_type == "ROYAL_VELVET") else Decimal("0.00")
+    order.gift_wrap_fee = gift_wrap_fee
+    order.is_gift = is_gift
+    order.gift_wrap_type = gift_wrap_type
+    order.gift_sender_name = gift_sender_name.strip()
+    order.gift_recipient_name = gift_recipient_name.strip()
+    order.gift_message = gift_message.strip()
+    order.hide_invoice_prices = hide_invoice_prices
+    order.total = money(order.subtotal - order.discount_total + order.shipping_total + gift_wrap_fee)
     order.finalised_at = timezone.now()
 
     if payment_method:
+        is_cod = payment_method.lower() in ("cod", "cash_on_delivery", "delivery")
+        if is_cod and order.user and order.user.is_cod_blacklisted:
+            raise CheckoutError(
+                "نعتذر، لإتمام هذا الطلب يُرجى الدفع عبر البطاقة المصرفية أو بوابات الدفع الإلكتروني (سداد / بلتو / تداول)",
+                field="payment_method",
+                status=403,
+            )
         order.payment_method = payment_method
         order.order_number = _retag_order_number(order.order_number, payment_method)
     if delivery_method_code:
@@ -562,6 +613,10 @@ def finalise_order(
         order.delivery_method = method
 
     order.save()
+    try:
+        dispatch_realtime_order_alert(order)
+    except Exception:
+        pass
     return order
 
 
@@ -650,3 +705,413 @@ def maybe_release_expired_drafts() -> None:
         release_expired_drafts()
     except Exception:
         logger.exception("draft sweep failed; will retry on the next window")
+
+
+# --------------------------------------------------------------------------
+# Plan 01 — Operational Velocity & Quick Order Entry Suite
+# --------------------------------------------------------------------------
+
+@transaction.atomic
+def quick_create_admin_order(
+    *,
+    customer_name: str,
+    customer_phone: str,
+    customer_email: str = "",
+    shipping_city_id: str | None = None,
+    shipping_region_id: str | None = None,
+    shipping_address: str = "",
+    delivery_method_code: str = "",
+    payment_method_code: str = "manual_payment",
+    discount_code: str = "",
+    customer_notes: str = "",
+    items: list[dict],
+    operator_user=None,
+) -> Order:
+    """Instant order entry for phone and WhatsApp sales.
+
+    - Resolves or provisions the customer account by phone number
+    - Validates and atomically deducts stock using `adjust_stock()`
+    - Applies promotions and pricing with exact Decimal precision
+    - Creates order, items, and initial payment record in one transaction
+    """
+    import re
+    import secrets
+    from apps.core.models import User, Role, City, Region
+    from apps.catalog.services import adjust_stock
+    from apps.payments.models import Payment
+
+    if not items:
+        raise CheckoutError("يجب إضافة منتج واحد على الأقل للطلب")
+
+    clean_phone = re.sub(r"[^0-9+]", "", customer_phone.strip())
+    if not clean_phone or len(clean_phone) < 8:
+        raise CheckoutError("رقم هاتف العميل غير صالح (8 أرقام على الأقل)", field="customer_phone")
+
+    # 1. Customer resolution (lookup or create)
+    customer = User.objects.filter(phone_number=clean_phone).first()
+    if not customer:
+        customer = User.objects.create_user(
+            phone_number=clean_phone,
+            name=customer_name.strip() or "عميل طلب يدوي",
+            email=customer_email.strip() or None,
+            password=secrets.token_urlsafe(16),
+            role=Role.CUSTOMER,
+        )
+        customer.phone_verified = True
+        customer.save(update_fields=["phone_verified"])
+    elif customer_name.strip() and not customer.name:
+        customer.name = customer_name.strip()
+        customer.save(update_fields=["name"])
+
+    # 2. Region / City resolution
+    region = None
+    city = None
+    if shipping_region_id:
+        region = Region.objects.filter(id=shipping_region_id, is_active=True).first()
+        if region:
+            city = region.city
+    if not region and shipping_city_id:
+        city = City.objects.filter(id=shipping_city_id, is_active=True).first()
+        if city:
+            region = city.regions.filter(is_active=True).first()
+
+    # 3. Delivery Method resolution
+    delivery_method = None
+    if delivery_method_code:
+        delivery_method = DeliveryMethod.objects.filter(
+            code=delivery_method_code, is_active=True
+        ).first()
+
+    # 4. Lock products & variants, verify active and stock availability
+    product_ids = sorted({str(it["product_id"]) for it in items if "product_id" in it and it["product_id"]})
+    variant_ids = sorted({str(it["variant_id"]) for it in items if it.get("variant_id")})
+
+    locked_products = {
+        str(p.id): p
+        for p in Product.objects.select_for_update().filter(id__in=product_ids).order_by("id")
+    }
+    locked_variants = {
+        str(v.id): v
+        for v in ProductVariant.objects.select_for_update().filter(id__in=variant_ids).order_by("id")
+    }
+
+    subtotal = Decimal("0.00")
+    validated_lines = []
+    for it in items:
+        p_id = str(it["product_id"])
+        v_id = str(it["variant_id"]) if it.get("variant_id") else None
+        qty = int(it.get("quantity", 1))
+        if qty < 1:
+            raise CheckoutError("الكمية يجب أن تكون 1 على الأقل")
+
+        product = locked_products.get(p_id)
+        if not product or not product.is_active:
+            raise CheckoutError(f"المنتج #{p_id} غير متاح للطلب")
+
+        variant = locked_variants.get(v_id) if v_id else None
+        if v_id and (not variant or not variant.is_active):
+            raise CheckoutError(f"الخيار المحدد للمنتج «{product.name}» غير متاح")
+
+        unit_price = Decimal(str(variant.price if variant else product.price))
+        line_total = (unit_price * qty).quantize(TWO_PLACES)
+        subtotal += line_total
+
+        # Check available stock
+        target = variant if variant else product
+        if product.track_quantity:
+            available = target.stock - target.reserved_stock
+            if qty > available:
+                label = f"{product.name} ({variant.label})" if variant else product.name
+                raise CheckoutError(
+                    f"الكمية المطلوبة من «{label}» ({qty}) غير متوفرة في المخزون (المتبقي: {available})"
+                )
+
+        validated_lines.append({
+            "product": product,
+            "variant": variant,
+            "quantity": qty,
+            "unit_price": unit_price,
+            "total_price": line_total,
+        })
+
+    # 5. Discount calculation
+    discount_total = Decimal("0.00")
+    applied_discount = None
+    if discount_code.strip():
+        applied_discount, discount_total, _ = resolve_discount(
+            discount_code.strip(), subtotal, user=customer
+        )
+
+    # 6. Shipping & Promotions
+    shipping_fee = Decimal(str(region.delivery_fee if region else (city.delivery_fee if city else "0.00")))
+    delivery_discount_amount = Decimal("0.00")
+    shipping_total = shipping_fee
+
+    promo = CartPromotion.objects.filter(is_active=True).first()
+    if promo and promo.is_active and subtotal >= promo.min_order_amount:
+        delivery_discount_amount = shipping_fee
+        shipping_total = Decimal("0.00")
+
+    total = (subtotal - discount_total + shipping_total).quantize(TWO_PLACES)
+    if total < Decimal("0.00"):
+        total = Decimal("0.00")
+
+    # 7. Create Order record
+    order_num = next_order_number(payment_method_code or "MAN")
+    order = Order.objects.create(
+        user=customer,
+        order_number=order_num,
+        status=OrderStatus.PROCESSING,
+        shipping_status=ShippingStatus.PENDING,
+        subtotal=subtotal,
+        discount_total=discount_total,
+        discount=applied_discount,
+        shipping_total=shipping_total,
+        delivery_discount_amount=delivery_discount_amount,
+        total=total,
+        payment_method=payment_method_code or "manual_payment",
+        delivery_method=delivery_method,
+        shipping_city=city,
+        shipping_region=region,
+        shipping_address=shipping_address.strip(),
+        customer_notes=customer_notes.strip(),
+        finalised_at=timezone.now(),
+    )
+
+    # 8. Create OrderItems & immediately deduct stock
+    for line in validated_lines:
+        OrderItem.objects.create(
+            order=order,
+            product=line["product"],
+            variant=line["variant"],
+            quantity=line["quantity"],
+            unit_price=line["unit_price"],
+            total_price=line["total_price"],
+        )
+        if line["product"].track_quantity:
+            adjust_stock(
+                product=line["product"],
+                variant=line["variant"],
+                change=-line["quantity"],
+                reason="admin_quick_order",
+                note=f"طلب يدوي رقم #{order.order_number}",
+                user=operator_user,
+            )
+
+    # 9. Create initial Payment record
+    Payment.objects.create(
+        order=order,
+        method_code=payment_method_code or "manual_payment",
+        amount=total,
+        status=PaymentStatus.COMPLETED if payment_method_code != "manual_payment" else PaymentStatus.WAITING_FOR_VERIFICATION,
+        reference_id=f"MAN_{order.order_number}",
+    )
+
+    if applied_discount:
+        Discount.objects.filter(pk=applied_discount.pk).update(usage_count=F("usage_count") + 1)
+
+    return order
+
+
+@transaction.atomic
+def execute_bulk_order_action(
+    *,
+    order_ids: list[str],
+    action: str,
+    operator_user=None,
+    notes: str = "",
+) -> dict:
+    """Bulk action runner for order lists.
+
+    Applies mass updates atomically and skips invalid transitions gracefully.
+    """
+    if not order_ids:
+        return {"updated_count": 0, "failed_ids": [], "message": "لم يتم تحديد أي طلبات"}
+
+    orders = list(Order.objects.filter(id__in=order_ids).select_for_update().order_by("id"))
+    updated_count = 0
+    failed_ids = []
+
+    for order in orders:
+        try:
+            if action == "mark_processing":
+                if order.status == OrderStatus.PENDING:
+                    order.status = OrderStatus.PROCESSING
+                    order.save(update_fields=["status", "updated_at"])
+                    updated_count += 1
+            elif action == "mark_shipped":
+                if order.shipping_status in [ShippingStatus.PENDING, ShippingStatus.ACCEPTED]:
+                    order.shipping_status = ShippingStatus.ACCEPTED
+                    order.save(update_fields=["shipping_status", "updated_at"])
+                    updated_count += 1
+            elif action == "mark_completed":
+                if order.status != OrderStatus.CANCELLED:
+                    order.status = OrderStatus.COMPLETED
+                    order.shipping_status = ShippingStatus.DELIVERED
+                    order.save(update_fields=["status", "shipping_status", "updated_at"])
+                    updated_count += 1
+            elif action == "mark_cancelled":
+                if order.status != OrderStatus.COMPLETED:
+                    order.status = OrderStatus.CANCELLED
+                    order.shipping_status = ShippingStatus.CANCELLED
+                    order.save(update_fields=["status", "shipping_status", "updated_at"])
+                    updated_count += 1
+            else:
+                failed_ids.append(str(order.id))
+        except Exception as err:
+            logger.exception("Bulk action %s failed for order %s: %s", action, order.id, err)
+            failed_ids.append(str(order.id))
+
+    return {
+        "updated_count": updated_count,
+        "failed_ids": failed_ids,
+        "message": f"تم تحديث {updated_count} طلبات بنجاح",
+    }
+
+
+# --------------------------------------------------------------------------
+# Plan 02 — Thermal Waybills & Official Invoicing Suite
+# --------------------------------------------------------------------------
+
+def build_order_waybill_data(order: Order) -> dict:
+    """Builds clean, structured data for 4x6 / 80mm thermal shipping waybill."""
+    courier_name = "مندوب المتجر"
+    courier_code = "local"
+    if order.delivery_method:
+        courier_name = order.delivery_method.name
+        courier_code = order.delivery_method.code
+
+    # Tracking number from delivery shipment if exists
+    tracking_number = order.order_number
+    try:
+        if hasattr(order, "shipment") and order.shipment and order.shipment.tracking_number:
+            tracking_number = order.shipment.tracking_number
+    except Exception:
+        pass
+
+    # Check payment method: prepaid vs COD
+    is_prepaid = order.payment_method in [
+        "sadad_pay", "moamalat", "plutu", "binance_pay", "wallet"
+    ] or (hasattr(order, "payment") and order.payment and order.payment.status == "completed")
+
+    items_list = []
+    for item in order.items.select_related("product", "variant").all():
+        variant_desc = ""
+        if item.variant:
+            variant_desc = " / ".join(
+                v.value for v in item.variant.values.all()
+            ) or item.variant.sku
+        items_list.append({
+            "product_name": item.product.name if item.product else "عطر فاخر",
+            "variant_description": variant_desc,
+            "quantity": item.quantity,
+            "sku": (item.variant.sku if item.variant else item.product.sku) if item.product else "",
+        })
+
+    city_name = order.shipping_city.name if order.shipping_city else "طرابلس"
+    region_name = order.shipping_region.name if order.shipping_region else ""
+
+    return {
+        "order_id": str(order.id),
+        "order_number": order.order_number,
+        "tracking_number": tracking_number,
+        "barcode_value": order.order_number,
+        "created_at": order.created_at.isoformat(),
+        "recipient": {
+            "name": order.user.name if order.user else "عميل نسائم",
+            "phone_1": order.user.phone_number if order.user else "",
+            "phone_2": "",
+            "city": city_name,
+            "region": region_name,
+            "address": order.shipping_address or f"{city_name} — {region_name}".strip(" —"),
+        },
+        "courier": {
+            "name": courier_name,
+            "code": courier_code,
+        },
+        "payment": {
+            "method": order.payment_method,
+            "is_prepaid": is_prepaid,
+            "cod_amount": "0.00" if is_prepaid else str(order.total),
+            "total_amount": str(order.total),
+        },
+        "packing_list": items_list,
+        "fragile_warning": "⚠️ تنبيه: بضاعة قابلة للكسر (عطور زجاجية فاخرة) 🍷 | يُرجى الحذر",
+        "customer_notes": order.customer_notes or "",
+    }
+
+
+def build_order_invoice_data(order: Order) -> dict:
+    """Builds official A4 Tax/Sales Invoice data with Arabic Tafqeet and QR verification."""
+    from apps.orders.tafqeet import tafqeet_libyan_dinars
+
+    # Formal invoice number: INV-YYYY-MM-XXXX
+    date_part = order.created_at.strftime("%Y-%m")
+    numeric_part = "".join(filter(str.isdigit, order.order_number))[-4:] or "0001"
+    invoice_number = f"INV-{date_part}-{numeric_part}"
+
+    items_list = []
+    for item in order.items.select_related("product", "variant").all():
+        variant_desc = ""
+        if item.variant:
+            variant_desc = " / ".join(
+                v.value for v in item.variant.values.all()
+            ) or item.variant.sku
+        items_list.append({
+            "product_name": item.product.name if item.product else "عطر فاخر",
+            "variant_description": variant_desc,
+            "sku": (item.variant.sku if item.variant else item.product.sku) if item.product else "",
+            "quantity": item.quantity,
+            "unit_price": str(item.unit_price),
+            "total_price": str(item.total_price),
+        })
+
+    city_name = order.shipping_city.name if order.shipping_city else "طرابلس"
+    region_name = order.shipping_region.name if order.shipping_region else ""
+
+    tafqeet_text = tafqeet_libyan_dinars(order.total)
+
+    return {
+        "invoice_number": invoice_number,
+        "order_id": str(order.id),
+        "order_number": order.order_number,
+        "issue_date": order.created_at.strftime("%Y/%m/%d"),
+        "issue_time": order.created_at.strftime("%I:%M %p"),
+        "company": {
+            "name": "شركة نسائم ليبيا لتجارة العطور الفاخرة ش.م.م",
+            "name_en": "NASAEEM LIBYA LUXURY PERFUMES CO.",
+            "cr_number": "2024/09812",
+            "city": "طرابلس، ليبيا",
+            "phone": "0910000000",
+            "website": "nasaeem.ly",
+        },
+        "customer": {
+            "name": order.user.name if order.user else "عميل نسائم",
+            "phone": order.user.phone_number if order.user else "",
+            "email": order.user.email if (order.user and order.user.email) else "",
+            "city": city_name,
+            "region": region_name,
+            "address": order.shipping_address or f"{city_name} — {region_name}".strip(" —"),
+        },
+        "items": items_list,
+        "financials": {
+            "subtotal": str(order.subtotal),
+            "discount_total": str(order.discount_total),
+            "shipping_total": str(order.shipping_total),
+            "delivery_discount_amount": str(order.delivery_discount_amount),
+            "total": str(order.total),
+            "tafqeet": tafqeet_text,
+            "payment_method": order.payment_method,
+            "payment_status": order.payment.status if hasattr(order, "payment") and order.payment else "pending",
+        },
+        "verification_url": f"https://nasaeem.ly/track?order={order.order_number}",
+        "terms": "نسائم ليبيا تضمن أصالة كافة العطور بنسبة 100%. يحق للعميل الاستبدال أو الاسترجاع خلال 7 أيام من تاريخ الاستلام شريطة بقاء الغلاف الأصلي مغلقاً وبحالته المصنعية.",
+    }
+
+
+def build_batch_waybills_data(order_ids: list[str]) -> list[dict]:
+    """Builds list of waybills for batch consecutive printing."""
+    orders = Order.objects.filter(id__in=order_ids).select_related(
+        "user", "shipping_city", "shipping_region", "delivery_method"
+    ).prefetch_related("items__product", "items__variant__values").order_by("-created_at")
+    return [build_order_waybill_data(order) for order in orders]

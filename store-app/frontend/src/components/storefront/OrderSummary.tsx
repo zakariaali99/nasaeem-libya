@@ -7,6 +7,7 @@ export interface OrderSummaryProps {
   total: string
   /** Shown in place of a zero delivery fee before a region is chosen. */
   shippingNote?: string
+  isFreeShipping?: boolean
 }
 
 /** The totals block, shared by the cart, the checkout review and the order
@@ -18,6 +19,7 @@ export function OrderSummary({
   shippingTotal,
   total,
   shippingNote,
+  isFreeShipping,
 }: OrderSummaryProps) {
   const hasDiscount = Number(discountTotal) > 0
   const hasShipping = Number(shippingTotal) > 0
@@ -30,8 +32,15 @@ export function OrderSummary({
       ) : null}
       <Row
         label="التوصيل"
-        value={hasShipping ? formatPrice(shippingTotal) : shippingNote ?? formatPrice(0)}
-        muted={!hasShipping && Boolean(shippingNote)}
+        value={
+          isFreeShipping
+            ? 'مجاني 🚀'
+            : hasShipping
+              ? formatPrice(shippingTotal)
+              : shippingNote ?? formatPrice(0)
+        }
+        tone={isFreeShipping ? 'success' : undefined}
+        muted={!hasShipping && !isFreeShipping && Boolean(shippingNote)}
       />
       <div className="flex items-baseline justify-between gap-4 border-t border-border pt-2">
         <dt className="text-base font-semibold">الإجمالي</dt>
@@ -49,7 +58,7 @@ function Row({
 }: {
   label: string
   value: string
-  tone?: 'discount'
+  tone?: 'discount' | 'success'
   muted?: boolean
 }) {
   return (
@@ -58,10 +67,12 @@ function Row({
       <dd
         className={
           tone === 'discount'
-            ? 'tabular-nums text-discount'
-            : muted
-              ? 'text-end text-xs text-muted-foreground'
-              : 'tabular-nums'
+            ? 'tabular-nums text-discount font-bold'
+            : tone === 'success'
+              ? 'tabular-nums text-emerald-600 dark:text-emerald-400 font-bold'
+              : muted
+                ? 'text-end text-xs text-muted-foreground'
+                : 'tabular-nums'
         }
       >
         {value}

@@ -40,6 +40,9 @@ class UserSerializer(serializers.ModelSerializer):
         fields = [
             "id", "phone_number", "phone_verified", "name", "email",
             "role", "is_active", "date_joined",
+            "loyalty_points", "lifetime_spend", "vip_tier",
+            "is_cod_blacklisted", "cod_rejections_count", "cod_blacklist_reason",
+            "banned", "ban_reason", "ban_expires_at",
         ]
         read_only_fields = fields
 
@@ -117,7 +120,10 @@ class AdminUserUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["role", "is_active", "banned", "ban_reason", "ban_expires_at", "name"]
+        fields = [
+            "role", "is_active", "banned", "ban_reason", "ban_expires_at", "name",
+            "is_cod_blacklisted", "cod_blacklist_reason",
+        ]
 
 
 class ProfileUpdateSerializer(serializers.ModelSerializer):

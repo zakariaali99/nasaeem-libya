@@ -302,3 +302,125 @@ class WishlistItem(TimestampedModel):
     def __str__(self):
         return f"{self.user} - {self.product.name}"
 
+
+class PerfumeAttribute(TimestampedModel):
+    """Sensory fragrance metadata: olfactory pyramid, longevity, sillage, occasions, seasons."""
+
+    GENDER_MEN = "MEN"
+    GENDER_WOMEN = "WOMEN"
+    GENDER_UNISEX = "UNISEX"
+
+    GENDER_CHOICES = [
+        (GENDER_MEN, "رجالي"),
+        (GENDER_WOMEN, "نسائي"),
+        (GENDER_UNISEX, "للجنسين"),
+    ]
+
+    product = models.OneToOneField(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="perfume_details",
+        verbose_name="المنتج العطري",
+    )
+    fragrance_family = models.CharField("العائلة العطرية", max_length=100, default="شرقي فاخر")
+    gender = models.CharField("الفئة المستهدفة", max_length=20, choices=GENDER_CHOICES, default=GENDER_UNISEX)
+    concentration = models.CharField("التركيز العطري", max_length=50, default="Eau de Parfum")
+    origin_country = models.CharField("بلد المنشأ والتصنيع", max_length=100, default="فرنسا")
+
+    # Olfactory Pyramid
+    top_notes = models.JSONField("قمة العطر (Top Notes)", default=list, blank=True)
+    heart_notes = models.JSONField("قلب العطر (Heart Notes)", default=list, blank=True)
+    base_notes = models.JSONField("قاعدة العطر (Base Notes)", default=list, blank=True)
+
+    # Sensory Performance (1 to 5)
+    longevity_score = models.PositiveSmallIntegerField("مؤشر الثبات والدوام", default=5)
+    longevity_hours = models.CharField("مدة الثبات التقريبية", max_length=50, default="14 إلى 18 ساعة")
+    sillage_score = models.PositiveSmallIntegerField("مؤشر الفوحان والانتشار", default=4)
+
+    # Seasons & Occasions
+    seasons = models.JSONField("فصول الاستخدام المثالية", default=list, blank=True)
+    occasions = models.JSONField("المناسبات المقترحة", default=list, blank=True)
+
+    class Meta:
+        verbose_name = "تفاصيل وبيانات العطر الحسية"
+        verbose_name_plural = "تفاصيل العطور الحسية"
+
+    def __str__(self):
+        return f"هرم {self.product.name} ({self.fragrance_family})"
+
+
+class ProductBundle(TimestampedModel):
+    """Frequently bought together & promotional bundles."""
+
+    name = models.CharField("اسم الحزمة", max_length=200)
+    slug = models.SlugField("الرمز اللطيف", max_length=200, unique=True, allow_unicode=True)
+    description = models.TextField("وصف الحزمة وميزاتها", blank=True)
+    main_product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="bundles_as_main",
+        verbose_name="المنتج الأساسي",
+    )
+    included_products = models.ManyToManyField(
+        Product,
+        related_name="bundles_included_in",
+        verbose_name="المنتجات المشمولة في الحزمة",
+        blank=True,
+    )
+    bundle_price = models.DecimalField("سعر الحزمة المخفض (د.ل)", max_digits=10, decimal_places=2)
+    original_price = models.DecimalField("السعر الأصلي قبل الخصم (د.ل)", max_digits=10, decimal_places=2)
+    badge_text = models.CharField("شارة التوفير", max_length=100, default="وفر حتى 20%")
+    is_active = models.BooleanField("مفعل ومعروض", default=True, db_index=True)
+
+    class Meta:
+        verbose_name = "حزمة عطور وتوفير"
+        verbose_name_plural = "حزم العطور والتوفير"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.name} ({self.bundle_price} د.ل)"
+
+    @property
+    def savings_amount(self):
+        return max(0, self.original_price - self.bundle_price)
+
+
+class ProductReview(TimestampedModel):
+    """Verified customer reviews with photo proof and ratings."""
+
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="reviews",
+        verbose_name="المنتج",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="reviews",
+        verbose_name="العميل",
+    )
+    order = models.ForeignKey(
+        "orders.Order",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reviews",
+        verbose_name="الطلب المرتبط",
+    )
+    rating = models.PositiveSmallIntegerField("التقييم", default=5)
+    title = models.CharField("عنوان التقييم", max_length=255, blank=True)
+    comment = models.TextField("نص وتجربة التقييم")
+    photo_url = models.CharField("رابط صورة العميل مع الزجاجة", max_length=500, blank=True)
+    is_verified_buyer = models.BooleanField("مشترٍ مؤكد", default=False, db_index=True)
+    is_approved = models.BooleanField("معتمد للنشر", default=True, db_index=True)
+    points_awarded = models.BooleanField("تم منح 50 نقطة مكافأة", default=False)
+
+    class Meta:
+        verbose_name = "تقييم منتج"
+        verbose_name_plural = "تقييمات المنتجات"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.user} - {self.product.name} ({self.rating}★)"
+

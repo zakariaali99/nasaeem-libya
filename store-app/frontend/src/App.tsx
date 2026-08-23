@@ -58,6 +58,9 @@ const AdminInventory = lazy(() => import('@/pages/admin/Inventory'))
 const AdminInventoryLogs = lazy(() => import('@/pages/admin/InventoryLogs'))
 const AdminOrders = lazy(() => import('@/pages/admin/AdminOrders'))
 const AdminOrderDetail = lazy(() => import('@/pages/admin/AdminOrderDetail'))
+const AdminOrderWaybill = lazy(() => import('@/pages/admin/AdminOrderWaybillPage'))
+const AdminOrderInvoice = lazy(() => import('@/pages/admin/AdminOrderInvoicePage'))
+const AdminBatchWaybills = lazy(() => import('@/pages/admin/AdminBatchWaybillsPage'))
 const AdminUsers = lazy(() => import('@/pages/admin/AdminUsers'))
 const AdminUserDetail = lazy(() => import('@/pages/admin/AdminUserDetail'))
 const AdminDiscounts = lazy(() => import('@/pages/admin/AdminDiscounts'))
@@ -68,10 +71,14 @@ const DiscountEditPage = lazy(() => import('@/pages/admin/DiscountEdit'))
 const AdminCities = lazy(() => import('@/pages/admin/AdminCities'))
 const AdminDeliveryMethods = lazy(() => import('@/pages/admin/DeliveryMethods'))
 const DeliveryMethodConfig = lazy(() => import('@/pages/admin/DeliveryMethodConfig'))
+const AdminCODReconciliation = lazy(() => import('@/pages/admin/AdminCODReconciliationPage'))
 const AdminPaymentMethods = lazy(() => import('@/pages/admin/PaymentMethods'))
 const PaymentMethodConfig = lazy(() => import('@/pages/admin/PaymentMethodConfig'))
+const AdminLedger = lazy(() => import('@/pages/admin/AdminLedgerPage'))
 const AdminCustomization = lazy(() => import('@/pages/admin/AdminCustomization'))
 const WidgetBuilder = lazy(() => import('@/pages/admin/WidgetBuilder'))
+const AdminAbandonedCarts = lazy(() => import('@/pages/admin/marketing/AbandonedCarts'))
+const AdminExecutiveAnalytics = lazy(() => import('@/pages/admin/analytics/ExecutiveAnalytics'))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -145,7 +152,10 @@ const router = createBrowserRouter([
               { path: 'inventory', element: withSuspense(<AdminInventory />) },
               { path: 'inventory/logs', element: withSuspense(<AdminInventoryLogs />) },
               { path: 'orders', element: withSuspense(<AdminOrders />) },
+              { path: 'orders/batch-waybills', element: withSuspense(<AdminBatchWaybills />) },
               { path: 'orders/:orderIdOrNumber', element: withSuspense(<AdminOrderDetail />) },
+              { path: 'orders/:orderIdOrNumber/waybill', element: withSuspense(<AdminOrderWaybill />) },
+              { path: 'orders/:orderIdOrNumber/invoice', element: withSuspense(<AdminOrderInvoice />) },
               { path: 'users', element: withSuspense(<AdminUsers />) },
               { path: 'users/:userId', element: withSuspense(<AdminUserDetail />) },
               { path: 'discounts', element: withSuspense(<AdminDiscounts />) },
@@ -153,11 +163,17 @@ const router = createBrowserRouter([
               { path: 'discounts/:id', element: withSuspense(<DiscountEditPage />) },
               { path: 'cities', element: withSuspense(<AdminCities />) },
               { path: 'delivery', element: withSuspense(<AdminDeliveryMethods />) },
+              { path: 'delivery/reconciliation', element: withSuspense(<AdminCODReconciliation />) },
               { path: 'delivery/:courierCode', element: withSuspense(<DeliveryMethodConfig />) },
               { path: 'payment_methods', element: withSuspense(<AdminPaymentMethods />) },
               { path: 'payment_methods/:methodCode', element: withSuspense(<PaymentMethodConfig />) },
+              { path: 'ledger', element: withSuspense(<AdminLedger />) },
               { path: 'customization', element: withSuspense(<AdminCustomization />) },
               { path: 'customization/:layoutId', element: withSuspense(<WidgetBuilder />) },
+              { path: 'marketing/abandoned-carts', element: withSuspense(<AdminAbandonedCarts />) },
+              { path: 'abandoned-carts', element: withSuspense(<AdminAbandonedCarts />) },
+              { path: 'analytics', element: withSuspense(<AdminExecutiveAnalytics />) },
+              { path: 'analytics/executive', element: withSuspense(<AdminExecutiveAnalytics />) },
             ],
           },
         ],

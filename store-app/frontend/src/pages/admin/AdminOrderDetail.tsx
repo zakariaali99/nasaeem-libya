@@ -5,12 +5,14 @@ import {
   Clock,
   Copy,
   CreditCard,
+  ExternalLink,
   MapPin,
   MessageCircle,
   Package,
   Phone,
   Printer,
   RotateCcw,
+  ShieldCheck,
   Truck,
   User,
   XCircle,
@@ -18,12 +20,16 @@ import {
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
+import { OrderTrackingTimeline } from '@/components/admin/OrderTrackingTimeline'
+import { RefundModal } from '@/components/admin/RefundModal'
 import { StatusBadge } from '@/components/admin/StatusBadge'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatDateTime, formatPrice } from '@/lib/format'
+import { useCreateShipment } from '@/lib/queries/delivery'
 import { useOrder, useUpdateOrder } from '@/lib/queries/orders'
+import { useVerifyPayment } from '@/lib/queries/payments'
 import { usePageTitle } from '@/lib/usePageTitle'
 import { cn } from '@/lib/utils'
 
@@ -38,7 +44,11 @@ export default function AdminOrderDetail() {
   const { orderIdOrNumber = '' } = useParams()
   const { data: order, isPending } = useOrder(orderIdOrNumber)
   const update = useUpdateOrder(orderIdOrNumber)
+  const createShipment = useCreateShipment(order?.id)
+  const verifyPayment = useVerifyPayment(orderIdOrNumber)
   const [copied, setCopied] = useState(false)
+  const [copiedTracking, setCopiedTracking] = useState(false)
+  const [refundModalOpen, setRefundModalOpen] = useState(false)
 
   usePageTitle(order ? `الطلب #${order.order_number} — لوحة التحكم` : 'تفاصيل الطلب')
 
@@ -71,10 +81,6 @@ export default function AdminOrderDetail() {
     navigator.clipboard.writeText(order.order_number)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
-  }
-
-  const handlePrint = () => {
-    window.print()
   }
 
   const phoneNumber = order.user?.phone_number || ''
@@ -156,14 +162,40 @@ export default function AdminOrderDetail() {
           )}
 
           <Button
+            asChild
             variant="outline"
             size="sm"
-            onClick={handlePrint}
+            className="rounded-xl text-xs font-bold gap-1.5 h-10 px-3.5 shadow-2xs border-primary/30 text-primary hover:bg-primary/10"
+          >
+            <Link to={`/admin/orders/${order.order_number}/waybill`}>
+              <Printer className="size-4" />
+              <span>بوليصة الشحن (4x6 / 80mm)</span>
+            </Link>
+          </Button>
+
+          <Button
+            asChild
+            variant="outline"
+            size="sm"
             className="rounded-xl text-xs font-bold gap-1.5 h-10 px-3.5 shadow-2xs"
           >
-            <Printer className="size-4" />
-            <span>طباعة الفاتورة</span>
+            <Link to={`/admin/orders/${order.order_number}/invoice`}>
+              <Printer className="size-4" />
+              <span>الفاتورة الرسمية (A4)</span>
+            </Link>
           </Button>
+
+          {order.payments && order.payments.length > 0 && order.payments[0]?.status === 'completed' && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setRefundModalOpen(true)}
+              className="rounded-xl text-xs font-bold gap-1.5 h-10 px-3.5 shadow-2xs border-destructive/30 text-destructive hover:bg-destructive/10"
+            >
+              <RotateCcw className="size-4" />
+              <span>استرداد مالي</span>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -337,6 +369,32 @@ export default function AdminOrderDetail() {
               </div>
 
               <div className="flex flex-wrap gap-2.5">
+                {/* Courier Shipment Dispatch Button */}
+                {!order.tracking_number ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    loading={createShipment.isPending}
+                    onClick={() => createShipment.mutate({ force: false })}
+                    className="rounded-xl text-xs font-bold h-9 px-4 gap-1.5 border-primary/30 text-primary bg-primary/5 hover:bg-primary/10"
+                  >
+                    <Truck className="size-3.5" />
+                    <span>إنشاء بوليصة شحن وتوليد رقم التتبع</span>
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    loading={createShipment.isPending}
+                    onClick={() => createShipment.mutate({ force: true })}
+                    className="rounded-xl text-xs font-bold h-9 px-3 gap-1.5 text-muted-foreground hover:text-foreground"
+                    title="إعادة إنشاء بوليصة شحن جديدة وإلغاء القديمة"
+                  >
+                    <RotateCcw className="size-3.5" />
+                    <span>إعادة توليد البوليصة (Force)</span>
+                  </Button>
+                )}
+
                 {order.shipping_status === 'pending' && (
                   <Button
                     variant="outline"
@@ -389,7 +447,7 @@ export default function AdminOrderDetail() {
             </div>
           </div>
 
-          {/* Delivery Address & Notes Card */}
+          {/* Delivery Address & Tracking Details Card */}
           <div className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-xs space-y-4">
             <div className="flex items-center gap-2.5 border-b border-border pb-3">
               <MapPin className="size-4 text-primary" />
@@ -397,6 +455,52 @@ export default function AdminOrderDetail() {
             </div>
 
             <div className="space-y-3 text-xs">
+              {order.delivery_method_name && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">شركة التوصيل:</span>
+                  <Badge tone="primary" className="font-bold text-xs">
+                    {order.delivery_method_name}
+                  </Badge>
+                </div>
+              )}
+
+              {order.tracking_number && (
+                <div className="rounded-2xl border border-primary/20 bg-primary/5 p-3 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-primary">رقم التتبع والشحنة:</span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(order.tracking_number)
+                          setCopiedTracking(true)
+                          setTimeout(() => setCopiedTracking(false), 2000)
+                        }}
+                        className="inline-flex items-center gap-1 font-mono text-xs font-extrabold text-foreground hover:text-primary transition-colors cursor-pointer"
+                        title="نسخ رقم التتبع"
+                      >
+                        <span>{order.tracking_number}</span>
+                        <Copy className="size-3 text-muted-foreground" />
+                      </button>
+                      {copiedTracking && (
+                        <span className="text-[10px] font-bold text-success animate-fade-in">تم النسخ</span>
+                      )}
+                    </div>
+                  </div>
+                  {order.tracking_url && (
+                    <a
+                      href={order.tracking_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline"
+                    >
+                      <span>تتبع الشحنة على نظام الشركة</span>
+                      <ExternalLink className="size-3 rtl:rotate-180" />
+                    </a>
+                  )}
+                </div>
+              )}
+
               <div>
                 <span className="text-muted-foreground block mb-0.5">المدينة والمنطقة:</span>
                 <p className="font-bold text-foreground text-sm">
@@ -414,7 +518,7 @@ export default function AdminOrderDetail() {
               {order.customer_notes && (
                 <div>
                   <span className="text-muted-foreground block mb-0.5">ملاحظات العميل:</span>
-                  <p className="font-medium text-foreground bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/30 text-amber-900 dark:text-amber-200">
+                  <p className="font-medium text-foreground bg-warning/10 p-2.5 rounded-xl border border-warning/25 text-warning">
                     {order.customer_notes}
                   </p>
                 </div>
@@ -422,7 +526,10 @@ export default function AdminOrderDetail() {
             </div>
           </div>
 
-          {/* Payment Method Card */}
+          {/* Courier Live Tracking Timeline */}
+          <OrderTrackingTimeline orderNumberOrId={order.order_number || order.id} />
+
+          {/* Payment Method & Ledger Card */}
           <div className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-xs space-y-4">
             <div className="flex items-center gap-2.5 border-b border-border pb-3">
               <CreditCard className="size-4 text-primary" />
@@ -441,10 +548,58 @@ export default function AdminOrderDetail() {
                 <span className="text-muted-foreground">حالة السداد:</span>
                 <StatusBadge status={order.payment_status || 'unpaid'} />
               </div>
+
+              {/* Admin Payment Attempts & Verification Ledger */}
+              {order.admin_payments && order.admin_payments.length > 0 && (
+                <div className="border-t border-border pt-3 space-y-2.5">
+                  <span className="font-bold text-[11px] text-foreground block">
+                    سجل حركات السداد ({order.admin_payments.length}):
+                  </span>
+                  <div className="space-y-2">
+                    {order.admin_payments.map((p) => (
+                      <div
+                        key={p.id}
+                        className="rounded-xl border border-border bg-muted/20 p-2.5 space-y-1.5 text-[11px]"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold font-mono text-foreground">{p.method_code}</span>
+                          <StatusBadge status={p.status} />
+                        </div>
+                        <div className="flex items-center justify-between text-muted-foreground font-mono">
+                          <span>المبلغ: {formatPrice(p.amount)}</span>
+                          <span>{p.created_at ? formatDateTime(p.created_at) : ''}</span>
+                        </div>
+                        {p.reference_id && (
+                          <p className="font-mono text-[10px] text-muted-foreground truncate">
+                            مرجع: {p.reference_id}
+                          </p>
+                        )}
+                        {p.status === 'waiting_for_verification' && (
+                          <Button
+                            size="sm"
+                            loading={verifyPayment.isPending}
+                            onClick={() => verifyPayment.mutate({ paymentId: p.id })}
+                            className="w-full mt-1.5 h-8 text-xs font-bold rounded-lg gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+                          >
+                            <ShieldCheck className="size-3.5" />
+                            <span>تأكيد واستلام الدفعة</span>
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
       </div>
+
+      <RefundModal
+        order={order}
+        open={refundModalOpen}
+        onClose={() => setRefundModalOpen(false)}
+      />
     </div>
   )
 }

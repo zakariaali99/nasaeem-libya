@@ -132,3 +132,23 @@ export function usePaymentRedirect(orderId?: string) {
     },
   })
 }
+
+export function useVerifyPayment(orderId?: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ paymentId }: { paymentId: string }) => {
+      const response = await api.post<{
+        success: boolean
+        status: string
+        message?: string
+      }>(`/admin/payments/${paymentId}/verify/`)
+      return response.data
+    },
+    onSuccess: () => {
+      if (orderId) {
+        queryClient.invalidateQueries({ queryKey: ['orders', orderId] })
+      }
+      queryClient.invalidateQueries({ queryKey: ['orders'] })
+    },
+  })
+}

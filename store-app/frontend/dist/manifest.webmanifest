@@ -1,0 +1,26 @@
+{
+  "name": "نسائم ليبيا",
+  "short_name": "نسائم ليبيا",
+  "description": "عطور وزيوت وأطقم هدايا، توصيل إلى جميع مدن ليبيا.",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f7f8f4",
+  "theme_color": "#444943",
+  "icons": [
+    {
+      "src": "/brand/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/brand/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

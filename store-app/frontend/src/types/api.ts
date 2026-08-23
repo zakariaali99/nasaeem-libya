@@ -93,6 +93,39 @@ export interface DiscountBadge {
   end_date: string | null
 }
 
+export interface PerfumeNote {
+  name: string
+  icon?: string
+  desc?: string
+}
+
+export interface PerfumeDetails {
+  fragrance_family: string
+  gender: 'MEN' | 'WOMEN' | 'UNISEX'
+  concentration: string
+  origin_country: string
+  top_notes: PerfumeNote[]
+  heart_notes: PerfumeNote[]
+  base_notes: PerfumeNote[]
+  longevity_score: number
+  longevity_hours: string
+  sillage_score: number
+  seasons: string[]
+  occasions: string[]
+}
+
+export interface ProductBundle {
+  id: string
+  name: string
+  slug: string
+  description: string
+  bundle_price: string
+  original_price: string
+  savings_amount: string
+  badge_text: string
+  included_products: Product[]
+}
+
 export interface Product {
   id: string
   name: string
@@ -115,6 +148,8 @@ export interface Product {
   discounts: DiscountBadge[]
   discount_percent: number | null
   variants?: ProductVariant[]
+  perfume_details?: PerfumeDetails
+  bundles?: ProductBundle[]
   meta_title?: string
   meta_description?: string
   created_at?: string
@@ -359,9 +394,35 @@ export interface Order {
   customer_notes: string
   tracking_number: string
   tracking_url: string
+  is_gift?: boolean
+  gift_wrap_type?: string
+  gift_wrap_fee?: string
+  gift_sender_name?: string
+  gift_recipient_name?: string
+  gift_message?: string
+  hide_invoice_prices?: boolean
   items: OrderLine[]
   created_at: string
   user?: { id: string; name: string; phone_number: string } | null
+  /** Admin-only: the order's payment attempts. `null` for customers. */
+  admin_payments?: {
+    id: string
+    method_code: string
+    status: string
+    amount: string
+    reference_id: string
+    verified_at: string | null
+    created_at: string
+  }[] | null
+  payments?: {
+    id: string
+    method_code: string
+    status: string
+    amount: string
+    reference_id: string
+    verified_at: string | null
+    created_at: string
+  }[] | null
 }
 
 export interface Address {
@@ -394,3 +455,123 @@ export interface CityAdmin {
   is_active: boolean
   regions: { id: string; name: string; delivery_fee: string; is_active: boolean }[]
 }
+
+export interface CartPromotion {
+  id: string
+  title: string
+  message: string
+  success_message: string
+  min_order_amount: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface ProductReview {
+  id: string
+  product: string
+  user: string
+  user_name: string
+  rating: number
+  title: string
+  comment: string
+  photo_url: string
+  is_verified_buyer: boolean
+  is_approved: boolean
+  points_awarded: boolean
+  created_at: string
+}
+
+export interface ProductReviewsResponse {
+  reviews: ProductReview[]
+  average_rating: number
+  total_reviews: number
+  rating_breakdown: Record<string, number>
+}
+
+export interface LoyaltySummary {
+  loyalty_points: number
+  points_value_lyd: string
+  lifetime_spend: string
+  vip_tier: 'SILVER' | 'GOLD' | 'DIAMOND'
+  vip_tier_label: string
+  next_tier: string | null
+  spend_to_next_tier: string
+  progress_percent: number
+  perks: string[]
+  recent_transactions: {
+    id: string
+    points_change: number
+    transaction_type: string
+    transaction_type_label: string
+    description: string
+    created_at: string
+  }[]
+}
+
+export interface AbandonedCartRow {
+  id: string
+  customer_name: string
+  phone_number: string
+  items_count: number
+  items: {
+    id: string
+    product_name: string
+    quantity: number
+    unit_price: string
+    total_price: string
+  }[]
+  cart_total: string
+  is_recovered: boolean
+  recovery_sms_sent_at: string | null
+  recovery_discount_code: string
+  whatsapp_link: string
+  last_activity_at: string
+}
+
+export interface AbandonedCartsResponse {
+  carts: AbandonedCartRow[]
+  stats: {
+    total_abandoned_value: string
+    abandoned_count: number
+    recovered_count: number
+    recovery_rate_percent: number
+  }
+}
+
+export interface CitySalesRow {
+  city_name: string
+  orders_count: number
+  revenue: string
+  percentage: number
+}
+
+export interface BrandProfitRow {
+  brand_name: string
+  units_sold: number
+  revenue: string
+  margin_percent: number
+  net_profit: string
+}
+
+export interface VipSpenderRow {
+  id: string
+  name: string
+  phone_number: string
+  vip_tier: string
+  lifetime_spend: string
+  loyalty_points: number
+}
+
+export interface ExecutiveAnalyticsData {
+  total_revenue: string
+  estimated_profit: string
+  total_orders_count: number
+  average_order_value: string
+  repeat_purchase_rate: number
+  avg_days_between_orders: number
+  city_breakdown: CitySalesRow[]
+  brand_performance: BrandProfitRow[]
+  vip_top_spenders: VipSpenderRow[]
+}
+

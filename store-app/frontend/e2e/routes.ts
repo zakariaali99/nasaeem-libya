@@ -91,6 +91,8 @@ export const ROUTES: RouteDef[] = [
   // Phase 8 customisation (beyond the original 44)
   { n: '8a', label: 'Customisation layouts', path: '/admin/customization', access: 'owner' },
   { n: '8b', label: 'Widget builder', path: '/admin/customization/:layoutId', access: 'owner', dynamic: 'layoutId' },
+  { n: '8c', label: 'Abandoned carts recovery', path: '/admin/marketing/abandoned-carts', access: 'owner' },
+  { n: '11', label: 'Executive analytics', path: '/admin/analytics', access: 'owner' },
 ]
 
 /** Text that betrays an unbuilt page — the reference's placeholder crime. */

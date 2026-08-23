@@ -44,15 +44,15 @@ export default function PaymentMethodConfigPage() {
       setSortOrder(String(method.sort_order ?? 0))
 
       const config = method.config_data || {}
-      setMerchantId(config.merchant_id || config.merchantId || '')
-      setTerminalId(config.terminal_id || config.terminalId || '')
-      setSecretKey(config.secret_key || config.secretKey || '')
-      setApiKey(config.api_key || config.apiKey || '')
-      setIsTestMode(Boolean(config.test_mode || config.is_test_mode))
-      setAccountName(config.account_name || '')
-      setAccountNumber(config.account_number || '')
-      setBankName(config.bank_name || '')
-      setInstructions(config.instructions || '')
+      setMerchantId(config.merchantId || config.merchant_id || '')
+      setTerminalId(config.terminalId || config.terminal_id || '')
+      setSecretKey(config.secureKey || config.secret_key || '')
+      setApiKey(config.apiKey || config.api_key || '')
+      setIsTestMode(Boolean(config.sandboxMode || config.test_mode))
+      setAccountName(config.accountName || '')
+      setAccountNumber(config.accountNumber || '')
+      setBankName(config.bankName || '')
+      setInstructions(config.instructionsAr || '')
     }
   }, [method])
 
@@ -75,16 +75,23 @@ export default function PaymentMethodConfigPage() {
     e.preventDefault()
     setSavedSuccess(false)
 
+    /*
+     * Key names here are CONTRACT, not style: the gateway providers read
+     * camelCase (`MoamalatGateway.initiate` reads `merchantId`, `secureKey`,
+     * `sandboxMode`; the manual gateways read `instructionsAr`). Saving
+     * snake_case here used to produce a config the gateway could not read —
+     * checkout initiation then failed with "إعدادات غير مكتملة".
+     */
     const config_data: Record<string, any> = {
-      ...(merchantId ? { merchant_id: merchantId } : {}),
-      ...(terminalId ? { terminal_id: terminalId } : {}),
-      ...(secretKey ? { secret_key: secretKey } : {}),
-      ...(apiKey ? { api_key: apiKey } : {}),
-      test_mode: isTestMode,
-      ...(accountName ? { account_name: accountName } : {}),
-      ...(accountNumber ? { account_number: accountNumber } : {}),
-      ...(bankName ? { bank_name: bankName } : {}),
-      ...(instructions ? { instructions } : {}),
+      ...(merchantId ? { merchantId } : {}),
+      ...(terminalId ? { terminalId } : {}),
+      ...(secretKey ? { secureKey: secretKey } : {}),
+      ...(apiKey ? { apiKey } : {}),
+      sandboxMode: isTestMode,
+      ...(accountName ? { accountName } : {}),
+      ...(accountNumber ? { accountNumber } : {}),
+      ...(bankName ? { bankName } : {}),
+      ...(instructions ? { instructionsAr: instructions } : {}),
     }
 
     try {

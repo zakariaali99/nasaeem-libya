@@ -1,5 +1,17 @@
-import { ArrowRight, Calendar, DollarSign, Mail, Package, Phone, User, UserCheck } from 'lucide-react'
+import {
+  ArrowRight,
+  Calendar,
+  DollarSign,
+  Mail,
+  Package,
+  Phone,
+  ShieldAlert,
+  ShieldCheck,
+  User,
+  UserCheck,
+} from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { StatusBadge } from '@/components/admin/StatusBadge'
 import { Badge } from '@/components/ui/badge'
@@ -8,7 +20,6 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import { formatDateTime, formatNumber, formatPrice } from '@/lib/format'
 import { usePageTitle } from '@/lib/usePageTitle'
-import { useQuery } from '@tanstack/react-query'
 import type { Order } from '@/types/api'
 
 interface AdminUser {
@@ -19,16 +30,35 @@ interface AdminUser {
   role: string
   is_active: boolean
   date_joined: string
+  loyalty_points?: number
+  lifetime_spend?: string
+  vip_tier?: string
+  is_cod_blacklisted?: boolean
+  cod_rejections_count?: number
+  cod_blacklist_reason?: string
+  banned?: boolean
+  ban_reason?: string
 }
 
 export default function AdminUserDetail() {
   const { userId = '' } = useParams()
+  const queryClient = useQueryClient()
   usePageTitle('ملف العميل — لوحة التحكم')
 
   const userQuery = useQuery({
     queryKey: ['admin-user', userId],
     queryFn: async () => (await api.get<AdminUser>(`/admin/users/${userId}/`)).data,
     enabled: Boolean(userId),
+  })
+
+  const updateSecurity = useMutation({
+    mutationFn: async (payload: Partial<AdminUser>) => {
+      const res = await api.patch<AdminUser>(`/admin/users/${userId}/`, payload)
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-user', userId] })
+    },
   })
 
   const ordersQuery = useQuery({
@@ -166,6 +196,48 @@ export default function AdminUserDetail() {
               <span>الصلاحية:</span>
               <span className="font-semibold text-foreground">{user.role}</span>
             </div>
+          </div>
+
+          {/* Anti-Fraud & COD Control Panel */}
+          <div className="mt-4 pt-4 border-t border-border space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                {user.is_cod_blacklisted ? (
+                  <ShieldAlert className="size-4 text-destructive" />
+                ) : (
+                  <ShieldCheck className="size-4 text-emerald-500" />
+                )}
+                <span>حالة الدفع عند الاستلام:</span>
+              </span>
+              {user.is_cod_blacklisted ? (
+                <span className="rounded-full bg-destructive/15 px-2.5 py-0.5 text-[10px] font-extrabold text-destructive">
+                  محظور من COD
+                </span>
+              ) : (
+                <span className="rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400">
+                  مسموح بالدفع عند الاستلام
+                </span>
+              )}
+            </div>
+
+            {user.cod_blacklist_reason && (
+              <p className="text-[11px] text-destructive bg-destructive/10 p-2 rounded-xl">
+                السبب: {user.cod_blacklist_reason}
+              </p>
+            )}
+
+            <Button
+              size="sm"
+              variant={user.is_cod_blacklisted ? 'outline' : 'destructive'}
+              onClick={() => updateSecurity.mutate({
+                is_cod_blacklisted: !user.is_cod_blacklisted,
+                cod_blacklist_reason: user.is_cod_blacklisted ? '' : 'حظر إداري بسبب عدم استلام متكرر',
+              })}
+              disabled={updateSecurity.isPending}
+              className="w-full min-h-11 rounded-xl text-xs font-bold gap-1"
+            >
+              {user.is_cod_blacklisted ? 'إلغاء حظر الدفع عند الاستلام' : 'حظر من الدفع عند الاستلام'}
+            </Button>
           </div>
         </div>
 

@@ -1,11 +1,13 @@
 import {
   ArrowUpRight,
+  BarChart3,
   Blocks,
   Boxes,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
   CreditCard,
+  FileSpreadsheet,
   FolderTree,
   LayoutGrid,
   LogOut,
@@ -16,18 +18,22 @@ import {
   Plus,
   Search,
   ShoppingBag,
+  ShoppingCart,
   Store,
   Tags,
   Truck,
   User,
   Users,
+  Wallet,
   X,
+  Zap,
 } from 'lucide-react'
 import * as React from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 
 import { Breadcrumbs } from '@/components/admin/Breadcrumbs'
 import { CommandPalette } from '@/components/admin/CommandPalette'
+import { QuickOrderModal } from '@/components/admin/QuickOrderModal'
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
 import { Button } from '@/components/ui/button'
 import { useLogout, useMe } from '@/lib/queries/auth'
@@ -51,7 +57,9 @@ const NAV_GROUPS: NavGroup[] = [
     title: 'الرئيسية والعمليات',
     items: [
       { to: '/admin', label: 'لوحة التحكم', icon: LayoutGrid, end: true },
+      { to: '/admin/analytics', label: 'التحليلات التنفيذية', icon: BarChart3 },
       { to: '/admin/orders', label: 'إدارة الطلبات', icon: ShoppingBag, badgeKey: 'pending_orders', badgeTone: 'warning' },
+      { to: '/admin/marketing/abandoned-carts', label: 'السلات المتروكة والواتساب', icon: ShoppingCart },
       { to: '/admin/users', label: 'سجل العملاء', icon: Users },
       { to: '/admin/discounts', label: 'كوبونات الخصم', icon: Percent },
     ],
@@ -71,7 +79,9 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: '/admin/cities', label: 'المدن والمناطق', icon: MapPin },
       { to: '/admin/delivery', label: 'شركات التوصيل', icon: Truck },
+      { to: '/admin/delivery/reconciliation', label: 'مطابقة كشوفات COD', icon: FileSpreadsheet },
       { to: '/admin/payment_methods', label: 'بوابات الدفع', icon: CreditCard },
+      { to: '/admin/ledger', label: 'دفتر الأستاذ والتسويات', icon: Wallet },
       { to: '/admin/customization', label: 'محرر الواجهة والقوالب', icon: Blocks },
     ],
   },
@@ -80,6 +90,7 @@ const NAV_GROUPS: NavGroup[] = [
 export function AdminLayout() {
   const [mobileOpen, setMobileOpen] = React.useState(false)
   const [paletteOpen, setPaletteOpen] = React.useState(false)
+  const [quickOrderOpen, setQuickOrderOpen] = React.useState(false)
   const [isCollapsed, setIsCollapsed] = React.useState(() => {
     return localStorage.getItem('admin_sidebar_collapsed') === 'true'
   })
@@ -88,6 +99,18 @@ export function AdminLayout() {
   const { data: stats } = useDashboardStats()
   const logout = useLogout()
   const navigate = useNavigate()
+
+  // Global keyboard shortcut: Cmd+Shift+O or Ctrl+Shift+O opens Quick Order Modal
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'O' || e.key === 'o')) {
+        e.preventDefault()
+        setQuickOrderOpen((prev) => !prev)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   const toggleCollapsed = () => {
     setIsCollapsed((prev) => {
@@ -360,6 +383,20 @@ export function AdminLayout() {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Quick Order Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setQuickOrderOpen(true)}
+              className="h-9 px-3 text-xs gap-1.5 rounded-xl border-primary/30 bg-primary/5 text-primary hover:bg-primary hover:text-primary-foreground shadow-2xs transition-colors"
+            >
+              <Zap className="size-3.5" />
+              <span className="font-bold">طلب سريع</span>
+              <kbd className="ms-1 pointer-events-none hidden h-5 select-none items-center gap-0.5 rounded border border-primary/20 bg-primary/10 px-1.5 font-mono text-[10px] font-bold text-primary opacity-100 sm:inline-flex">
+                <span>⌘⇧O</span>
+              </kbd>
+            </Button>
+
             {/* Quick Command Palette Button */}
             <Button
               variant="outline"
@@ -368,8 +405,8 @@ export function AdminLayout() {
               className="h-9 px-3 text-xs gap-2 rounded-xl text-muted-foreground hover:text-foreground shadow-2xs border-border bg-background"
             >
               <Search className="size-3.5" />
-              <span>بحث سريع في النظام…</span>
-              <kbd className="ms-2 pointer-events-none hidden h-5 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100 sm:inline-flex">
+              <span>بحث سريع…</span>
+              <kbd className="ms-1 pointer-events-none hidden h-5 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100 sm:inline-flex">
                 <span className="text-xs">⌘</span>K
               </kbd>
             </Button>
@@ -386,6 +423,9 @@ export function AdminLayout() {
 
       {/* Command Palette Modal */}
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+
+      {/* Quick Order Entry Modal */}
+      <QuickOrderModal open={quickOrderOpen} onOpenChange={setQuickOrderOpen} />
     </div>
   )
 }

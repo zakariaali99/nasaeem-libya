@@ -138,3 +138,25 @@ export function useSyncDeliveryMethod() {
   })
 }
 
+export function useCreateShipment(orderId?: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ force = false }: { force?: boolean } = {}) => {
+      const response = await api.post<{
+        success: boolean
+        tracking_number: string
+        tracking_url: string
+        courier_code: string
+        message?: string
+      }>(`/admin/orders/${orderId}/shipment/`, { force })
+      return response.data
+    },
+    onSuccess: () => {
+      if (orderId) {
+        queryClient.invalidateQueries({ queryKey: deliveryKeys.order(orderId) })
+      }
+      queryClient.invalidateQueries({ queryKey: ['orders'] })
+    },
+  })
+}
+

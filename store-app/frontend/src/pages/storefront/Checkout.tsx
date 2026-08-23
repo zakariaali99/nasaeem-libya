@@ -12,6 +12,7 @@ import { ErrorState } from '@/components/storefront/ErrorState'
 import { OrderSummary } from '@/components/storefront/OrderSummary'
 import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
@@ -19,7 +20,9 @@ import { ApiError } from '@/lib/api'
 import { formatPrice } from '@/lib/format'
 import { useConfirmCheckout } from '@/lib/queries/cart'
 import { useCities, useDeliveryMethods, useOrder, useRegions } from '@/lib/queries/delivery'
+import { useActiveCartPromotion } from '@/lib/queries/orders'
 import { useInitiatePayment, usePublicPaymentMethods } from '@/lib/queries/payments'
+import { LuxuryGiftingSection, type GiftingState } from '@/components/storefront/LuxuryGiftingSection'
 import { usePageTitle } from '@/lib/usePageTitle'
 
 export default function CheckoutPage() {
@@ -28,6 +31,7 @@ export default function CheckoutPage() {
   usePageTitle('إتمام الطلب والدفع — نسائم ليبيا', 'أدخل عنوان التوصيل واختر طريقة الدفع.')
 
   const { data: order, isPending, isError, error, refetch } = useOrder(orderId)
+  const { data: promo } = useActiveCartPromotion()
   const confirm = useConfirmCheckout()
   const initiatePayment = useInitiatePayment()
   const { data: availablePaymentMethods } = usePublicPaymentMethods()
@@ -38,8 +42,17 @@ export default function CheckoutPage() {
   const [notes, setNotes] = useState('')
   const [method, setMethod] = useState('')
   const [payment, setPayment] = useState('manual_payment')
+  const [transferReceipt, setTransferReceipt] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
   const [formError, setFormError] = useState<string | null>(null)
+  const [gifting, setGifting] = useState<GiftingState>({
+    is_gift: false,
+    gift_wrap_type: 'CLASSIC_ELEGANCE',
+    gift_sender_name: '',
+    gift_recipient_name: '',
+    gift_message: '',
+    hide_invoice_prices: false,
+  })
 
   const {
     data: cityData,
@@ -69,32 +82,28 @@ export default function CheckoutPage() {
 
   if (isPending) return <CheckoutSkeleton />
 
-  if (isError) {
-    const missing = error instanceof ApiError && error.status === 404
+  if (isError || !order) {
     return (
-      <div className="mx-auto w-full max-w-3xl px-4 py-12">
-        <h1 className="mb-4 text-2xl font-bold">إتمام الطلب</h1>
-        {missing ? (
-          <Alert tone="error">
-            الطلب غير موجود.{' '}
-            <Link to="/cart" className="font-semibold underline">
-              العودة إلى السلة
-            </Link>
-          </Alert>
-        ) : (
-          <ErrorState error={error} onRetry={() => refetch()} />
-        )}
+      <div className="mx-auto w-full max-w-lg px-4 py-16 text-center space-y-4">
+        <Alert tone="error">
+          {error instanceof ApiError ? error.message : 'تعذّر تحميل بيانات الطلب.'}
+        </Alert>
+        <Button onClick={() => refetch()} variant="outline">
+          إعادة المحاولة
+        </Button>
       </div>
     )
   }
 
   if (order.status !== 'pending') {
     return (
-      <div className="mx-auto w-full max-w-3xl px-4 py-12">
-        <h1 className="mb-4 text-2xl font-bold">إتمام الطلب</h1>
+      <div className="mx-auto w-full max-w-lg px-4 py-16 text-center space-y-4">
         <Alert tone="info">
-          هذا الطلب ({order.order_number}) لم يعد بانتظار التأكيد.{' '}
-          <Link to={`/me/orders/${order.id}`} className="font-semibold underline">
+          هذا الطلب مكتمل أو قيد المعالجة بالفعل.
+          <Link
+            to={`/orders/${encodeURIComponent(order.order_number)}`}
+            className="block mt-2 font-bold text-primary hover:underline"
+          >
             عرض تفاصيل الطلب
           </Link>
         </Alert>
@@ -114,6 +123,12 @@ export default function CheckoutPage() {
         delivery_method_code: method,
         payment_method: payment,
         customer_notes: notes,
+        is_gift: String(gifting.is_gift),
+        gift_wrap_type: gifting.gift_wrap_type,
+        gift_sender_name: gifting.gift_sender_name,
+        gift_recipient_name: gifting.gift_recipient_name,
+        gift_message: gifting.gift_message,
+        hide_invoice_prices: String(gifting.hide_invoice_prices),
       })
 
       if (['moamalat', 'plutu', 'sadad_pay', 'binance_pay'].includes(payment)) {
@@ -134,6 +149,18 @@ export default function CheckoutPage() {
         }
       }
 
+      if (payment === 'manual_payment') {
+        try {
+          await initiatePayment.mutateAsync({
+            order_id: order.id,
+            method_code: payment,
+            user_input: transferReceipt ? { transferReceipt } : {},
+          })
+        } catch {
+          // Manual payment record created during initiation
+        }
+      }
+
       navigate(`/checkout/complete?order=${encodeURIComponent(order.order_number)}`)
     } catch (failure) {
       if (failure instanceof ApiError) {
@@ -145,9 +172,14 @@ export default function CheckoutPage() {
     }
   }
 
-  const shipping = selectedRegion ? selectedRegion.delivery_fee : order.shipping_total
+  const isFreeShipping = Boolean(
+    promo?.is_active && order && Number(order.subtotal) >= Number(promo.min_order_amount),
+  )
+  const regularShipping = selectedRegion ? selectedRegion.delivery_fee : order.shipping_total
+  const shipping = isFreeShipping ? '0.00' : regularShipping
+  const giftWrapFee = gifting.is_gift && gifting.gift_wrap_type === 'ROYAL_VELVET' ? 15 : 0
   const total = (
-    Number(order.subtotal) - Number(order.discount_total) + Number(shipping)
+    Number(order.subtotal) - Number(order.discount_total) + Number(shipping) + giftWrapFee
   ).toFixed(2)
 
   return (
@@ -298,6 +330,9 @@ export default function CheckoutPage() {
             )}
           </section>
 
+          {/* Luxury Gifting Suite */}
+          <LuxuryGiftingSection value={gifting} onChange={setGifting} />
+
           {/* Payment Methods Section */}
           <section className="space-y-4 rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-xs">
             <div className="flex items-center gap-2.5 border-b border-border/80 pb-3">
@@ -337,6 +372,23 @@ export default function CheckoutPage() {
                   />
                 </>
               )}
+
+              {payment === 'manual_payment' && (
+                <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-2.5 animate-fade-rise">
+                  <p className="text-xs text-primary font-medium">
+                    يرجى تحويل قيمة الطلب إلى الحساب المصرفي المعتمد للمتجر، وإدخال رقم الإشعار أو مرجع التحويل لتسريع التحقق وتجهيز طلبك:
+                  </p>
+                  <Field label="رقم مرجع التحويل أو إشعار الإيداع (اختياري)" htmlFor="transferReceipt">
+                    <Input
+                      id="transferReceipt"
+                      value={transferReceipt}
+                      onChange={(e) => setTransferReceipt(e.target.value)}
+                      placeholder="مثال: TRX-884920 أو رقم إشعار موبي كاش / سداد"
+                      className="h-10 text-xs font-mono"
+                    />
+                  </Field>
+                </div>
+              )}
             </div>
           </section>
         </div>
@@ -368,6 +420,7 @@ export default function CheckoutPage() {
                 discountTotal={order.discount_total}
                 shippingTotal={shipping}
                 total={total}
+                isFreeShipping={isFreeShipping}
                 shippingNote="رسوم التوصيل محتسبة للمنطقة المحددة"
               />
             </div>

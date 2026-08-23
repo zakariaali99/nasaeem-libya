@@ -1,6 +1,9 @@
 import { Search as SearchIcon } from 'lucide-react'
+import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 
+import { FragranceFinderQuizModal } from '@/components/storefront/FragranceFinderQuizModal'
+import { NotesBrowserBar } from '@/components/storefront/NotesBrowserBar'
 import { EmptyState } from '@/components/storefront/EmptyState'
 import { ProductListing } from '@/components/storefront/ProductListing'
 import { SearchBox } from '@/components/layout/Header'
@@ -16,6 +19,7 @@ import { usePageTitle } from '@/lib/usePageTitle'
  */
 export default function SearchPage() {
   const [params] = useSearchParams()
+  const [quizOpen, setQuizOpen] = useState(false)
   const term = (params.get('q') ?? '').trim()
   const { data: categories } = useCategories()
 
@@ -24,10 +28,16 @@ export default function SearchPage() {
   return (
     <div>
       <div className="border-b border-border bg-muted/40">
-        <div className="mx-auto w-full max-w-3xl px-4 py-6">
+        <div className="mx-auto w-full max-w-3xl px-4 py-6 space-y-4">
           <SearchBox autoFocus={!term} />
+          <NotesBrowserBar
+            currentQuery={term}
+            onOpenFinder={() => setQuizOpen(true)}
+          />
         </div>
       </div>
+
+      <FragranceFinderQuizModal open={quizOpen} onClose={() => setQuizOpen(false)} />
 
       {term ? (
         <ProductListing

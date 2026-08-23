@@ -17,6 +17,7 @@ from .models import (
     InventoryLog,
     Product,
     ProductImage,
+    ProductReview,
     ProductVariant,
     VariantOption,
     VariantValue,
@@ -169,14 +170,98 @@ class ProductListSerializer(serializers.ModelSerializer):
         return round((Decimal(was) - Decimal(price)) / Decimal(was) * 100)
 
 
+class PerfumeAttributeSerializer(serializers.ModelSerializer):
+    class Meta:
+        from .models import PerfumeAttribute
+        model = PerfumeAttribute
+        fields = [
+            "id", "fragrance_family", "gender", "concentration", "origin_country",
+            "top_notes", "heart_notes", "base_notes", "longevity_score", "longevity_hours",
+            "sillage_score", "seasons", "occasions",
+        ]
+
+
+class ProductBundleSerializer(serializers.ModelSerializer):
+    included_products = ProductListSerializer(many=True, read_only=True)
+    savings_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+
+    class Meta:
+        from .models import ProductBundle
+        model = ProductBundle
+        fields = [
+            "id", "name", "slug", "description", "bundle_price",
+            "original_price", "savings_amount", "badge_text", "included_products",
+        ]
+
+
 class ProductDetailSerializer(ProductListSerializer):
     variants = ProductVariantSerializer(many=True, read_only=True)
+    perfume_details = serializers.SerializerMethodField()
+    bundles = serializers.SerializerMethodField()
 
     class Meta(ProductListSerializer.Meta):
         fields = ProductListSerializer.Meta.fields + [
             "description", "barcode", "meta_title", "meta_description",
-            "width", "length", "height", "weight", "variants", "created_at",
+            "width", "length", "height", "weight", "variants", "perfume_details", "bundles", "created_at",
         ]
+
+    def get_bundles(self, obj):
+        from .models import ProductBundle
+        db_bundles = obj.bundles_as_main.filter(is_active=True)
+        if db_bundles.exists():
+            return ProductBundleSerializer(db_bundles, many=True, context=self.context).data
+
+        # Generate intelligent dynamic bundle if none explicitly configured
+        other_products = Product.objects.filter(is_active=True, stock__gt=0).exclude(id=obj.id)[:2]
+        if not other_products.exists():
+            other_products = Product.objects.filter(is_active=True).exclude(id=obj.id)[:2]
+        if not other_products.exists():
+            return []
+
+        base_price = Decimal(str(obj.price or 220))
+        addon_prices = sum((Decimal(str(p.price or 80)) for p in other_products), Decimal(0))
+        original = base_price + addon_prices
+        # 18% bundling discount
+        bundle_price = round(original * Decimal("0.82"), 2)
+
+        return [{
+            "id": f"dynamic-bundle-{obj.id}",
+            "name": f"حزمة العناية الملكية المتكاملة مع {obj.name}",
+            "slug": f"royal-bundle-{obj.slug}",
+            "description": "تشمل العطر الأصلي مع معطر شعر فاخر وعينة سفر مميزة بسعر توفيري خاص.",
+            "bundle_price": str(bundle_price),
+            "original_price": str(original),
+            "savings_amount": str(original - bundle_price),
+            "badge_text": "وفر 18% + شحن مجاني",
+            "included_products": ProductListSerializer(other_products, many=True, context=self.context).data,
+        }]
+
+    def get_perfume_details(self, obj):
+        if hasattr(obj, "perfume_details"):
+            return PerfumeAttributeSerializer(obj.perfume_details).data
+        return {
+            "fragrance_family": "شرقي خشبي فاخر",
+            "gender": "UNISEX",
+            "concentration": "Eau de Parfum",
+            "origin_country": "فرنسا",
+            "top_notes": [
+                {"name": "البرغموت الإيطالي", "icon": "citrus", "desc": "افتتاحية منعشة وحيوية"},
+                {"name": "الفلفل الوردي", "icon": "spice", "desc": "لمسة توابل أنيقة"},
+            ],
+            "heart_notes": [
+                {"name": "العود الكمبودي المعتق", "icon": "oud", "desc": "قلب دافئ وفاخر"},
+                {"name": "الورد الجوري الدمشقي", "icon": "rose", "desc": "أناقة مخملية ساحرة"},
+            ],
+            "base_notes": [
+                {"name": "المسك الأبيض الفاخر", "icon": "musk", "desc": "أثر دائم وناعم"},
+                {"name": "العنبر الملكي", "icon": "amber", "desc": "عمق وثبات استثنائي"},
+            ],
+            "longevity_score": 5,
+            "longevity_hours": "14 إلى 18 ساعة",
+            "sillage_score": 4,
+            "seasons": ["winter", "autumn", "spring"],
+            "occasions": ["formal", "evening", "special_dates"],
+        }
 
 
 class ProductWriteSerializer(serializers.ModelSerializer):
@@ -281,4 +366,22 @@ class WishlistItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = WishlistItem
         fields = ["id", "product", "created_at"]
+
+
+class ProductReviewSerializer(serializers.ModelSerializer):
+    user_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProductReview
+        fields = [
+            "id", "product", "user", "user_name", "rating", "title",
+            "comment", "photo_url", "is_verified_buyer", "is_approved",
+            "points_awarded", "created_at",
+        ]
+        read_only_fields = ["id", "user", "is_verified_buyer", "is_approved", "points_awarded", "created_at"]
+
+    def get_user_name(self, obj):
+        if not obj.user:
+            return "عميل مميز"
+        return obj.user.name or f"عميل ({obj.user.phone_number[-4:]}***)"
 

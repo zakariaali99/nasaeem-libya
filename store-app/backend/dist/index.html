@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#444943" />
+    <title>نسائم ليبيا</title>
+    <meta name="description" content="نسائم ليبيا — عطور وزيوت وأطقم هدايا، توصيل إلى جميع مدن ليبيا." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      href="/fonts/cairo-arabic.woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      href="/fonts/reem-kufi-arabic.woff2"
+      crossorigin
+    />
+    <script type="module" crossorigin src="/assets/index-zWWuIJzv.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/react-B6FDOkqr.js">
+    <link rel="modulepreload" crossorigin href="/assets/query-U7OZ3Y6O.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-DLkyQWk-.js">
+    <link rel="modulepreload" crossorigin href="/assets/radix-HIQHkypO.js">
+    <link rel="modulepreload" crossorigin href="/assets/icons-D_bJFkm2.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-X-Go6NHH.css">
+  </head>
+  <body>
+    <script>
+      /*
+       * Product-page priming. Measured, not guessed: Lighthouse put 4,776 ms of
+       * the product page's LCP into "load delay", because the image could not
+       * be discovered until the JS bundle had downloaded AND the API had
+       * answered — a three-hop chain of HTML → JS → API → image.
+       *
+       * This starts the API request from the HTML itself, in parallel with the
+       * bundle, and injects the image preload the moment the response lands.
+       *
+       * It is the ONE fetch() outside src/lib/api.ts, and it is deliberate: the
+       * whole point is to run before any module has loaded. `lib/api.ts` still
+       * owns every response — it adopts this promise rather than re-requesting.
+       */
+      (function () {
+        var match = location.pathname.match(/^\/products\/([^/]+)\/?$/)
+        if (!match) return
+        var url = '/api/products/' + match[1] + '/'
+        window.__nasaimPreload = {
+          url: url,
+          promise: fetch(url, { credentials: 'include', headers: { Accept: 'application/json' } })
+            .then(function (response) {
+              return response.ok ? response.json() : null
+            })
+            .then(function (body) {
+              var image = body && body.data && body.data.images && body.data.images[0]
+              if (!image) return body
+              var renditions = image.renditions || {}
+              var link = document.createElement('link')
+              link.rel = 'preload'
+              link.as = 'image'
+              link.href = renditions.medium || image.url
+              /*
+               * The candidate list and `sizes` must match <ProductGallery>'s
+               * <img> exactly. Preloading a bare `medium` while the img's
+               * srcset chose `full` downloaded BOTH files — measured in the
+               * Lighthouse network log — which is worse than no preload.
+               */
+              if (renditions.medium && renditions.full) {
+                link.imageSrcset = renditions.medium + ' 600w, ' + renditions.full + ' 1200w'
+                link.imageSizes = '(max-width: 1024px) 100vw, 600px'
+              }
+              link.fetchPriority = 'high'
+              document.head.appendChild(link)
+              return body
+            })
+            .catch(function () {
+              return null
+            }),
+        }
+      })()
+    </script>
+    <div id="root"></div>
+  </body>
+</html>

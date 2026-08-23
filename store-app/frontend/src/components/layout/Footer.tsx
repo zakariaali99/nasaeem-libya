@@ -128,11 +128,11 @@ export function Footer() {
 
       {/* Payment Badges & Copyright */}
       <div className="border-t border-border/80 bg-muted/30 px-4 py-6">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 sm:flex-row text-xs text-muted-foreground">
-          <p>© {currentYear} شركة نسائم ليبيا لاستيراد العطور. جميع الحقوق محفوظة.</p>
-          <div className="flex items-center gap-3">
-            <span className="text-[11px] font-semibold text-foreground">طرق الدفع المعتمدة:</span>
-            <div className="flex items-center gap-1.5">
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 sm:flex-row text-center sm:text-start text-xs text-muted-foreground">
+          <p className="leading-relaxed">© {currentYear} شركة نسائم ليبيا لاستيراد العطور. جميع الحقوق محفوظة.</p>
+          <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3">
+            <span className="text-[11px] font-semibold text-foreground shrink-0">طرق الدفع المعتمدة:</span>
+            <div className="flex flex-wrap items-center justify-center gap-1.5">
               <span className="rounded-lg border border-border bg-card px-2 py-1 text-[10px] font-bold font-mono">
                 سداد Sadad
               </span>

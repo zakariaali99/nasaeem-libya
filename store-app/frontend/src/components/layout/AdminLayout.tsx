@@ -131,9 +131,9 @@ export function AdminLayout() {
   }
 
   return (
-    <div className="min-h-dvh bg-muted/25 text-foreground flex flex-col md:flex-row antialiased">
+    <div className="min-h-dvh w-full max-w-full overflow-x-clip bg-muted/25 text-foreground flex flex-col md:flex-row antialiased">
       {/* Mobile Top Bar */}
-      <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-border bg-card/95 backdrop-blur-md px-4 md:hidden">
+      <header className="sticky top-0 z-40 flex h-16 w-full max-w-full items-center justify-between border-b border-border bg-card/95 backdrop-blur-md px-3 sm:px-4 md:hidden">
         <div className="flex items-center gap-2.5">
           <Button
             variant="ghost"
@@ -375,7 +375,7 @@ export function AdminLayout() {
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col w-full max-w-full overflow-x-clip">
         {/* Desktop Top Header Bar */}
         <header className="hidden md:flex h-16 items-center justify-between border-b border-border bg-card/80 backdrop-blur-md px-6 sticky top-0 z-20">
           <div className="flex items-center gap-4 min-w-0">
@@ -416,7 +416,7 @@ export function AdminLayout() {
         </header>
 
         {/* Page Inner Container with Responsive Padding */}
-        <main className="flex-1 p-4 sm:p-6 md:p-8 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-3.5 sm:p-6 md:p-8 max-w-7xl w-full mx-auto overflow-x-clip">
           <Outlet />
         </main>
       </div>

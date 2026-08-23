@@ -266,126 +266,129 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Revenue Area Chart Section */}
-      <section className="rounded-2xl border border-border bg-card p-6 shadow-2xs space-y-4">
+      {/* Earnings Over Time Chart Section */}
+      <section className="rounded-2xl border border-border bg-card p-4 sm:p-6 shadow-2xs space-y-4 max-w-full overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/60 pb-4">
           <div>
-            <h2 className="text-base font-bold text-foreground">مخطط المبيعات والإيرادات اليومية</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">تحليل الإيرادات المحققة خلال الـ 14 يوماً السابقة</p>
+            <h2 className="text-base font-bold text-foreground">مخطط الإيرادات والمبيعات</h2>
+            <p className="text-xs text-muted-foreground">تطور إجمالي الإيرادات اليومية بالدينار الليبي (د.ل) لآخر 14 يوماً</p>
           </div>
-          <div className="flex items-center gap-6">
-            <div className="text-end">
-              <span className="text-[11px] text-muted-foreground block">إجمالي الفترة:</span>
-              <span className="font-mono text-base font-bold text-primary">{formatPrice(data.revenue_total)}</span>
-            </div>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary font-mono">
+              <TrendingUp className="size-3.5" />
+              <span>إجمالي 14 يوماً: {formatPrice(revenueValues.reduce((a, b) => a + b, 0))}</span>
+            </span>
           </div>
         </div>
 
-        {/* SVG Area Chart - Fluid Responsive */}
-        <div className="relative overflow-hidden pt-2">
-          <svg
-            viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-            className="w-full h-48 sm:h-60 md:h-72 overflow-visible"
-            onMouseLeave={() => setHoveredPoint(null)}
-          >
-            <defs>
-              <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--color-primary)" stopOpacity="0.28" />
-                <stop offset="100%" stopColor="var(--color-primary)" stopOpacity="0.0" />
-              </linearGradient>
-            </defs>
+        {/* SVG Area Chart - Fluid & Contained */}
+        <div className="relative w-full overflow-x-auto overflow-y-hidden pt-2 no-scrollbar">
+          <div className="min-w-[560px] sm:min-w-full">
+            <svg
+              viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+              preserveAspectRatio="xMidYMid meet"
+              className="w-full h-48 sm:h-60 md:h-72"
+              onMouseLeave={() => setHoveredPoint(null)}
+            >
+              <defs>
+                <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--color-primary)" stopOpacity="0.28" />
+                  <stop offset="100%" stopColor="var(--color-primary)" stopOpacity="0.0" />
+                </linearGradient>
+              </defs>
 
-            {/* Horizontal Grid lines */}
-            {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
-              const y = paddingTop + plotHeight * (1 - ratio)
-              const val = maxRevenue * ratio
-              return (
-                <g key={ratio}>
-                  <line
-                    x1={paddingLeft}
-                    y1={y}
-                    x2={chartWidth - paddingRight}
-                    y2={y}
-                    stroke="var(--color-border)"
-                    strokeDasharray="4 4"
-                    strokeOpacity={0.8}
+              {/* Horizontal Grid lines */}
+              {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+                const y = paddingTop + plotHeight * (1 - ratio)
+                const val = maxRevenue * ratio
+                return (
+                  <g key={ratio}>
+                    <line
+                      x1={paddingLeft}
+                      y1={y}
+                      x2={chartWidth - paddingRight}
+                      y2={y}
+                      stroke="var(--color-border)"
+                      strokeDasharray="4 4"
+                      strokeOpacity={0.8}
+                    />
+                    <text
+                      x={paddingLeft - 12}
+                      y={y + 3.5}
+                      textAnchor="end"
+                      className="text-[11px] fill-muted-foreground font-mono font-medium"
+                    >
+                      {formatPrice(val)}
+                    </text>
+                  </g>
+                )
+              })}
+
+              {/* Area Fill */}
+              <path d={areaPath} fill="url(#revenueGradient)" />
+
+              {/* Line Path */}
+              <path
+                d={linePath}
+                fill="none"
+                stroke="var(--color-primary)"
+                strokeWidth={2.5}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+
+              {/* Data Point Circles */}
+              {chartPoints.map((point) => (
+                <g key={point.date}>
+                  <circle
+                    cx={point.x}
+                    cy={point.y}
+                    r={hoveredPoint?.date === point.date ? 6 : 3.5}
+                    className="fill-card stroke-primary transition-all duration-150 cursor-pointer"
+                    strokeWidth={2}
+                    onMouseEnter={() =>
+                      setHoveredPoint({
+                        date: point.date,
+                        revenue: point.revenue,
+                        x: point.x,
+                        y: point.y,
+                      })
+                    }
                   />
+                  {/* Date labels at bottom */}
                   <text
-                    x={paddingLeft - 12}
-                    y={y + 3.5}
-                    textAnchor="end"
+                    x={point.x}
+                    y={chartHeight - 12}
+                    textAnchor="middle"
                     className="text-[11px] fill-muted-foreground font-mono font-medium"
                   >
-                    {formatPrice(val)}
+                    {point.date.slice(5)}
                   </text>
                 </g>
-              )
-            })}
+              ))}
+            </svg>
 
-            {/* Area Fill */}
-            <path d={areaPath} fill="url(#revenueGradient)" />
-
-            {/* Line Path */}
-            <path
-              d={linePath}
-              fill="none"
-              stroke="var(--color-primary)"
-              strokeWidth={2.5}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-
-            {/* Data Point Circles */}
-            {chartPoints.map((point) => (
-              <g key={point.date}>
-                <circle
-                  cx={point.x}
-                  cy={point.y}
-                  r={hoveredPoint?.date === point.date ? 6 : 3.5}
-                  className="fill-card stroke-primary transition-all duration-150 cursor-pointer"
-                  strokeWidth={2}
-                  onMouseEnter={() =>
-                    setHoveredPoint({
-                      date: point.date,
-                      revenue: point.revenue,
-                      x: point.x,
-                      y: point.y,
-                    })
-                  }
-                />
-                {/* Date labels at bottom */}
-                <text
-                  x={point.x}
-                  y={chartHeight - 12}
-                  textAnchor="middle"
-                  className="text-[11px] fill-muted-foreground font-mono font-medium"
-                >
-                  {point.date.slice(5)}
-                </text>
-              </g>
-            ))}
-          </svg>
-
-          {/* Interactive Tooltip */}
-          {hoveredPoint && (
-            <div
-              className="pointer-events-none absolute rounded-xl border border-border bg-popover/95 px-3 py-2 text-xs shadow-lg backdrop-blur-md transition-all -translate-x-1/2 -translate-y-full"
-              style={{
-                left: `${(hoveredPoint.x / chartWidth) * 100}%`,
-                top: `${(hoveredPoint.y / chartHeight) * 100}%`,
-              }}
-            >
-              <p className="font-mono text-[11px] text-muted-foreground">{hoveredPoint.date}</p>
-              <p className="font-bold font-mono text-primary mt-0.5">{formatPrice(hoveredPoint.revenue)}</p>
-            </div>
-          )}
+            {/* Interactive Tooltip */}
+            {hoveredPoint && (
+              <div
+                className="pointer-events-none absolute rounded-xl border border-border bg-popover/95 px-3 py-2 text-xs shadow-lg backdrop-blur-md transition-all -translate-x-1/2 -translate-y-full z-10"
+                style={{
+                  left: `${(hoveredPoint.x / chartWidth) * 100}%`,
+                  top: `${(hoveredPoint.y / chartHeight) * 100}%`,
+                }}
+              >
+                <p className="font-mono text-[11px] text-muted-foreground">{hoveredPoint.date}</p>
+                <p className="font-bold font-mono text-primary mt-0.5">{formatPrice(hoveredPoint.revenue)}</p>
+              </div>
+            )}
+          </div>
         </div>
       </section>
 
       {/* Split Section: Recent Orders & Operational Summary */}
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Recent Orders (2 Columns) */}
-        <div className="rounded-2xl border border-border bg-card p-6 shadow-2xs space-y-4 lg:col-span-2">
+        <div className="rounded-2xl border border-border bg-card p-4 sm:p-6 shadow-2xs space-y-4 lg:col-span-2 max-w-full overflow-hidden">
           <div className="flex items-center justify-between border-b border-border/60 pb-4">
             <div>
               <h2 className="text-base font-bold text-foreground">أحدث الطلبات المستلمة</h2>
@@ -409,8 +412,8 @@ export default function Dashboard() {
           ) : !recentOrdersData?.items?.length ? (
             <div className="py-10 text-center text-xs text-muted-foreground">لا توجد طلبات حديثة مسجلة بعد.</div>
           ) : (
-            <div className="divide-y divide-border/50 overflow-x-auto">
-              <table className="w-full text-start text-xs">
+            <div className="divide-y divide-border/50 overflow-x-auto w-full no-scrollbar">
+              <table className="w-full min-w-[480px] text-start text-xs">
                 <thead>
                   <tr className="text-muted-foreground font-semibold">
                     <th className="pb-2 text-start">رقم الطلب</th>

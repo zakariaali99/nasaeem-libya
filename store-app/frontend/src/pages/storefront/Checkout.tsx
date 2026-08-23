@@ -75,6 +75,11 @@ export default function CheckoutPage() {
     setRegionId('')
   }, [cityId])
 
+  const selectedCity = useMemo(
+    () => cities.find((city) => city.id === cityId),
+    [cities, cityId],
+  )
+
   const selectedRegion = useMemo(
     () => regions.find((region) => region.id === regionId),
     [regions, regionId],
@@ -118,7 +123,8 @@ export default function CheckoutPage() {
     try {
       await confirm.mutateAsync({
         order_id: order.id,
-        region_id: regionId,
+        city_id: cityId,
+        region_id: regionId || '',
         address,
         delivery_method_code: method,
         payment_method: payment,
@@ -175,7 +181,11 @@ export default function CheckoutPage() {
   const isFreeShipping = Boolean(
     promo?.is_active && order && Number(order.subtotal) >= Number(promo.min_order_amount),
   )
-  const regularShipping = selectedRegion ? selectedRegion.delivery_fee : order.shipping_total
+  const regularShipping = selectedRegion
+    ? selectedRegion.delivery_fee
+    : selectedCity
+      ? selectedCity.delivery_fee
+      : order.shipping_total
   const shipping = isFreeShipping ? '0.00' : regularShipping
   const giftWrapFee = gifting.is_gift && gifting.gift_wrap_type === 'ROYAL_VELVET' ? 15 : 0
   const total = (
@@ -230,7 +240,7 @@ export default function CheckoutPage() {
               </Alert>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="المدينة *" htmlFor="city">
+                <Field label="المدينة *" htmlFor="city" error={fieldErrors.city_id?.[0]}>
                   <Select
                     id="city"
                     value={cityId}
@@ -241,18 +251,14 @@ export default function CheckoutPage() {
                     <option value="">اختر المدينة</option>
                     {cities.map((city) => (
                       <option key={city.id} value={city.id}>
-                        {city.name}
+                        {city.name} ({formatPrice(city.delivery_fee)})
                       </option>
                     ))}
                   </Select>
                 </Field>
 
-                <Field label="المنطقة والحي *" htmlFor="region" error={fieldErrors.region_id?.[0]}>
-                  {cityId && regions.length === 0 ? (
-                    <p className="text-xs text-muted-foreground pt-3">
-                      {regionData?.message ?? 'لا توجد مناطق توصيل لهذه المدينة حالياً'}
-                    </p>
-                  ) : (
+                {regions.length > 0 ? (
+                  <Field label="المنطقة والحي (اختياري)" htmlFor="region" error={fieldErrors.region_id?.[0]}>
                     <Select
                       id="region"
                       value={regionId}
@@ -260,17 +266,28 @@ export default function CheckoutPage() {
                       disabled={!cityId}
                       aria-invalid={Boolean(fieldErrors.region_id)}
                       className="h-11 rounded-xl"
-                      required
                     >
-                      <option value="">{cityId ? 'اختر المنطقة' : 'اختر المدينة أولاً'}</option>
+                      <option value="">{cityId ? 'كل مناطق المدينة (افتراضي)' : 'اختر المدينة أولاً'}</option>
                       {regions.map((region) => (
                         <option key={region.id} value={region.id}>
                           {region.name} — توصيل {formatPrice(region.delivery_fee)}
                         </option>
                       ))}
                     </Select>
-                  )}
-                </Field>
+                  </Field>
+                ) : (
+                  <div className="flex flex-col justify-center">
+                    <span className="text-xs font-bold text-foreground mb-1.5">نطاق التوصيل</span>
+                    <div className="flex items-center gap-2 rounded-xl bg-primary/5 border border-primary/20 px-3.5 py-2.5 text-xs text-primary font-bold min-h-11">
+                      <Truck className="size-4 shrink-0" />
+                      <span>
+                        {selectedCity
+                          ? `توصيل لكافة أحياء ${selectedCity.name} (${formatPrice(selectedCity.delivery_fee)})`
+                          : 'اختر المدينة لعرض رسوم التوصيل'}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

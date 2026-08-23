@@ -26,7 +26,7 @@ from django.db.models.functions import Greatest
 from django.utils import timezone
 
 from apps.catalog.models import Product, ProductVariant
-from apps.core.models import Region
+from apps.core.models import City, Region
 
 from .notifications import dispatch_realtime_order_alert
 
@@ -222,17 +222,38 @@ def _optional_region(region_id):
     return Region.objects.select_related("city").filter(id=region_id, is_active=True).first()
 
 
-def resolve_region(region_id) -> Region:
-    """The region, or an Arabic explanation of why there isn't one.
-
-    > **The empty-city failure.** In the reference the city list came only from
-    > a live courier API, it was empty, checkout rendered an empty `<select>`
-    > with no explanation, and the customer could not proceed.
-
-    So the two cases are answered differently: "you have not chosen yet" and
-    "this store has no delivery regions at all" are not the same problem, and
-    telling a customer to pick from an empty list is the failure being avoided.
+def resolve_destination(
+    region_id: str | None = None, city_id: str | None = None
+) -> tuple[Region | None, City]:
+    """Resolves destination (region, city).
+    If region_id is provided, resolves region and its city.
+    If only city_id is provided (no area/region selected), resolves city directly with region=None.
     """
+    region = _optional_region(region_id)
+    city = None
+    if region is not None:
+        city = region.city
+    elif city_id:
+        city = City.objects.filter(id=city_id, is_active=True).first()
+
+    if city is not None:
+        return region, city
+
+    if not City.objects.filter(is_active=True).exists() and not Region.objects.filter(is_active=True).exists():
+        raise CheckoutError(
+            "لا توجد مناطق توصيل أو مدن مُعرّفة في المتجر حالياً، يرجى التواصل معنا لإتمام الطلب",
+            field="city_id",
+        )
+    if not City.objects.filter(is_active=True).exists():
+        raise CheckoutError(
+            "لا توجد مناطق توصيل أو مدن مُعرّفة في المتجر حالياً، يرجى التواصل معنا لإتمام الطلب",
+            field="city_id",
+        )
+    raise CheckoutError("يرجى اختيار مدينة أو منطقة التوصيل", field="city_id")
+
+
+def resolve_region(region_id) -> Region:
+    """The region, or an Arabic explanation of why there isn't one."""
     region = _optional_region(region_id)
     if region is not None:
         return region
@@ -244,16 +265,21 @@ def resolve_region(region_id) -> Region:
     raise CheckoutError("يرجى اختيار منطقة التوصيل", field="region_id")
 
 
-def delivery_fee(region: Region | None, subtotal: Decimal = Decimal("0.00")) -> tuple[Decimal, Decimal]:
+def delivery_fee(
+    region: Region | None = None,
+    city: City | None = None,
+    subtotal: Decimal = Decimal("0.00"),
+) -> tuple[Decimal, Decimal]:
     """The fee comes from the region, falling back to its city.
     Returns (actual_shipping_fee, delivery_discount_amount).
     """
-    if region is None:
-        return Decimal("0.00"), Decimal("0.00")
-    if region.delivery_fee and region.delivery_fee > 0:
+    base_fee = Decimal("0.00")
+    if region is not None and region.delivery_fee and region.delivery_fee > 0:
         base_fee = money(region.delivery_fee)
-    else:
+    elif region is not None and region.city:
         base_fee = money(region.city.delivery_fee)
+    elif city is not None:
+        base_fee = money(city.delivery_fee)
 
     promo = CartPromotion.objects.filter(is_active=True).first()
     if promo and money(subtotal) >= money(promo.min_order_amount):
@@ -298,8 +324,9 @@ def checkout(
     *,
     cart: Cart,
     user,
-    region_id: str | None,
-    address: str,
+    city_id: str | None = None,
+    region_id: str | None = None,
+    address: str = "",
     delivery_method_code: str = "",
     payment_method: str = "",
     discount_code: str = "",
@@ -323,9 +350,17 @@ def checkout(
     # puts the address step on the checkout screen, which means the order id has
     # to exist before the customer types an address. Reserving stock at draft
     # time is the point: nobody loses the last unit while filling in a form.
-    region = resolve_region(region_id) if require_delivery else _optional_region(region_id)
-    if require_delivery and not address.strip():
-        raise CheckoutError("العنوان مطلوب", field="address")
+    if require_delivery:
+        region, city = resolve_destination(region_id=region_id, city_id=city_id)
+        if not address.strip():
+            raise CheckoutError("العنوان مطلوب", field="address")
+    else:
+        region = _optional_region(region_id)
+        city = (
+            region.city
+            if region
+            else (City.objects.filter(id=city_id, is_active=True).first() if city_id else None)
+        )
 
     # ---- lock every row we will touch, sorted by primary key ----------------
     # Sorting matters: two checkouts holding each other's rows in the opposite
@@ -397,7 +432,7 @@ def checkout(
     # ---- delivery ----------------------------------------------------------
     # A draft has no region yet, so no delivery fee yet. `finalise_order()` adds
     # it, and recomputes the total from the same stored numbers.
-    shipping_total, delivery_discount_amount = delivery_fee(region, subtotal=subtotal)
+    shipping_total, delivery_discount_amount = delivery_fee(region=region, city=city, subtotal=subtotal)
     method = (
         DeliveryMethod.objects.filter(code=delivery_method_code, is_active=True).first()
         if delivery_method_code
@@ -423,7 +458,7 @@ def checkout(
         discount=discount,
         shipping_address=address.strip(),
         shipping_region=region,
-        shipping_city=region.city if region else None,
+        shipping_city=city,
         billing_address=(billing_address or address).strip(),
         customer_notes=customer_notes.strip(),
         is_gift=is_gift,
@@ -472,7 +507,9 @@ def checkout(
     return order
 
 
-def cart_summary(cart: Cart | None, *, region_id=None, discount_code="") -> dict:
+def cart_summary(
+    cart: Cart | None, *, city_id=None, region_id=None, discount_code=""
+) -> dict:
     """What the cart screen shows. Every number is computed here, server-side —
     the client never sends a total and is never believed about one."""
     lines = (
@@ -513,7 +550,12 @@ def cart_summary(cart: Cart | None, *, region_id=None, discount_code="") -> dict
         if region_id
         else None
     )
-    shipping_total, delivery_discount_amount = delivery_fee(region, subtotal=subtotal)
+    city = (
+        region.city
+        if region
+        else (City.objects.filter(id=city_id, is_active=True).first() if city_id else None)
+    )
+    shipping_total, delivery_discount_amount = delivery_fee(region=region, city=city, subtotal=subtotal)
 
     return {
         "items": items,
@@ -524,6 +566,7 @@ def cart_summary(cart: Cart | None, *, region_id=None, discount_code="") -> dict
         "shipping_total": shipping_total,
         "delivery_discount_amount": delivery_discount_amount,
         "region": region,
+        "city": city,
         "total": money(subtotal - discount_total + shipping_total),
     }
 
@@ -551,8 +594,9 @@ def _retag_order_number(number: str, payment_method: str) -> str:
 def finalise_order(
     order: Order,
     *,
-    region_id: str,
-    address: str,
+    city_id: str = "",
+    region_id: str = "",
+    address: str = "",
     delivery_method_code: str = "",
     payment_method: str = "",
     customer_notes: str = "",
@@ -574,16 +618,16 @@ def finalise_order(
     if order.status != OrderStatus.PENDING:
         raise CheckoutError("لا يمكن تعديل هذا الطلب", status=409)
 
-    region = resolve_region(region_id)
+    region, city = resolve_destination(region_id=region_id or None, city_id=city_id or None)
     if not address.strip():
         raise CheckoutError("العنوان مطلوب", field="address")
 
     order.shipping_region = region
-    order.shipping_city = region.city
+    order.shipping_city = city
     order.shipping_address = address.strip()
     order.billing_address = (billing_address or address).strip()
     order.customer_notes = customer_notes.strip()
-    shipping_total, delivery_discount_amount = delivery_fee(region, subtotal=order.subtotal)
+    shipping_total, delivery_discount_amount = delivery_fee(region=region, city=city, subtotal=order.subtotal)
     order.shipping_total = shipping_total
     order.delivery_discount_amount = delivery_discount_amount
     gift_wrap_fee = Decimal("15.00") if (is_gift and gift_wrap_type == "ROYAL_VELVET") else Decimal("0.00")

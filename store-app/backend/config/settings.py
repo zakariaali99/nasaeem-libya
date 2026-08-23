@@ -118,7 +118,15 @@ if DATABASES["default"].get("ENGINE") == "django.db.backends.sqlite3":
 
 DATABASES["default"]["ATOMIC_REQUESTS"] = True
 
+has_django_redis = False
 if REDIS_URL:
+    try:
+        import django_redis  # noqa: F401
+        has_django_redis = True
+    except ImportError:
+        has_django_redis = False
+
+if REDIS_URL and has_django_redis:
     CACHES = {
         "default": {
             "BACKEND": "django_redis.cache.RedisCache",

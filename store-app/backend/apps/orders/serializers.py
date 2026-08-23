@@ -100,29 +100,45 @@ class CartUpdateSerializer(serializers.Serializer):
 
 
 class CartDetailsSerializer(serializers.Serializer):
-    """Checkout inputs held between screens.
+    city_id = serializers.CharField(required=False, allow_blank=True, default="")
+    region_id = serializers.CharField(required=False, allow_blank=True, default="")
+    address = serializers.CharField(required=False, allow_blank=True, max_length=500, default="")
+    delivery_method_code = serializers.CharField(
+        required=False, allow_blank=True, max_length=50, default=""
+    )
+    payment_method = serializers.CharField(
+        required=False, allow_blank=True, max_length=50, default=""
+    )
+    discount_code = serializers.CharField(
+        required=False, allow_blank=True, max_length=50, default=""
+    )
+    customer_notes = serializers.CharField(
+        required=False, allow_blank=True, max_length=1000, default=""
+    )
+    billing_address = serializers.CharField(
+        required=False, allow_blank=True, max_length=500, default=""
+    )
 
-    `02-data-model.md`'s `Cart` has no fields for an address or a note, and
-    Phase 1's recorded decision is spec-normative models only — so these live in
-    the session rather than in a column added on the quiet.
-    """
 
-    region_id = serializers.CharField(required=False, allow_blank=True)
-    address = serializers.CharField(required=False, allow_blank=True, max_length=500)
-    customer_notes = serializers.CharField(required=False, allow_blank=True, max_length=1000)
-    delivery_method_code = serializers.CharField(required=False, allow_blank=True, max_length=50)
-    payment_method = serializers.CharField(required=False, allow_blank=True, max_length=50)
-    discount_code = serializers.CharField(required=False, allow_blank=True, max_length=50)
+class CheckoutDraftSerializer(serializers.Serializer):
+    city_id = serializers.CharField(required=False, allow_blank=True, default="")
+    region_id = serializers.CharField(required=False, allow_blank=True, default="")
+    address = serializers.CharField(required=False, allow_blank=True, max_length=500, default="")
+    customer_notes = serializers.CharField(required=False, allow_blank=True, max_length=1000, default="")
+    delivery_method_code = serializers.CharField(required=False, allow_blank=True, max_length=50, default="")
+    payment_method = serializers.CharField(required=False, allow_blank=True, max_length=50, default="")
+    discount_code = serializers.CharField(required=False, allow_blank=True, max_length=50, default="")
 
 
 class CheckoutSerializer(serializers.Serializer):
-    region_id = serializers.CharField(allow_blank=True, required=False)
-    address = serializers.CharField(max_length=500, allow_blank=True, required=False)
-    delivery_method_code = serializers.CharField(required=False, allow_blank=True, max_length=50)
-    payment_method = serializers.CharField(required=False, allow_blank=True, max_length=50)
-    discount_code = serializers.CharField(required=False, allow_blank=True, max_length=50)
-    customer_notes = serializers.CharField(required=False, allow_blank=True, max_length=1000)
-    billing_address = serializers.CharField(required=False, allow_blank=True, max_length=500)
+    city_id = serializers.CharField(required=False, allow_blank=True, default="")
+    region_id = serializers.CharField(required=False, allow_blank=True, default="")
+    address = serializers.CharField(max_length=500, allow_blank=True, required=False, default="")
+    delivery_method_code = serializers.CharField(required=False, allow_blank=True, max_length=50, default="")
+    payment_method = serializers.CharField(required=False, allow_blank=True, max_length=50, default="")
+    discount_code = serializers.CharField(required=False, allow_blank=True, max_length=50, default="")
+    customer_notes = serializers.CharField(required=False, allow_blank=True, max_length=1000, default="")
+    billing_address = serializers.CharField(required=False, allow_blank=True, max_length=500, default="")
     
     # Luxury Gifting Suite
     is_gift = serializers.BooleanField(required=False, default=False)

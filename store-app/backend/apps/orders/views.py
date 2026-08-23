@@ -213,12 +213,15 @@ class CartCheckoutView(CsrfProtectedAPIView):
 
         # A draft when no address has been chosen yet: `/checkout/:orderId` is
         # where the customer picks one, so the order id must exist first.
-        require_delivery = bool(payload.get("address") and payload.get("region_id"))
+        require_delivery = bool(
+            payload.get("address") and (payload.get("city_id") or payload.get("region_id"))
+        )
 
         try:
             order = services.checkout(
                 cart=cart,
                 user=request.user,
+                city_id=payload.get("city_id") or None,
                 region_id=payload.get("region_id") or None,
                 address=payload.get("address") or "",
                 require_delivery=require_delivery,
@@ -279,6 +282,7 @@ class CheckoutConfirmView(CsrfProtectedAPIView):
         try:
             order = services.finalise_order(
                 order,
+                city_id=payload.get("city_id") or "",
                 region_id=payload.get("region_id") or "",
                 address=payload.get("address") or "",
                 delivery_method_code=payload.get("delivery_method_code") or "",

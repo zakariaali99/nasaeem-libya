@@ -79,30 +79,41 @@ export default function Dashboard() {
   const revenueValues = series.map((d) => Number(d.revenue))
   const maxRevenue = Math.max(...revenueValues, 100)
 
-  // Chart coordinate calculations
-  const chartWidth = 700
-  const chartHeight = 220
-  const paddingLeft = 60
-  const paddingRight = 20
+  // Chart coordinate calculations - ample margins to prevent label overlap
+  const chartWidth = 750
+  const chartHeight = 230
+  const paddingLeft = 90
+  const paddingRight = 25
   const paddingTop = 20
-  const paddingBottom = 30
+  const paddingBottom = 45
 
   const plotWidth = chartWidth - paddingLeft - paddingRight
   const plotHeight = chartHeight - paddingTop - paddingBottom
 
-  const chartPoints = series.map((day, i) => {
-    const x = paddingLeft + (i / Math.max(series.length - 1, 1)) * plotWidth
-    const y = paddingTop + plotHeight - (Number(day.revenue) / maxRevenue) * plotHeight
-    return { ...day, x, y }
+  const chartPoints = series.map((d, index) => {
+    const x = paddingLeft + (index / (series.length - 1 || 1)) * plotWidth
+    const y = paddingTop + plotHeight * (1 - Number(d.revenue) / maxRevenue)
+    return { x, y, date: d.date, revenue: d.revenue }
   })
 
-  const firstPoint = chartPoints[0]
-  const lastPoint = chartPoints[chartPoints.length - 1]
-  const linePath = chartPoints.length > 0 ? `M ${chartPoints.map((p) => `${p.x},${p.y}`).join(' L ')}` : ''
-  const areaPath =
-    firstPoint && lastPoint
-      ? `M ${firstPoint.x},${paddingTop + plotHeight} L ${chartPoints.map((p) => `${p.x},${p.y}`).join(' L ')} L ${lastPoint.x},${paddingTop + plotHeight} Z`
-      : ''
+  const linePath = chartPoints
+    .map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`)
+    .join(' ')
+
+  const areaPath = `
+    ${linePath}
+    L ${paddingLeft + plotWidth} ${paddingTop + plotHeight}
+    L ${paddingLeft} ${paddingTop + plotHeight}
+    Z
+  `
+
+  const totalOrders =
+    data.pending_orders + data.processing_orders + data.completed_orders + data.cancelled_orders
+
+  const deliverySuccessRate =
+    totalOrders > 0
+      ? Math.round((data.completed_orders / totalOrders) * 100)
+      : 0
 
   return (
     <div className="space-y-8 animate-fade-rise">
@@ -222,14 +233,18 @@ export default function Dashboard() {
           <div className="mt-3 flex items-baseline justify-between">
             <p className="text-3xl font-extrabold font-mono text-foreground">{formatNumber(data.completed_orders)}</p>
             <MiniSparkline
-              values={[3, 5, 8, 12, data.completed_orders]}
+              values={revenueValues.length > 0 ? revenueValues.slice(-5) : [0, 0, 0, 0, data.completed_orders]}
               color="oklch(0.60 0.15 150)"
               fillColor="oklch(0.60 0.15 150)"
             />
           </div>
           <div className="mt-3 flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
             <TrendingUp className="size-3.5" />
-            <span>تسليم ناجح بنسبة 98%</span>
+            <span>
+              {totalOrders > 0
+                ? `تسليم ناجح بنسبة ${deliverySuccessRate}%`
+                : 'لا توجد طلبات مكتملة بعد'}
+            </span>
           </div>
         </Link>
 
@@ -270,7 +285,7 @@ export default function Dashboard() {
         <div className="relative overflow-hidden pt-2">
           <svg
             viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-            className="w-full h-44 sm:h-56 md:h-64 overflow-visible"
+            className="w-full h-48 sm:h-60 md:h-72 overflow-visible"
             onMouseLeave={() => setHoveredPoint(null)}
           >
             <defs>
@@ -296,10 +311,10 @@ export default function Dashboard() {
                     strokeOpacity={0.8}
                   />
                   <text
-                    x={paddingLeft - 8}
-                    y={y + 3}
+                    x={paddingLeft - 12}
+                    y={y + 3.5}
                     textAnchor="end"
-                    className="text-[10px] fill-muted-foreground font-mono"
+                    className="text-[11px] fill-muted-foreground font-mono font-medium"
                   >
                     {formatPrice(val)}
                   </text>
@@ -341,9 +356,9 @@ export default function Dashboard() {
                 {/* Date labels at bottom */}
                 <text
                   x={point.x}
-                  y={chartHeight - 8}
+                  y={chartHeight - 12}
                   textAnchor="middle"
-                  className="text-[10px] fill-muted-foreground font-mono"
+                  className="text-[11px] fill-muted-foreground font-mono font-medium"
                 >
                   {point.date.slice(5)}
                 </text>

@@ -1,9 +1,12 @@
-"""Catalogue business logic.
+"""
+Catalogue business logic.
 
 Everything that mutates stock goes through `adjust_stock()`, which always writes
 an `InventoryLog` row. There is no other supported way to change a stock level —
 if a code path sets `product.stock` directly, inventory history silently lies.
 """
+
+from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass

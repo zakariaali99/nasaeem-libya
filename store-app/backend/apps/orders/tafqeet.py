@@ -1,8 +1,11 @@
-"""Arabic Number to Words (Tafqeet) for Libyan Dinars and Dirhams.
+"""
+Arabic Number to Words (Tafqeet) for Libyan Dinars and Dirhams.
 
 Converts numeric amounts (e.g. Decimal("145.50")) into formal Arabic financial wording:
 "فقط مائة وخمسة وأربعون ديناراً وخمسون درهماً لا غير"
 """
+
+from __future__ import annotations
 
 from decimal import Decimal
 

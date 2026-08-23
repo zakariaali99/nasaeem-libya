@@ -36,7 +36,6 @@ if not DEBUG:
             ("SECRET_KEY", SECRET_KEY),
             ("ALLOWED_HOSTS", ALLOWED_HOSTS),
             ("DATABASE_URL", DATABASE_URL),
-            ("REDIS_URL", REDIS_URL),
             ("CSRF_TRUSTED_ORIGINS", CSRF_TRUSTED_ORIGINS),
         )
         if not value
@@ -111,15 +110,23 @@ DATABASES = {
 }
 DATABASES["default"]["ATOMIC_REQUESTS"] = True
 
-CACHES = {
-    "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": REDIS_URL or "redis://127.0.0.1:6379/0",
-        "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
+if REDIS_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": REDIS_URL,
+            "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
+        }
     }
-}
-
-SESSION_ENGINE = "django.contrib.sessions.backends.cached_db"
+    SESSION_ENGINE = "django.contrib.sessions.backends.cached_db"
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "nasaeem-memory-cache",
+        }
+    }
+    SESSION_ENGINE = "django.contrib.sessions.backends.db"
 
 
 # --------------------------------------------------------------------------

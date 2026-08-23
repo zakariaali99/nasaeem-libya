@@ -36,10 +36,8 @@ export const SheetContent = React.forwardRef<
   const sideClasses = {
     top: 'inset-x-0 top-0 border-b border-border',
     bottom: 'inset-x-0 bottom-0 border-t border-border',
-    // `start`/`end`, never `left`/`right`: the sheet mirrors with the document.
-    left: 'inset-y-0 start-0 h-full w-[82vw] max-w-[340px] border-e border-border sm:max-w-md',
-    right:
-      'inset-y-0 end-0 h-full w-[82vw] max-w-[340px] border-s border-border sm:max-w-md',
+    left: 'inset-y-0 left-0 h-full w-[82vw] max-w-[340px] border-e border-border sm:max-w-md',
+    right: 'inset-y-0 right-0 h-full w-[82vw] max-w-[340px] border-s border-border sm:max-w-md',
   }
 
   return (

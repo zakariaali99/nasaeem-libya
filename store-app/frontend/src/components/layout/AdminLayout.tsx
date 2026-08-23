@@ -159,7 +159,7 @@ export function AdminLayout() {
           isCollapsed ? 'md:w-20' : 'md:w-64',
           // Mobile Off-Canvas Drawer from the RIGHT (RTL start)
           mobileOpen
-            ? 'fixed inset-y-0 start-0 w-[80vw] max-w-[300px] flex flex-col bg-card shadow-2xl border-e border-border overflow-hidden animate-fade-rise'
+            ? 'fixed inset-y-0 right-0 w-[80vw] max-w-[300px] flex flex-col bg-card shadow-2xl border-s border-border overflow-hidden animate-fade-rise z-50'
             : 'hidden md:flex',
         )}
         aria-label="التنقل في لوحة التحكم"
@@ -275,7 +275,7 @@ export function AdminLayout() {
                                   'ms-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold font-mono',
                                   badgeTone === 'danger'
                                     ? 'bg-destructive/10 text-destructive'
-                                    : 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+                                    : 'bg-warning/10 text-warning',
                                 )}
                               >
                                 {count}

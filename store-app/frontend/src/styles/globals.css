@@ -119,6 +119,7 @@
   --color-price: oklch(0.16 0.012 145);
   --color-price-sale: oklch(0.55 0.19 25);
   --color-discount: oklch(0.55 0.19 25);
+  --color-discount-foreground: oklch(0.99 0 0);
   --color-in-stock: oklch(0.60 0.15 150);
   --color-low-stock: oklch(0.65 0.155 70);
   --color-out-of-stock: oklch(0.55 0.02 0);
@@ -240,7 +241,8 @@
 
   --color-price: oklch(0.965 0.004 120);
   --color-price-sale: oklch(0.72 0.17 25);
-  --color-discount: oklch(0.72 0.17 25);
+  --color-discount: oklch(0.62 0.19 25);
+  --color-discount-foreground: oklch(0.99 0 0);
   --color-in-stock: oklch(0.75 0.16 150);
   --color-low-stock: oklch(0.82 0.14 70);
   --color-out-of-stock: oklch(0.65 0.02 0);

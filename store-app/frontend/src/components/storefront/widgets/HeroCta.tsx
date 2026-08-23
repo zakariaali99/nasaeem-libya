@@ -56,7 +56,7 @@ export function HeroCta({ widget, priority = false }: { widget: Widget; priority
           />
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute -bottom-24 -end-16 size-96 rounded-full bg-amber-500/15 blur-3xl"
+            className="pointer-events-none absolute -bottom-24 -end-16 size-96 rounded-full bg-rating/15 blur-3xl"
           />
           <div
             aria-hidden="true"
@@ -82,12 +82,12 @@ export function HeroCta({ widget, priority = false }: { widget: Widget; priority
         {/* Hero Title & Subtitle */}
         <div className="space-y-3">
           {title ? (
-            <h2 className="text-3xl font-black leading-tight tracking-tight sm:text-5xl lg:text-6xl text-white drop-shadow-sm">
+            <h2 className="text-3xl font-black leading-tight tracking-tight sm:text-5xl lg:text-6xl text-background drop-shadow-sm">
               {title}
             </h2>
           ) : null}
           {subtitle ? (
-            <p className="max-w-2xl text-sm sm:text-lg leading-relaxed text-slate-300 font-normal">
+            <p className="max-w-2xl text-sm sm:text-lg leading-relaxed text-background/70 font-normal">
               {subtitle}
             </p>
           ) : null}
@@ -129,17 +129,17 @@ export function HeroCta({ widget, priority = false }: { widget: Widget; priority
         </div>
 
         {/* Embedded Trust Pillars Strip */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4 border-t border-white/10 text-xs">
-          <div className="flex items-center gap-2.5 text-slate-300">
-            <ShieldCheck className="size-4 text-emerald-400 shrink-0" />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4 border-t border-background/10 text-xs">
+          <div className="flex items-center gap-2.5 text-background/70">
+            <ShieldCheck className="size-4 text-success shrink-0" />
             <span>عطور أصلية ومضمونة 100%</span>
           </div>
-          <div className="flex items-center gap-2.5 text-slate-300">
-            <Truck className="size-4 text-sky-400 shrink-0" />
+          <div className="flex items-center gap-2.5 text-background/70">
+            <Truck className="size-4 text-info shrink-0" />
             <span>توصيل لكافة المدن (1–5 أيام)</span>
           </div>
-          <div className="flex items-center gap-2.5 text-slate-300">
-            <Sparkles className="size-4 text-amber-400 shrink-0" />
+          <div className="flex items-center gap-2.5 text-background/70">
+            <Sparkles className="size-4 text-rating shrink-0" />
             <span>أفضل الأسعار بالجملة والقطاعي</span>
           </div>
         </div>

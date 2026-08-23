@@ -131,6 +131,23 @@ export function DataTable<T>({
     return <ChevronsUpDown className="size-4 opacity-40" aria-hidden="true" />
   }
 
+  const columnMenuRef = React.useRef<HTMLDivElement>(null)
+
+  React.useEffect(() => {
+    if (!showColumns) return
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      if (columnMenuRef.current && !columnMenuRef.current.contains(event.target as Node)) {
+        setShowColumns(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('touchstart', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('touchstart', handleClickOutside)
+    }
+  }, [showColumns])
+
   return (
     <div className="space-y-4">
       {/* Quick filter chips (if provided) */}
@@ -184,7 +201,7 @@ export function DataTable<T>({
 
         {toolbar}
 
-        <div className="relative">
+        <div className="relative ms-auto" ref={columnMenuRef}>
           <Button
             variant="outline"
             size="icon"
@@ -196,7 +213,7 @@ export function DataTable<T>({
             <SlidersHorizontal className="size-4" aria-hidden="true" />
           </Button>
           {showColumns ? (
-            <div className="absolute end-0 top-full z-20 mt-2 w-56 rounded-2xl border border-border bg-popover p-3 shadow-xl backdrop-blur-md">
+            <div className="absolute end-0 top-full z-50 mt-2 w-56 max-w-[calc(100vw-3rem)] rounded-2xl border border-border bg-card p-3 shadow-xl backdrop-blur-md animate-fade-rise">
               <span className="text-xs font-bold text-foreground block mb-2 px-1">تخصيص الأعمدة:</span>
               <div className="space-y-1">
                 {columns.map((column) => (

@@ -98,7 +98,7 @@ export function Footer() {
                 <Link
                   to={link.to}
                   viewTransition
-                  className="inline-flex h-8 items-center text-xs font-medium text-muted-foreground hover:text-primary transition-colors"
+                  className="inline-flex min-h-11 items-center text-xs font-medium text-muted-foreground hover:text-primary transition-colors"
                 >
                   {link.label}
                 </Link>
@@ -116,7 +116,7 @@ export function Footer() {
                 <Link
                   to={link.to}
                   viewTransition
-                  className="inline-flex h-8 items-center text-xs font-medium text-muted-foreground hover:text-primary transition-colors"
+                  className="inline-flex min-h-11 items-center text-xs font-medium text-muted-foreground hover:text-primary transition-colors"
                 >
                   {link.label}
                 </Link>

@@ -129,6 +129,13 @@
   --color-destructive-foreground: oklch(0.99 0 0);
   --color-rating: oklch(0.66 0.16 85);
 
+  /*
+   * Modal scrims dim whatever is beneath — darkening works in both themes,
+   * so the scrim is black regardless of scheme (a light scrim on dark mode
+   * would wash the screen out).
+   */
+  --color-scrim: oklch(0 0 0);
+
   /* executive chart palette */
   --color-chart-1: oklch(0.60 0.15 150);
   --color-chart-2: oklch(0.65 0.15 240);
@@ -171,6 +178,7 @@
 
   /* entrance choreography */
   --animate-fade-rise: fade-rise var(--duration-slow) var(--ease-out) both;
+  --animate-fade-in: fade-in var(--duration-base) var(--ease-out) both;
 }
 
 /* keyframes for the animate tokens above (v4 emits them alongside utilities) */
@@ -182,6 +190,12 @@
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
   }
 }
 

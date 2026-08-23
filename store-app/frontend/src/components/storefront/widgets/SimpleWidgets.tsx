@@ -65,7 +65,7 @@ export function PhotoLinkGrid({ widget }: { widget: Widget }) {
         action={
           <Link
             to="/products"
-            className="inline-flex items-center gap-1 text-xs sm:text-sm font-bold text-primary hover:gap-1.5 transition-all"
+            className="inline-flex min-h-11 items-center gap-1 text-xs sm:text-sm font-bold text-primary hover:gap-1.5 transition-all px-2"
           >
             <span>عرض الكل</span>
             <ArrowLeft className="size-4 rtl:rotate-0" />

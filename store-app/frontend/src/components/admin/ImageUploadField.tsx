@@ -3,6 +3,7 @@ import { useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { ApiError } from '@/lib/api'
+import { compressImageFile } from '@/lib/imageCompress'
 import { uploadImage } from '@/lib/queries/catalog'
 import { cn } from '@/lib/utils'
 
@@ -34,7 +35,10 @@ export function ImageUploadField({
     setUploading(true)
     setError(null)
     try {
-      const result = await uploadImage(file)
+      // Compress in the browser BEFORE the network: a 5 MB phone photo
+      // becomes ~200 KB, so the upload survives Libyan uplink speeds.
+      const compressed = await compressImageFile(file)
+      const result = await uploadImage(compressed)
       onChange(result.url)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'تعذّر رفع الصورة، يرجى المحاولة مرة أخرى')

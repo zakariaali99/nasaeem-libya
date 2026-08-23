@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { PageHeader } from '@/components/layout/AdminLayout'
 import { DataTable } from '@/components/admin/DataTable'
@@ -10,6 +11,14 @@ export default function AdminDeliveryMethodsPage() {
   usePageTitle('شركات التوصيل — لوحة التحكم')
   const { data: methods, isLoading } = useAdminDeliveryMethods()
   const sync = useSyncDeliveryMethod()
+  const [search, setSearch] = useState('')
+
+  const filteredMethods = (methods ?? []).filter(
+    (m) =>
+      m.name.toLowerCase().includes(search.toLowerCase()) ||
+      m.code.toLowerCase().includes(search.toLowerCase()) ||
+      (m.description || '').toLowerCase().includes(search.toLowerCase()),
+  )
 
   return (
     <div className="space-y-6">
@@ -19,6 +28,9 @@ export default function AdminDeliveryMethodsPage() {
       />
 
       <DataTable
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="بحث في شركات التوصيل والشحن..."
         columns={[
           {
             key: 'name',
@@ -63,7 +75,7 @@ export default function AdminDeliveryMethodsPage() {
             ),
           },
         ]}
-        rows={methods ?? []}
+        rows={filteredMethods}
         rowKey={(m: AdminDeliveryMethod) => m.id}
         isLoading={isLoading}
         emptyTitle="لا توجد شركات توصيل"

@@ -84,7 +84,7 @@ export function ProductCard({ product, priority = false, sizes }: ProductCardPro
             onClick={handleToggleWishlist}
             aria-label={isWishlisted ? 'إزالة من المفضلة' : 'إضافة إلى المفضلة'}
             className={cn(
-              'absolute end-2.5 top-2.5 z-10 flex size-9 items-center justify-center rounded-full backdrop-blur-md transition-all shadow-xs focus-visible:outline-2 focus-visible:outline-ring',
+              'absolute end-2.5 top-2.5 z-10 flex min-h-11 min-w-11 size-11 items-center justify-center rounded-full backdrop-blur-md transition-all shadow-xs focus-visible:outline-2 focus-visible:outline-ring',
               isWishlisted
                 ? 'bg-rose-500 text-white shadow-rose-500/20'
                 : 'bg-card/85 text-muted-foreground hover:bg-card hover:text-rose-500',

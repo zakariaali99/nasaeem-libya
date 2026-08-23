@@ -49,7 +49,7 @@ export function CartDrawer({ children }: CartDrawerProps) {
           </button>
         )}
       </SheetTrigger>
-      <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col">
+      <SheetContent side="right" className="w-[85vw] max-w-[360px] sm:max-w-md p-0 flex flex-col bg-card border-s border-border shadow-2xl z-50 overflow-hidden">
         <SheetHeader className="p-6 pb-4 border-b border-border">
           <div className="flex items-center gap-2.5">
             <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary">

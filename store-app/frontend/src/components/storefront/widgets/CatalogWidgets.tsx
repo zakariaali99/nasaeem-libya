@@ -17,7 +17,7 @@ export function ProductListWidget({ widget }: { widget: Widget }) {
         action={
           <Link
             to="/products"
-            className="inline-flex items-center gap-1 text-xs sm:text-sm font-bold text-primary hover:gap-1.5 transition-all"
+            className="inline-flex min-h-11 items-center gap-1 text-xs sm:text-sm font-bold text-primary hover:gap-1.5 transition-all px-2"
           >
             <span>عرض التشكيلة كاملة</span>
             <ArrowLeft className="size-4 rtl:rotate-0" />
@@ -48,7 +48,7 @@ export function CollectionShowcase({ widget }: { widget: Widget }) {
         action={
           <Link
             to={`/collections/${encodeURIComponent(collection.slug)}`}
-            className="inline-flex items-center gap-1 rounded-xl border border-primary/30 bg-primary/10 px-3.5 py-1.5 text-xs font-bold text-primary hover:bg-primary/20 transition-all"
+            className="inline-flex min-h-11 items-center gap-1 rounded-xl border border-primary/30 bg-primary/10 px-3.5 py-1.5 text-xs font-bold text-primary hover:bg-primary/20 transition-all"
           >
             <span>استكشف المجموعة</span>
             <ArrowLeft className="size-3.5 rtl:rotate-0" />
@@ -80,7 +80,7 @@ export function CategoryListWidget({ widget }: { widget: Widget }) {
         action={
           <Link
             to="/products"
-            className="inline-flex items-center gap-1 text-xs sm:text-sm font-bold text-primary hover:gap-1.5 transition-all"
+            className="inline-flex min-h-11 items-center gap-1 text-xs sm:text-sm font-bold text-primary hover:gap-1.5 transition-all px-2"
           >
             <span>جميع الماركات</span>
             <ArrowLeft className="size-4 rtl:rotate-0" />

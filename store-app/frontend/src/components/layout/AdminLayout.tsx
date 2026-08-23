@@ -159,7 +159,7 @@ export function AdminLayout() {
           isCollapsed ? 'md:w-20' : 'md:w-64',
           // Mobile Off-Canvas Drawer from the RIGHT (RTL start)
           mobileOpen
-            ? 'fixed inset-y-0 end-0 w-80 max-w-[85vw] flex flex-col bg-card shadow-2xl border-s border-border overflow-hidden animate-fade-rise'
+            ? 'fixed inset-y-0 start-0 w-[80vw] max-w-[300px] flex flex-col bg-card shadow-2xl border-e border-border overflow-hidden animate-fade-rise'
             : 'hidden md:flex',
         )}
         aria-label="التنقل في لوحة التحكم"

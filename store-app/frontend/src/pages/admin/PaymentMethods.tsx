@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { PageHeader } from '@/components/layout/AdminLayout'
 import { DataTable } from '@/components/admin/DataTable'
@@ -9,6 +10,14 @@ import { usePageTitle } from '@/lib/usePageTitle'
 export default function AdminPaymentMethodsPage() {
   usePageTitle('طرق الدفع — لوحة التحكم')
   const { data: methods, isLoading } = useAdminPaymentMethods()
+  const [search, setSearch] = useState('')
+
+  const filteredMethods = (methods ?? []).filter(
+    (m) =>
+      m.display_name.toLowerCase().includes(search.toLowerCase()) ||
+      m.method_code.toLowerCase().includes(search.toLowerCase()) ||
+      (m.description || '').toLowerCase().includes(search.toLowerCase()),
+  )
 
   return (
     <div className="space-y-6">
@@ -18,6 +27,9 @@ export default function AdminPaymentMethodsPage() {
       />
 
       <DataTable
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="بحث في بوابات وطرق الدفع..."
         columns={[
           {
             key: 'display_name',
@@ -55,7 +67,7 @@ export default function AdminPaymentMethodsPage() {
             ),
           },
         ]}
-        rows={methods ?? []}
+        rows={filteredMethods}
         rowKey={(m: AdminPaymentMethod) => m.id}
         isLoading={isLoading}
         emptyTitle="لا توجد طرق دفع"

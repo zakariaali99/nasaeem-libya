@@ -134,7 +134,7 @@ export default function CartPage() {
               onClick={proceed}
               className="rounded-xl font-bold text-sm h-12 shadow-sm"
             >
-              متابعة عملية الشراء
+              متابعة الشراء
             </Button>
 
             <Button asChild variant="outline" block className="rounded-xl font-semibold text-xs h-10">

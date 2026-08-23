@@ -88,7 +88,7 @@ export function CategoriesDrawer({ children }: CategoriesDrawerProps) {
 
       <SheetContent
         side="right"
-        className="w-full sm:max-w-md p-0 flex flex-col bg-card border-s border-border shadow-2xl z-50 overflow-hidden"
+        className="w-[82vw] max-w-[340px] sm:max-w-md p-0 flex flex-col bg-card border-s border-border shadow-2xl z-50 overflow-hidden"
       >
         {/* Drawer Header */}
         <SheetHeader className="p-5 pb-4 border-b border-border bg-muted/20">

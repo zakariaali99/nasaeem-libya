@@ -63,7 +63,7 @@ export function AnnouncementBar({ widget }: { widget: Widget }) {
             <Link
               to={linkUrl}
               viewTransition
-              className="inline-flex items-center gap-1 rounded-xl bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground shadow-2xs hover:bg-primary/90 transition-all hover:gap-1.5"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-xs font-bold text-primary-foreground shadow-2xs hover:bg-primary/90 transition-all hover:gap-2"
             >
               <span>{linkLabel}</span>
               <ArrowLeft className="size-3.5 rtl:rotate-0" />
@@ -75,9 +75,9 @@ export function AnnouncementBar({ widget }: { widget: Widget }) {
               type="button"
               onClick={close}
               aria-label="إغلاق الإعلان"
-              className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors"
+              className="inline-flex size-11 min-h-11 min-w-11 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors"
             >
-              <X className="size-3.5" aria-hidden="true" />
+              <X className="size-4" aria-hidden="true" />
             </button>
           ) : null}
         </div>

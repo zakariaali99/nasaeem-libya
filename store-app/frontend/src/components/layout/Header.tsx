@@ -65,7 +65,7 @@ export function Header() {
             <CategoriesDrawer>
               <button
                 type="button"
-                className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl text-foreground hover:bg-muted/70 focus-visible:outline-2 focus-visible:outline-ring transition-colors"
+                className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl text-foreground hover:bg-muted/70 focus-visible:outline-2 focus-visible:outline-ring transition-colors"
                 aria-label="فتح قائمة التصنيفات"
               >
                 <Menu className="size-5" aria-hidden="true" />
@@ -76,7 +76,7 @@ export function Header() {
             <Link
               to="/"
               viewTransition
-              className="flex h-10 shrink-0 items-center gap-2.5 rounded-xl focus-visible:outline-2 focus-visible:outline-ring group"
+              className="flex min-h-11 shrink-0 items-center gap-2.5 rounded-xl focus-visible:outline-2 focus-visible:outline-ring group"
             >
               <div className="flex size-9 items-center justify-center rounded-xl bg-primary/10 border border-primary/20 shadow-2xs group-hover:border-primary/50 transition-all">
                 <img src="/brand/logo.svg" alt="" width={24} height={24} className="size-6 transition-transform group-hover:scale-105" />
@@ -102,7 +102,7 @@ export function Header() {
               {isAdminRole(user?.role) && (
                 <Link
                   to="/admin"
-                  className="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/20 transition-all shadow-2xs"
+                  className="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/20 transition-all shadow-2xs min-h-11"
                   title="الانتقال للوحة التحكم"
                 >
                   <LayoutDashboard className="size-3.5" />
@@ -110,13 +110,15 @@ export function Header() {
                 </Link>
               )}
 
-              <ThemeToggle />
+              <div className="hidden sm:flex">
+                <ThemeToggle />
+              </div>
 
               {/* Mobile Search Button */}
               <button
                 type="button"
                 onClick={() => setMobileSearchOpen(true)}
-                className="inline-flex size-10 items-center justify-center rounded-xl text-foreground hover:bg-muted/70 lg:hidden transition-colors"
+                className="inline-flex size-11 items-center justify-center rounded-xl text-foreground hover:bg-muted/70 lg:hidden transition-colors"
                 aria-label="البحث"
               >
                 <Search className="size-5" aria-hidden="true" />
@@ -128,7 +130,7 @@ export function Header() {
                 viewTransition
                 aria-label={wishlistCount > 0 ? `المفضلة — ${wishlistCount} عنصر` : 'قائمة المفضلة'}
                 title="قائمة المفضلة"
-                className="relative inline-flex size-10 items-center justify-center rounded-xl text-foreground transition-colors hover:bg-muted/70 focus-visible:outline-2 focus-visible:outline-ring"
+                className="relative hidden sm:inline-flex size-11 items-center justify-center rounded-xl text-foreground transition-colors hover:bg-muted/70 focus-visible:outline-2 focus-visible:outline-ring"
               >
                 <Heart className="size-5 text-muted-foreground hover:text-rose-500 transition-colors" aria-hidden="true" />
                 {wishlistCount > 0 && (
@@ -143,16 +145,18 @@ export function Header() {
               </Link>
 
               {/* Account Link */}
-              <IconLink to={user ? '/me' : '/login'} label={user ? 'حسابي' : 'تسجيل الدخول'}>
-                <User className="size-5" aria-hidden="true" />
-              </IconLink>
+              <div className="hidden sm:inline-flex">
+                <IconLink to={user ? '/me' : '/login'} label={user ? 'حسابي' : 'تسجيل الدخول'}>
+                  <User className="size-5" aria-hidden="true" />
+                </IconLink>
+              </div>
 
               {/* Cart Drawer Trigger */}
               <CartDrawer>
                 <button
                   type="button"
                   aria-label={cartCount > 0 ? `سلة التسوّق — ${cartCount} عنصر` : 'سلة التسوّق'}
-                  className="relative inline-flex size-10 items-center justify-center rounded-xl text-foreground transition-colors hover:bg-muted/70 focus-visible:outline-2 focus-visible:outline-ring"
+                  className="relative inline-flex size-11 items-center justify-center rounded-xl text-foreground transition-colors hover:bg-muted/70 focus-visible:outline-2 focus-visible:outline-ring"
                 >
                   <ShoppingBag className="size-5 text-foreground" aria-hidden="true" />
                   {cartCount > 0 ? (
@@ -192,7 +196,7 @@ function IconLink({
       aria-label={label}
       title={label}
       className={cn(
-        'inline-flex size-10 items-center justify-center rounded-xl text-foreground transition-colors hover:bg-muted/70 focus-visible:outline-2 focus-visible:outline-ring',
+        'relative inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl text-foreground transition-colors hover:bg-muted/70 focus-visible:outline-2 focus-visible:outline-ring',
         className,
       )}
     >

@@ -282,18 +282,28 @@ def search_products(queryset, term):
     nothing back — so trigram similarity carries the prefix case and the two are
     ranked together. `pg_trgm` is created by the Phase 0 database setup.
     """
+    from django.db import connection
+    from django.db.models import Q
+
+    term = normalise_arabic((term or "").strip())
+    if not term:
+        return queryset
+
+    if connection.vendor != "postgresql":
+        return queryset.filter(
+            Q(name__icontains=term)
+            | Q(description__icontains=term)
+            | Q(sku__icontains=term)
+        )
+
     from django.contrib.postgres.search import (
         SearchQuery,
         SearchRank,
         SearchVector,
         TrigramSimilarity,
     )
-    from django.db.models import F, Q, Value
+    from django.db.models import F, Value
     from django.db.models.functions import Greatest
-
-    term = normalise_arabic((term or "").strip())
-    if not term:
-        return queryset
 
     name = _normalised_column(F("name"))
     description = _normalised_column(F("description"))

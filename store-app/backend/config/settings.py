@@ -56,7 +56,6 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "django.contrib.postgres",
     "rest_framework",
     "corsheaders",
     "apps.core",
@@ -68,6 +67,9 @@ INSTALLED_APPS = [
     "apps.storefront",
     "apps.health",
 ]
+
+if "postgres" in (DATABASE_URL or ""):
+    INSTALLED_APPS.insert(6, "django.contrib.postgres")
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -108,6 +110,11 @@ DATABASES = {
         conn_max_age=600,
     )
 }
+if DATABASES["default"].get("ENGINE") == "django.db.backends.sqlite3":
+    db_name = DATABASES["default"].get("NAME")
+    if db_name and not os.path.isabs(str(db_name)):
+        DATABASES["default"]["NAME"] = str(BASE_DIR / db_name)
+
 DATABASES["default"]["ATOMIC_REQUESTS"] = True
 
 if REDIS_URL:

@@ -121,7 +121,7 @@ export function HeroCta({ widget, priority = false }: { widget: Widget; priority
 
           <Link
             to="/collections"
-            className="inline-flex h-13 items-center gap-2 rounded-2xl border border-white/20 bg-white/5 px-6 text-sm font-bold text-white hover:bg-white/10 hover:border-white/40 transition-all backdrop-blur-sm"
+            className="inline-flex h-13 items-center gap-2 rounded-2xl border border-secondary-foreground/20 bg-secondary-foreground/5 px-6 text-sm font-bold text-secondary-foreground hover:bg-secondary-foreground/10 hover:border-secondary-foreground/40 transition-all backdrop-blur-sm"
           >
             <span>أحدث المجموعات والعروض</span>
             <ArrowLeft className="size-4 rtl:rotate-0" />

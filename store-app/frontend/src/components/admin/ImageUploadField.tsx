@@ -91,7 +91,7 @@ export function ImageUploadField({
               aspectRatio === 'banner' && 'aspect-[21/9] object-cover',
             )}
           />
-          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center gap-2">
+          <div className="absolute inset-0 animate-fade-in bg-scrim/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center gap-2">
             <Button
               type="button"
               variant="outline"

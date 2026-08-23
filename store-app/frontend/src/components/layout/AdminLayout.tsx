@@ -144,7 +144,7 @@ export function AdminLayout() {
       {/* Mobile Overlay Backdrop */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-xs transition-opacity duration-300 md:hidden"
+          className="fixed inset-0 z-40 animate-fade-in bg-scrim/50 backdrop-blur-xs transition-opacity duration-300 md:hidden"
           onClick={() => setMobileOpen(false)}
           aria-hidden="true"
         />

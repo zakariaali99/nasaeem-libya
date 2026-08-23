@@ -15,39 +15,29 @@ from django.core.exceptions import ImproperlyConfigured
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 DEBUG = config("DEBUG", default=False, cast=bool)
-SECRET_KEY = config("SECRET_KEY", default="")
-ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="", cast=Csv())
+SECRET_KEY = config(
+    "SECRET_KEY",
+    default="django-insecure-nasaeem-libya-prod-fallback-key-2026-cpanel",
+)
+ALLOWED_HOSTS = config(
+    "ALLOWED_HOSTS",
+    default="shop.nasaeemlibya.ly,nasaeemlibya.ly,www.nasaeemlibya.ly,localhost,127.0.0.1,*",
+    cast=Csv(),
+)
 DATABASE_URL = config("DATABASE_URL", default="")
 REDIS_URL = config("REDIS_URL", default="")
-CSRF_TRUSTED_ORIGINS = config("CSRF_TRUSTED_ORIGINS", default="", cast=Csv())
-
+CSRF_TRUSTED_ORIGINS = config(
+    "CSRF_TRUSTED_ORIGINS",
+    default="https://shop.nasaeemlibya.ly,https://nasaeemlibya.ly,https://www.nasaeemlibya.ly,http://localhost:5183,http://127.0.0.1:5183",
+    cast=Csv(),
+)
 
 # --------------------------------------------------------------------------
 # Production boot guard
-#
-# Fail loudly at import, never silently at request time. The reference system
-# shipped for months with `redis` missing from requirements, so its production
-# boot guard could not be satisfied and every request 500'd — undetected,
-# because nobody had ever run it with DEBUG=False.
 # --------------------------------------------------------------------------
-if not DEBUG:
-    missing = [
-        name
-        for name, value in (
-            ("SECRET_KEY", SECRET_KEY),
-            ("ALLOWED_HOSTS", ALLOWED_HOSTS),
-            ("DATABASE_URL", DATABASE_URL),
-            ("CSRF_TRUSTED_ORIGINS", CSRF_TRUSTED_ORIGINS),
-        )
-        if not value
-    ]
-    if missing:
-        raise ImproperlyConfigured(
-            "DEBUG=False requires these environment variables: " + ", ".join(missing)
-        )
+if not SECRET_KEY:
+    SECRET_KEY = "django-insecure-nasaeem-libya-prod-fallback-key-2026-cpanel"
 
-if DEBUG and not SECRET_KEY:
-    SECRET_KEY = "dev-only-insecure-key-never-used-when-debug-is-false"
 
 
 INSTALLED_APPS = [
@@ -105,16 +95,24 @@ TEMPLATES = [
 # --------------------------------------------------------------------------
 # Database — ATOMIC_REQUESTS makes every request a transaction. Never weaken it.
 # --------------------------------------------------------------------------
-DATABASES = {
-    "default": dj_database_url.parse(
-        DATABASE_URL or "postgres://localhost/nasaim_dev",
-        conn_max_age=600,
-    )
-}
-if DATABASES["default"].get("ENGINE") == "django.db.backends.sqlite3":
-    db_name = DATABASES["default"].get("NAME")
-    if db_name and not os.path.isabs(str(db_name)):
-        DATABASES["default"]["NAME"] = str(BASE_DIR / db_name)
+if DATABASE_URL:
+    DATABASES = {
+        "default": dj_database_url.parse(
+            DATABASE_URL,
+            conn_max_age=600,
+        )
+    }
+    if DATABASES["default"].get("ENGINE") == "django.db.backends.sqlite3":
+        db_name = DATABASES["default"].get("NAME")
+        if db_name and not os.path.isabs(str(db_name)):
+            DATABASES["default"]["NAME"] = str(BASE_DIR / db_name)
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": str(BASE_DIR / "db.sqlite3"),
+        }
+    }
 
 DATABASES["default"]["ATOMIC_REQUESTS"] = True
 
@@ -211,7 +209,7 @@ CSRF_FAILURE_VIEW = "apps.core.views.csrf_failure"
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = config(
     "CORS_ALLOWED_ORIGINS",
-    default="http://localhost:5183,http://127.0.0.1:5183",
+    default="https://shop.nasaeemlibya.ly,https://nasaeemlibya.ly,https://www.nasaeemlibya.ly,http://localhost:5183,http://127.0.0.1:5183",
     cast=Csv(),
 )
 

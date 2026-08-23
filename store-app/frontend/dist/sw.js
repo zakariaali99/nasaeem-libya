@@ -15,12 +15,12 @@
  *   the network, always.
  */
 
-const VERSION = 'v1'
+const VERSION = 'v2'
 const SHELL_CACHE = `shell-${VERSION}`
 const ASSET_CACHE = `assets-${VERSION}`
 const DATA_CACHE = `data-${VERSION}`
 
-const SHELL_URLS = ['/', '/index.html', '/manifest.webmanifest', '/brand/logo.svg']
+const SHELL_URLS = ['/manifest.webmanifest', '/brand/logo.svg']
 
 // Money and personal state: network only, no exceptions.
 const NEVER_CACHE = [
@@ -35,11 +35,14 @@ const NEVER_CACHE = [
 ]
 
 self.addEventListener('install', (event) => {
+  self.skipWaiting()
   event.waitUntil(
     caches
       .open(SHELL_CACHE)
       .then((cache) => cache.addAll(SHELL_URLS))
-      .then(() => self.skipWaiting()),
+      .catch(() => {
+        /* Ignore partial preload failures */
+      }),
   )
 })
 
@@ -120,16 +123,12 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  // 4) Navigations: try the network, fall back to the cached shell.
+  // 4) Navigations: try the network first, fall back to cache only when offline.
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const copy = response.clone()
-          caches.open(SHELL_CACHE).then((cache) => cache.put('/', copy))
-          return response
-        })
-        .catch(() => caches.match('/index.html').then((hit) => hit || caches.match('/'))),
+      fetch(request, { cache: 'no-cache' }).catch(() =>
+        caches.match('/index.html').then((hit) => hit || caches.match('/')),
+      ),
     )
   }
 })

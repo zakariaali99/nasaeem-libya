@@ -12,12 +12,19 @@ construction, and `nextval` never hands the same number to two callers.
 from django.db import migrations
 
 
+def create_sequence(apps, schema_editor):
+    if schema_editor.connection.vendor == "postgresql":
+        schema_editor.execute("CREATE SEQUENCE IF NOT EXISTS order_number_seq START WITH 1 INCREMENT BY 1;")
+
+
+def drop_sequence(apps, schema_editor):
+    if schema_editor.connection.vendor == "postgresql":
+        schema_editor.execute("DROP SEQUENCE IF EXISTS order_number_seq;")
+
+
 class Migration(migrations.Migration):
     dependencies = [("orders", "0001_initial")]
 
     operations = [
-        migrations.RunSQL(
-            sql="CREATE SEQUENCE IF NOT EXISTS order_number_seq START WITH 1 INCREMENT BY 1;",
-            reverse_sql="DROP SEQUENCE IF EXISTS order_number_seq;",
-        ),
+        migrations.RunPython(create_sequence, reverse_code=drop_sequence),
     ]

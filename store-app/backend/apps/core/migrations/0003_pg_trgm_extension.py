@@ -16,11 +16,22 @@ Arabic harakat are not accents as far as `unaccent` is concerned. Normalisation
 is done explicitly in `apps.catalog.services.search_products` instead.
 """
 
-from django.contrib.postgres.operations import TrigramExtension
 from django.db import migrations
+
+
+def create_extension(apps, schema_editor):
+    if schema_editor.connection.vendor == "postgresql":
+        schema_editor.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm;")
+
+
+def drop_extension(apps, schema_editor):
+    if schema_editor.connection.vendor == "postgresql":
+        schema_editor.execute("DROP EXTENSION IF EXISTS pg_trgm;")
 
 
 class Migration(migrations.Migration):
     dependencies = [("core", "0002_city_region_useraddress")]
 
-    operations = [TrigramExtension()]
+    operations = [
+        migrations.RunPython(create_extension, reverse_code=drop_extension),
+    ]

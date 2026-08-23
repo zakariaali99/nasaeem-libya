@@ -278,9 +278,12 @@ def next_order_number(payment_method: str) -> str:
     the numeric part simply becomes five digits. A wrapping counter would
     reintroduce exactly the collision this replaces.
     """
-    with connection.cursor() as cursor:
-        cursor.execute("SELECT nextval('order_number_seq')")
-        value = cursor.fetchone()[0]
+    if connection.vendor == "postgresql":
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT nextval('order_number_seq')")
+            value = cursor.fetchone()[0]
+    else:
+        value = Order.objects.count() + 1
 
     code = (payment_method or "UNK")[:3].upper().ljust(3, "X")
     return f"{timezone.localtime():%Y%m}{code}{value:04d}"

@@ -243,6 +243,7 @@ CURRENCY = config("CURRENCY", default="LYD")
 
 _FRONTEND_DIR = BASE_DIR.parent / "frontend"
 SPA_INDEX_CANDIDATES = [
+    BASE_DIR / "dist" / "index.html",
     _FRONTEND_DIR / "dist" / "index.html",
     _FRONTEND_DIR / "index.html",
 ]

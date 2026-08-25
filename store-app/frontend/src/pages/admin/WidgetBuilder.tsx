@@ -17,16 +17,20 @@ import {
 } from '@/lib/queries/customization'
 
 const TYPE_LABELS: Record<string, string> = {
-  announcement_bar: 'شريط إعلان',
-  hero_cta: 'بانر رئيسي',
-  carousel: 'شرائح متحركة',
+  announcement_bar: 'شريط إعلان علوي',
+  hero_cta: 'بانر رئيسي تفاعلي',
+  discovery_box: 'باقة عينات التجربة والكاش باك 🧪',
+  trust_badges: 'شريط مزايا وضمانات المتجر',
+  carousel: 'شرائح متحركة (Carousel)',
   category_list: 'قائمة تصنيفات',
   product_list: 'قائمة منتجات',
-  text_block: 'نص',
+  text_block: 'كتلة نصية',
   photo_link_grid: 'شبكة صور بروابط',
   collection_showcase: 'عرض مجموعة',
+  free_shipping_bar: 'شريط الشحن المجاني',
+  gift_wrap_upsell: 'تغليف الهدايا الفاخر',
   spacer: 'مسافة فارغة',
-  image: 'صورة',
+  image: 'صورة منفردة',
   recently_viewed: 'شاهدت مؤخراً',
   buy_again: 'اشترِ مرة أخرى',
   recommended_for_you: 'مقترحات لك',
@@ -35,7 +39,7 @@ const TYPE_LABELS: Record<string, string> = {
 
 /** Field keys match `services.normalise_widget_data` exactly — the server
  * canonicalises on write, so the editor speaks the same names it saves. */
-const FIELD_SPECS: Record<string, { key: string; label: string; kind?: 'number' | 'textarea' | 'image' }[]> = {
+const FIELD_SPECS: Record<string, { key: string; label: string; kind?: 'number' | 'textarea' | 'image' | 'boolean' }[]> = {
   announcement_bar: [
     { key: 'message', label: 'نص الإعلان' },
     { key: 'title', label: 'عنوان الإعلان (اختياري)' },
@@ -49,6 +53,30 @@ const FIELD_SPECS: Record<string, { key: string; label: string; kind?: 'number' 
     { key: 'mobileImageUrl', label: 'صورة الهاتف والموبايل (Mobile Phone Image)', kind: 'image' },
     { key: 'buttonLabel', label: 'نص زر الإجراء' },
     { key: 'buttonUrl', label: 'رابط زر الإجراء' },
+  ],
+  discovery_box: [
+    { key: 'title', label: 'عنوان باقة العينات' },
+    { key: 'badge', label: 'شارة العرض (مثال: ضمان الرضا الكامل 🧪)' },
+    { key: 'price', label: 'سعر باقة العينات (مثال: 60 د.ل)' },
+    { key: 'sampleCount', label: 'عدد العينات (مثال: 5)', kind: 'number' },
+    { key: 'cashbackPercent', label: 'نسبة الكاش باك المسترد % (مثال: 100)', kind: 'number' },
+    { key: 'buttonText', label: 'نص زر الطلب' },
+    { key: 'linkUrl', label: 'رابط التوجيه عند النقر' },
+    { key: 'description', label: 'نص الوصف التوضيحي (اتركه فارغاً للتوليد التلقائي)', kind: 'textarea' },
+  ],
+  trust_badges: [
+    { key: 'title', label: 'عنوان قسم المزايا (اختياري)' },
+  ],
+  free_shipping_bar: [
+    { key: 'threshold', label: 'الحد الأدنى للشحن المجاني (د.ل)', kind: 'number' },
+    { key: 'messageBefore', label: 'رسالة الحث (استخدم {amount} لقيمة المتبقي)' },
+    { key: 'messageAfter', label: 'رسالة التأهل للشحن المجاني' },
+  ],
+  gift_wrap_upsell: [
+    { key: 'title', label: 'عنوان جناح التغليف الفاخر' },
+    { key: 'price', label: 'سعر التغليف' },
+    { key: 'description', label: 'وصف صندوق الهدايا وبطاقة الإهداء', kind: 'textarea' },
+    { key: 'imageUrl', label: 'صورة صندوق الهدايا', kind: 'image' },
   ],
   carousel: [],
   category_list: [{ key: 'title', label: 'العنوان' }],
@@ -72,10 +100,13 @@ const CHOICE_SPECS: Record<string, { key: string; label: string; options: { valu
   announcement_bar: [{
     key: 'icon', label: 'الأيقونة',
     options: [
-      { value: 'megaphone', label: 'مكبر صوت' }, { value: 'info', label: 'معلومة' },
-      { value: 'sparkles', label: 'لمعة' }, { value: 'bell', label: 'جرس' },
-      { value: 'gift', label: 'هدية' }, { value: 'star', label: 'نجمة' },
-      { value: 'tag', label: 'وسم سعر' },
+      { value: 'sparkles', label: 'لمعة ذهبية ✨' },
+      { value: 'megaphone', label: 'مكبر صوت 📢' },
+      { value: 'gift', label: 'هدية 🎁' },
+      { value: 'star', label: 'نجمة ⭐' },
+      { value: 'tag', label: 'وسم سعر 🏷️' },
+      { value: 'bell', label: 'جرس 🔔' },
+      { value: 'info', label: 'معلومة ℹ️' },
     ],
   }],
   spacer: [{
@@ -95,7 +126,7 @@ const WEEKDAYS = [
   { value: 5, label: 'السبت' },
 ]
 
-function toLocalInput(iso: string | null): string {
+function toLocalInput(iso: string | null | undefined): string {
   if (!iso) return ''
   const date = new Date(iso)
   const pad = (n: number) => String(n).padStart(2, '0')
@@ -454,6 +485,30 @@ export default function WidgetBuilder() {
                   )}
                 </Field>
               ))}
+
+              {current.type === 'discovery_box' && (
+                <div className="space-y-2.5 rounded-xl border border-primary/20 bg-primary/5 p-3.5">
+                  <h4 className="text-xs font-bold text-foreground">خيارات العرض في صفحات المتجر:</h4>
+                  <div className="flex flex-col gap-2">
+                    <label className="flex items-center gap-2 text-xs font-semibold text-foreground cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={current.data.showInCart !== false}
+                        onChange={(e) => updateField('showInCart', e.target.checked)}
+                      />
+                      <span>إظهار بانر باقة العينات داخل صفحة سلة المشتريات (Cart Page)</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-xs font-semibold text-foreground cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={current.data.showInProductDetail !== false}
+                        onChange={(e) => updateField('showInProductDetail', e.target.checked)}
+                      />
+                      <span>إظهار بانر باقة العينات داخل صفحة تفاصيل العطر (Product Page)</span>
+                    </label>
+                  </div>
+                </div>
+              )}
 
               {/* Scheduling & targeting for this widget */}
               <p className="text-xs text-muted-foreground">

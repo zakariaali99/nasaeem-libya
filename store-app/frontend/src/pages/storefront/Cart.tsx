@@ -21,6 +21,7 @@ import {
   useRemoveCartItem,
   useUpdateCartItem,
 } from '@/lib/queries/cart'
+import { useStorefrontLayout } from '@/lib/queries/storefront'
 import { usePageTitle } from '@/lib/usePageTitle'
 import type { CartLine } from '@/types/api'
 
@@ -29,9 +30,14 @@ export default function CartPage() {
 
   const navigate = useNavigate()
   const { data: cart, isPending, isError, error, refetch } = useCart()
+  const { data: layoutData } = useStorefrontLayout()
   const { data: user } = useMe()
   const createOrder = useCreateOrder()
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
+
+  const discoveryWidget = layoutData?.widgets?.find(
+    (w) => w.type === 'discovery_box' && w.is_active && w.data?.showInCart !== false,
+  )
 
   if (isPending) return <CartSkeleton />
   if (isError) {
@@ -154,9 +160,20 @@ export default function CartPage() {
         </aside>
       </div>
 
-      <div className="pt-4">
-        <DiscoveryBoxBanner />
-      </div>
+      {discoveryWidget && (
+        <div className="pt-4">
+          <DiscoveryBoxBanner
+            title={discoveryWidget.data.title}
+            badge={discoveryWidget.data.badge}
+            description={discoveryWidget.data.description}
+            price={discoveryWidget.data.price}
+            sampleCount={discoveryWidget.data.sampleCount}
+            cashbackPercent={discoveryWidget.data.cashbackPercent}
+            linkUrl={discoveryWidget.data.linkUrl}
+            buttonText={discoveryWidget.data.buttonText}
+          />
+        </div>
+      )}
     </div>
   )
 }

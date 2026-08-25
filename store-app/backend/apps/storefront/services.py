@@ -193,6 +193,54 @@ def normalise_widget_data(widget_type: str, data: dict | None) -> dict:
             "icon": icon if icon in ANNOUNCEMENT_ICONS else "megaphone",
         }
 
+    if widget_type == WidgetType.DISCOVERY_BOX:
+        return {
+            "title": data.get("title", "") or "باقة عينات التجربة واسترداد القيمة 100%",
+            "badge": data.get("badge", "") or "ضمان الرضا الكامل 🧪",
+            "description": data.get("description", "") or "",
+            "price": str(_first(data, "price", default="60 د.ل")),
+            "sampleCount": int(data.get("sampleCount") or data.get("sample_count") or 5),
+            "cashbackPercent": int(data.get("cashbackPercent") or data.get("cashback_percent") or 100),
+            "linkUrl": _first(data, "linkUrl", "link_url", default="/search?q=عينات"),
+            "buttonText": _first(data, "buttonText", "button_text", default="اطلب باقة التجربة الآن"),
+            "showInCart": bool(data.get("showInCart", True)),
+            "showInProductDetail": bool(data.get("showInProductDetail", True)),
+        }
+
+    if widget_type == WidgetType.TRUST_BADGES:
+        items = []
+        default_items = [
+            {"icon": "shield-check", "title": "عطور أصلية 100%", "subtitle": "ماركات عالمية وأصلية مضمونة"},
+            {"icon": "truck", "title": "توصيل لجميع مدن ليبيا", "subtitle": "شحن سريع وموثوق لباب بيتك"},
+            {"icon": "credit-card", "title": "دفع آمن ومريح", "subtitle": "سداد، معاملات، بطاقات، أو كاش"},
+        ]
+        for item in data.get("items") or default_items:
+            if isinstance(item, dict):
+                items.append({
+                    "icon": str(item.get("icon") or "sparkles"),
+                    "title": str(item.get("title") or ""),
+                    "subtitle": str(item.get("subtitle") or ""),
+                })
+        return {
+            "title": data.get("title", "") or "",
+            "items": items,
+        }
+
+    if widget_type == WidgetType.FREE_SHIPPING_BAR:
+        return {
+            "threshold": float(data.get("threshold") or 150),
+            "messageBefore": str(data.get("messageBefore") or "أضف عطوراً بقيمة {amount} د.ل للحصول على شحن مجاني!"),
+            "messageAfter": str(data.get("messageAfter") or "مبروك! مؤهل للشحن المجاني لكافة المدن 🚚"),
+        }
+
+    if widget_type == WidgetType.GIFT_WRAP_UPSELL:
+        return {
+            "title": data.get("title", "") or "تغليف الهدايا الفاخر",
+            "price": str(_first(data, "price", default="15 د.ل")),
+            "description": data.get("description", "") or "صندوق مخملي أنيق وشريط ستان وبطاقة إهداء مخصصة.",
+            "imageUrl": _first(data, "imageUrl", "image_url"),
+        }
+
     if widget_type == WidgetType.SPACER:
         height = data.get("height")
         return {"height": height if height in SPACER_HEIGHTS else "md"}

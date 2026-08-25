@@ -206,6 +206,10 @@ export type WidgetType =
   | 'photo_link_grid'
   | 'hero_cta'
   | 'announcement_bar'
+  | 'discovery_box'
+  | 'trust_badges'
+  | 'free_shipping_bar'
+  | 'gift_wrap_upsell'
   | 'spacer'
   | 'recently_viewed'
   | 'buy_again'
@@ -234,6 +238,12 @@ export interface PhotoLinkItem {
   imageUrl: string
   linkUrl: string
   label: string
+}
+
+export interface TrustBadgeItem {
+  icon: string
+  title: string
+  subtitle: string
 }
 
 /** The union of every populated `data` shape. Each renderer narrows by type. */
@@ -274,6 +284,21 @@ export interface WidgetData {
   linkLabel?: string
   dismissible?: boolean
   icon?: string
+  // discovery_box
+  badge?: string
+  description?: string
+  price?: string
+  sampleCount?: number
+  cashbackPercent?: number
+  buttonText?: string
+  showInCart?: boolean
+  showInProductDetail?: boolean
+  // trust_badges
+  trustItems?: TrustBadgeItem[]
+  // free_shipping_bar
+  threshold?: number
+  messageBefore?: string
+  messageAfter?: string
   // spacer
   height?: 'sm' | 'md' | 'lg' | 'xl' | '2xl'
 }

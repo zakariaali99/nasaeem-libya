@@ -5,6 +5,7 @@ import {
   CollectionShowcase,
   ProductListWidget,
 } from '@/components/storefront/widgets/CatalogWidgets'
+import { DiscoveryBoxWidget } from '@/components/storefront/widgets/DiscoveryBoxWidget'
 import { HeroCta } from '@/components/storefront/widgets/HeroCta'
 import {
   ImageWidget,
@@ -12,15 +13,14 @@ import {
   Spacer,
   TextBlock,
 } from '@/components/storefront/widgets/SimpleWidgets'
+import { TrustBadgesWidget } from '@/components/storefront/widgets/TrustBadgesWidget'
 import { WidgetShell } from '@/components/storefront/widgets/WidgetShell'
 import type { Widget, WidgetType } from '@/types/api'
 
 type Renderer = (props: { widget: Widget; priority?: boolean }) => React.ReactNode
 
 /**
- * All 14 types, one registry. The four personalised types share
- * `ProductListWidget` because the server has already decided what goes in them —
- * the client difference is only the title, which is in the data.
+ * All widget types, one registry.
  */
 export const WIDGET_RENDERERS: Record<WidgetType, Renderer> = {
   carousel: Carousel,
@@ -32,6 +32,10 @@ export const WIDGET_RENDERERS: Record<WidgetType, Renderer> = {
   photo_link_grid: PhotoLinkGrid,
   hero_cta: HeroCta,
   announcement_bar: AnnouncementBar,
+  discovery_box: DiscoveryBoxWidget,
+  trust_badges: TrustBadgesWidget,
+  free_shipping_bar: AnnouncementBar,
+  gift_wrap_upsell: DiscoveryBoxWidget,
   spacer: Spacer,
   recently_viewed: ProductListWidget,
   buy_again: ProductListWidget,

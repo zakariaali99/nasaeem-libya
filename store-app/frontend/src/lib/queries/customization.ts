@@ -17,10 +17,17 @@ export interface Layout {
   updated_at: string
 }
 
-export type LayoutDraft = Pick<
-  Layout,
-  'name' | 'is_global_active' | 'active_start_date' | 'active_end_date'
-  | 'active_days' | 'active_start_hour' | 'active_end_hour'
+export type LayoutDraft = Partial<
+  Pick<
+    Layout,
+    | 'name'
+    | 'is_global_active'
+    | 'active_start_date'
+    | 'active_end_date'
+    | 'active_days'
+    | 'active_start_hour'
+    | 'active_end_hour'
+  >
 > & {
   widgets?: {
     id?: string

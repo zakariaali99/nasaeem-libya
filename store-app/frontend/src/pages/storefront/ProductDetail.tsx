@@ -30,6 +30,7 @@ import { ApiError } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { useAddToCart } from '@/lib/queries/cart'
 import { useProduct, useProducts } from '@/lib/queries/catalog'
+import { useStorefrontLayout } from '@/lib/queries/storefront'
 import { useToggleWishlist, useWishlistIds } from '@/lib/queries/wishlist'
 import { rememberViewed } from '@/lib/recentlyViewed'
 import { usePageTitle } from '@/lib/usePageTitle'
@@ -86,6 +87,11 @@ function ProductView({
   selection: VariantSelection
   onSelect: (selection: VariantSelection) => void
 }) {
+  const { data: layoutData } = useStorefrontLayout()
+  const discoveryWidget = layoutData?.widgets?.find(
+    (w) => w.type === 'discovery_box' && w.is_active && w.data?.showInProductDetail !== false,
+  )
+
   const variants = product.variants ?? []
   const groups = optionGroups(variants)
   const variant = matchVariant(variants, selection, groups)
@@ -274,9 +280,20 @@ function ProductView({
       ) : null}
 
       {/* Discovery Box & 100% Cashback Banner */}
-      <section className="mt-10">
-        <DiscoveryBoxBanner />
-      </section>
+      {discoveryWidget && (
+        <section className="mt-10">
+          <DiscoveryBoxBanner
+            title={discoveryWidget.data.title}
+            badge={discoveryWidget.data.badge}
+            description={discoveryWidget.data.description}
+            price={discoveryWidget.data.price}
+            sampleCount={discoveryWidget.data.sampleCount}
+            cashbackPercent={discoveryWidget.data.cashbackPercent}
+            linkUrl={discoveryWidget.data.linkUrl}
+            buttonText={discoveryWidget.data.buttonText}
+          />
+        </section>
+      )}
 
       {/* Verified Customer Photo Reviews */}
       <section className="mt-10">

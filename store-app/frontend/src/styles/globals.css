@@ -61,7 +61,8 @@
 @theme static {
   /* type */
   --font-sans: "Cairo", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Reem Kufi", "Cairo", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Cairo", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
   /* type scale — 12 / 14 / 16 / 18 / 20 / 24 / 30 / 36 / 48. Nothing else. */
   --text-xs: 0.75rem;

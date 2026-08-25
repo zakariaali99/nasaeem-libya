@@ -104,18 +104,32 @@ def test_executive_analytics_builder_metrics(executive_dataset):
     assert len(data["city_breakdown"]) >= 2
     assert any(c["city_name"] == "طرابلس" for c in data["city_breakdown"])
     assert any(c["city_name"] == "بنغازي" for c in data["city_breakdown"])
+    assert len(data["payment_methods_breakdown"]) >= 2
+    assert len(data["trend_series"]) == 14
 
 
 @pytest.mark.django_db
-def test_executive_analytics_admin_api_endpoint(api_client, admin_user, executive_dataset):
+def test_executive_analytics_admin_api_endpoint_with_timeframe(api_client, admin_user, executive_dataset):
     api_client.force_authenticate(user=admin_user)
-    res = api_client.get("/api/admin/analytics/executive/")
+    res = api_client.get("/api/admin/analytics/executive/?days=30")
     assert res.status_code == 200
     data = res.data["data"]
     assert "total_revenue" in data
     assert "city_breakdown" in data
     assert "brand_performance" in data
     assert "vip_top_spenders" in data
+    assert data["timeframe_days"] == 30
+    assert len(data["trend_series"]) == 30
+
+
+@pytest.mark.django_db
+def test_dashboard_stats_with_dynamic_days(api_client, admin_user, executive_dataset):
+    api_client.force_authenticate(user=admin_user)
+    res = api_client.get("/api/admin/dashboard/?days=7")
+    assert res.status_code == 200
+    data = res.data["data"]
+    assert data["timeframe_days"] == 7
+    assert len(data["series"]) == 7
 
 
 def test_telegram_order_alert_formatting(executive_dataset):

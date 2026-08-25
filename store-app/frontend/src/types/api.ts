@@ -469,6 +469,9 @@ export interface DashboardStats {
   revenue_total: string
   customers: number
   low_stock: number
+  timeframe_days?: number
+  timeframe_revenue?: string
+  timeframe_orders?: number
   series: { date: string; orders: number; revenue: string }[]
 }
 
@@ -586,9 +589,26 @@ export interface VipSpenderRow {
   vip_tier: string
   lifetime_spend: string
   loyalty_points: number
+  orders_count?: number
+}
+
+export interface PaymentMethodBreakdownRow {
+  method_code: string
+  label: string
+  orders_count: number
+  revenue: string
+  percentage: number
+}
+
+export interface DeliveryCourierBreakdownRow {
+  courier_name: string
+  orders_count: number
+  revenue: string
 }
 
 export interface ExecutiveAnalyticsData {
+  timeframe?: string
+  timeframe_days?: number
   total_revenue: string
   estimated_profit: string
   total_orders_count: number
@@ -598,5 +618,7 @@ export interface ExecutiveAnalyticsData {
   city_breakdown: CitySalesRow[]
   brand_performance: BrandProfitRow[]
   vip_top_spenders: VipSpenderRow[]
+  payment_methods_breakdown?: PaymentMethodBreakdownRow[]
+  delivery_couriers_breakdown?: DeliveryCourierBreakdownRow[]
+  trend_series?: { date: string; orders: number; revenue: string }[]
 }
-

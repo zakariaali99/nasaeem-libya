@@ -4,8 +4,8 @@ import {
   Boxes,
   CheckCircle2,
   Clock,
+  Coins,
   DollarSign,
-  Package,
   Plus,
   ShoppingBag,
   TrendingUp,
@@ -21,43 +21,10 @@ import { useDashboardStats, useMyOrders } from '@/lib/queries/orders'
 import { usePageTitle } from '@/lib/usePageTitle'
 import type { Order } from '@/types/api'
 
-// Simple SVG sparkline generator
-function MiniSparkline({
-  values,
-  color = 'var(--color-primary)',
-  fillColor = 'var(--color-primary)',
-}: {
-  values: number[]
-  color?: string
-  fillColor?: string
-}) {
-  if (!values || values.length < 2) return null
-  const min = Math.min(...values)
-  const max = Math.max(...values, min + 1)
-  const width = 80
-  const height = 28
-  const padding = 2
-
-  const points = values.map((val, i) => {
-    const x = (i / (values.length - 1)) * (width - padding * 2) + padding
-    const y = height - ((val - min) / (max - min)) * (height - padding * 2) - padding
-    return `${x},${y}`
-  })
-
-  const pathD = `M ${points.join(' L ')}`
-  const fillD = `M ${points[0]} L ${points.join(' L ')} L ${width - padding},${height} L ${padding},${height} Z`
-
-  return (
-    <svg width={width} height={height} className="overflow-visible">
-      <path d={fillD} fill={fillColor} fillOpacity={0.15} />
-      <path d={pathD} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
 export default function Dashboard() {
   usePageTitle('لوحة الإدارة والتحكم')
-  const { data, isPending } = useDashboardStats()
+  const [timeframe, setTimeframe] = React.useState<number | string>(14)
+  const { data, isPending } = useDashboardStats(timeframe)
   const { data: recentOrdersData, isPending: ordersPending } = useMyOrders({ limit: 5 })
   const [hoveredPoint, setHoveredPoint] = React.useState<{ date: string; revenue: string; x: number; y: number } | null>(null)
 
@@ -78,13 +45,16 @@ export default function Dashboard() {
   const series = [...data.series].reverse() // chronological order
   const revenueValues = series.map((d) => Number(d.revenue))
   const maxRevenue = Math.max(...revenueValues, 100)
+  const totalPeriodRevenue = data.timeframe_revenue
+    ? Number(data.timeframe_revenue)
+    : revenueValues.reduce((a, b) => a + b, 0)
 
-  // Chart coordinate calculations - ample margins to prevent label overlap
-  const chartWidth = 750
-  const chartHeight = 230
-  const paddingLeft = 90
+  // Chart coordinate calculations - generous left gutter (140px) so prices have their own dedicated column
+  const chartWidth = 840
+  const chartHeight = 240
+  const paddingLeft = 140
   const paddingRight = 25
-  const paddingTop = 20
+  const paddingTop = 24
   const paddingBottom = 45
 
   const plotWidth = chartWidth - paddingLeft - paddingRight
@@ -115,6 +85,17 @@ export default function Dashboard() {
       ? Math.round((data.completed_orders / totalOrders) * 100)
       : 0
 
+  const timeframes: { label: string; value: number | string }[] = [
+    { label: '7 أيام', value: 7 },
+    { label: '14 يوماً', value: 14 },
+    { label: '30 يوماً', value: 30 },
+    { label: '90 يوماً', value: 90 },
+    { label: 'الشهر الحالي', value: 'month' },
+    { label: 'السنة الحالية', value: 'year' },
+  ]
+
+  const activeTimeframeLabel = timeframes.find((t) => t.value === timeframe)?.label || 'الفترة المحددة'
+
   return (
     <div className="space-y-8 animate-fade-rise">
       {/* Low stock warning banner */}
@@ -133,10 +114,9 @@ export default function Dashboard() {
           </div>
           <Link
             to="/admin/inventory"
-            className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-amber-700 transition-colors"
+            className="text-xs font-bold text-amber-700 dark:text-amber-300 underline hover:no-underline"
           >
-            <span>فحص المخزون</span>
-            <ArrowUpRight className="size-3.5" />
+            عرض المنتجات المنخفضة ←
           </Link>
         </div>
       )}
@@ -167,76 +147,62 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* KPI Tiles Grid */}
+      {/* Primary KPI Grid (4 columns) */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Pending Orders */}
+        {/* Total Revenue */}
+        <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-2xs">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-muted-foreground">إجمالي الإيرادات (المؤكدة)</span>
+            <div className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Coins className="size-5" />
+            </div>
+          </div>
+          <div className="mt-3 flex items-baseline justify-between">
+            <p className="text-2xl font-extrabold font-mono text-price truncate">{formatPrice(data.revenue_total)}</p>
+          </div>
+          <div className="mt-3 flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
+            <TrendingUp className="size-3.5" />
+            <span>{formatNumber(data.customers)} عميل مسجل بالمتجر</span>
+          </div>
+        </div>
+
+        {/* Orders In Processing */}
         <Link
-          to="/admin/orders?status=pending"
-          className="group relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-2xs hover:shadow-md hover:border-amber-500/40 transition-all duration-200"
+          to="/admin/orders?status=processing"
+          className="group relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-2xs hover:border-primary/40 hover:shadow-xs transition-all"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-muted-foreground">بانتظار التأكيد</span>
-            <div className="flex size-9 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+            <span className="text-xs font-bold text-muted-foreground">طلبات قيد التجهيز والشحن</span>
+            <div className="flex size-9 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 group-hover:scale-105 transition-transform">
               <Clock className="size-5" />
             </div>
           </div>
           <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-extrabold font-mono text-foreground">{formatNumber(data.pending_orders)}</p>
-            <MiniSparkline
-              values={[1, 3, 2, 4, data.pending_orders]}
-              color="oklch(0.70 0.16 75)"
-              fillColor="oklch(0.70 0.16 75)"
-            />
+            <p className="text-2xl font-extrabold font-mono text-foreground">{formatNumber(data.processing_orders)}</p>
+            {data.pending_orders > 0 && (
+              <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold text-amber-600 dark:text-amber-400">
+                +{data.pending_orders} جديدة
+              </span>
+            )}
           </div>
-          <div className="mt-3 flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 font-semibold">
-            <span className="font-sans">←</span>
-            <span>معالجة الطلبات الواردة</span>
-          </div>
-        </Link>
-
-        {/* Processing Orders */}
-        <Link
-          to="/admin/orders?status=processing"
-          className="group relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-2xs hover:shadow-md hover:border-sky-500/40 transition-all duration-200"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-muted-foreground">قيد التجهيز والشحن</span>
-            <div className="flex size-9 items-center justify-center rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400">
-              <Package className="size-5" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-extrabold font-mono text-foreground">{formatNumber(data.processing_orders)}</p>
-            <MiniSparkline
-              values={[2, 2, 5, 3, data.processing_orders]}
-              color="oklch(0.65 0.15 240)"
-              fillColor="oklch(0.65 0.15 240)"
-            />
-          </div>
-          <div className="mt-3 flex items-center gap-1.5 text-xs text-sky-600 dark:text-sky-400 font-semibold">
-            <span className="font-sans">←</span>
-            <span>متابعة الشحنات مع المناديب</span>
+          <div className="mt-3 flex items-center gap-1 text-xs text-muted-foreground">
+            <span>{data.today_orders} طلب جديد اليوم</span>
           </div>
         </Link>
 
         {/* Completed Orders */}
         <Link
           to="/admin/orders?status=completed"
-          className="group relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-2xs hover:shadow-md hover:border-emerald-500/40 transition-all duration-200"
+          className="group relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-2xs hover:border-primary/40 hover:shadow-xs transition-all"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-muted-foreground">طلبات مسلمة ومكتملة</span>
-            <div className="flex size-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+            <span className="text-xs font-bold text-muted-foreground">الطلبات المسلمة بنجاح</span>
+            <div className="flex size-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 group-hover:scale-105 transition-transform">
               <CheckCircle2 className="size-5" />
             </div>
           </div>
           <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl font-extrabold font-mono text-foreground">{formatNumber(data.completed_orders)}</p>
-            <MiniSparkline
-              values={revenueValues.length > 0 ? revenueValues.slice(-5) : [0, 0, 0, 0, data.completed_orders]}
-              color="oklch(0.60 0.15 150)"
-              fillColor="oklch(0.60 0.15 150)"
-            />
+            <p className="text-2xl font-extrabold font-mono text-foreground">{formatNumber(data.completed_orders)}</p>
           </div>
           <div className="mt-3 flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
             <TrendingUp className="size-3.5" />
@@ -266,43 +232,72 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Earnings Over Time Chart Section */}
+      {/* Earnings Over Time Chart Section with Dedicated Y-Axis Column & Dynamic Timeframes */}
       <section className="rounded-2xl border border-border bg-card p-4 sm:p-6 shadow-2xs space-y-4 max-w-full overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/60 pb-4">
           <div>
             <h2 className="text-base font-bold text-foreground">مخطط الإيرادات والمبيعات</h2>
-            <p className="text-xs text-muted-foreground">تطور إجمالي الإيرادات اليومية بالدينار الليبي (د.ل) لآخر 14 يوماً</p>
+            <p className="text-xs text-muted-foreground">تطور إجمالي الإيرادات اليومية بالدينار الليبي (د.ل) — {activeTimeframeLabel}</p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary font-mono">
+
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Dynamic Timeframe Selector Pills */}
+            <div className="flex items-center rounded-xl bg-muted/60 p-1 border border-border text-xs font-bold">
+              {timeframes.map((tf) => (
+                <button
+                  key={tf.label}
+                  type="button"
+                  onClick={() => setTimeframe(tf.value)}
+                  className={`rounded-lg px-2.5 py-1 transition-all ${
+                    timeframe === tf.value
+                      ? 'bg-card text-foreground font-bold shadow-2xs border border-border/50'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {tf.label}
+                </button>
+              ))}
+            </div>
+
+            <span className="inline-flex items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary font-mono">
               <TrendingUp className="size-3.5" />
-              <span>إجمالي 14 يوماً: {formatPrice(revenueValues.reduce((a, b) => a + b, 0))}</span>
+              <span>إجمالي {activeTimeframeLabel}: {formatPrice(totalPeriodRevenue)}</span>
             </span>
           </div>
         </div>
 
-        {/* SVG Area Chart - Fluid & Contained */}
+        {/* SVG Area Chart - Isolated Left Column for Prices & Zero Collision */}
         <div className="relative w-full overflow-x-auto overflow-y-hidden pt-2 no-scrollbar">
-          <div className="min-w-[560px] sm:min-w-full">
+          <div className="min-w-[620px] sm:min-w-full">
             <svg
               viewBox={`0 0 ${chartWidth} ${chartHeight}`}
               preserveAspectRatio="xMidYMid meet"
-              className="w-full h-48 sm:h-60 md:h-72"
+              className="w-full h-52 sm:h-64 md:h-76"
               onMouseLeave={() => setHoveredPoint(null)}
             >
               <defs>
                 <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--color-primary)" stopOpacity="0.28" />
+                  <stop offset="0%" stopColor="var(--color-primary)" stopOpacity="0.25" />
                   <stop offset="100%" stopColor="var(--color-primary)" stopOpacity="0.0" />
                 </linearGradient>
               </defs>
 
-              {/* Horizontal Grid lines */}
+              {/* Dedicated Left Y-Axis Shaded Column Guide */}
+              <rect
+                x={0}
+                y={0}
+                width={paddingLeft - 10}
+                height={chartHeight}
+                className="fill-transparent"
+              />
+
+              {/* Horizontal Grid lines & Isolated Price Labels */}
               {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
                 const y = paddingTop + plotHeight * (1 - ratio)
                 const val = maxRevenue * ratio
                 return (
                   <g key={ratio}>
+                    {/* Grid line starting cleanly at paddingLeft */}
                     <line
                       x1={paddingLeft}
                       y1={y}
@@ -310,13 +305,14 @@ export default function Dashboard() {
                       y2={y}
                       stroke="var(--color-border)"
                       strokeDasharray="4 4"
-                      strokeOpacity={0.8}
+                      strokeOpacity={0.7}
                     />
+                    {/* Dedicated Y-Axis Price Label strictly left of paddingLeft */}
                     <text
-                      x={paddingLeft - 12}
-                      y={y + 3.5}
+                      x={paddingLeft - 18}
+                      y={y + 4}
                       textAnchor="end"
-                      className="text-[11px] fill-muted-foreground font-mono font-medium"
+                      className="text-[11px] fill-muted-foreground font-mono font-bold"
                     >
                       {formatPrice(val)}
                     </text>
@@ -337,35 +333,43 @@ export default function Dashboard() {
                 strokeLinejoin="round"
               />
 
-              {/* Data Point Circles */}
-              {chartPoints.map((point) => (
-                <g key={point.date}>
-                  <circle
-                    cx={point.x}
-                    cy={point.y}
-                    r={hoveredPoint?.date === point.date ? 6 : 3.5}
-                    className="fill-card stroke-primary transition-all duration-150 cursor-pointer"
-                    strokeWidth={2}
-                    onMouseEnter={() =>
-                      setHoveredPoint({
-                        date: point.date,
-                        revenue: point.revenue,
-                        x: point.x,
-                        y: point.y,
-                      })
-                    }
-                  />
-                  {/* Date labels at bottom */}
-                  <text
-                    x={point.x}
-                    y={chartHeight - 12}
-                    textAnchor="middle"
-                    className="text-[11px] fill-muted-foreground font-mono font-medium"
-                  >
-                    {point.date.slice(5)}
-                  </text>
-                </g>
-              ))}
+              {/* Data Point Circles & Smart X-Axis Labels */}
+              {chartPoints.map((point, idx) => {
+                // Smart sampling for X-Axis labels to avoid overlapping on dense ranges
+                const step = series.length > 30 ? Math.ceil(series.length / 10) : series.length > 15 ? 2 : 1
+                const showXLabel = idx % step === 0 || idx === series.length - 1
+
+                return (
+                  <g key={point.date}>
+                    <circle
+                      cx={point.x}
+                      cy={point.y}
+                      r={hoveredPoint?.date === point.date ? 6 : 3.5}
+                      className="fill-card stroke-primary transition-all duration-150 cursor-pointer"
+                      strokeWidth={2}
+                      onMouseEnter={() =>
+                        setHoveredPoint({
+                          date: point.date,
+                          revenue: point.revenue,
+                          x: point.x,
+                          y: point.y,
+                        })
+                      }
+                    />
+                    {/* Date labels at bottom */}
+                    {showXLabel && (
+                      <text
+                        x={point.x}
+                        y={chartHeight - 12}
+                        textAnchor="middle"
+                        className="text-[11px] fill-muted-foreground font-mono font-medium"
+                      >
+                        {point.date.slice(5)}
+                      </text>
+                    )}
+                  </g>
+                )
+              })}
             </svg>
 
             {/* Interactive Tooltip */}
@@ -378,7 +382,9 @@ export default function Dashboard() {
                 }}
               >
                 <p className="font-mono text-[11px] text-muted-foreground">{hoveredPoint.date}</p>
-                <p className="font-bold font-mono text-primary mt-0.5">{formatPrice(hoveredPoint.revenue)}</p>
+                <p className="font-mono text-xs font-bold text-price mt-0.5">
+                  {formatPrice(hoveredPoint.revenue)}
+                </p>
               </div>
             )}
           </div>

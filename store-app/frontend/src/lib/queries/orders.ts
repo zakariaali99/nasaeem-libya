@@ -105,10 +105,13 @@ export function useVerifyPayment(orderId: string) {
   })
 }
 
-export function useDashboardStats() {
+export function useDashboardStats(days?: number | string) {
   return useQuery({
-    queryKey: ['dashboard'],
-    queryFn: async () => (await api.get<DashboardStats>('/admin/dashboard/')).data,
+    queryKey: ['dashboard', days],
+    queryFn: async () => {
+      const params = days ? { days } : undefined
+      return (await api.get<DashboardStats>('/admin/dashboard/', { params })).data
+    },
   })
 }
 

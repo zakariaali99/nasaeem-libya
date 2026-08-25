@@ -533,7 +533,9 @@ class DashboardStatsView(APIView):
     permission_classes = [IsAdminRole]
 
     def get(self, request):
-        stats = DashboardStatsSerializer().build()
+        days = request.GET.get("days")
+        timeframe = request.GET.get("timeframe")
+        stats = DashboardStatsSerializer().build(days=days, timeframe=timeframe)
         return Response({"data": stats})
 
 
@@ -543,7 +545,9 @@ class ExecutiveAnalyticsView(APIView):
     permission_classes = [IsAdminRole]
 
     def get(self, request):
-        data = ExecutiveAnalyticsSerializer().build()
+        days = request.GET.get("days")
+        timeframe = request.GET.get("timeframe")
+        data = ExecutiveAnalyticsSerializer().build(days=days, timeframe=timeframe)
         return Response({"data": data})
 
 

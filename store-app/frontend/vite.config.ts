@@ -12,28 +12,24 @@ export default defineConfig(({ mode }) => {
     resolve: { alias: { '@': path.resolve(__dirname, './src') } },
     server: {
       port: 5183,
-      strictPort: true,
+      strictPort: false,
       proxy: {
         '/api': {
-          target: env.VITE_API_URL || 'http://127.0.0.1:8010',
+          target: env.VITE_API_URL || 'http://127.0.0.1:8000',
           changeOrigin: true,
         },
         '/media': {
-          target: env.VITE_API_URL || 'http://127.0.0.1:8010',
+          target: env.VITE_API_URL || 'http://127.0.0.1:8000',
           changeOrigin: true,
         },
       },
     },
-    // `vite preview` serves the production build so the JS budget can be
-    // measured against real, minified, chunked output rather than dev modules.
-    // It is a build-time tool like `vite build` itself — nothing Node serves
-    // traffic in production; nginx does (see deploy/nginx.conf).
     preview: {
       port: 5184,
-      strictPort: true,
+      strictPort: false,
       proxy: {
-        '/api': { target: env.VITE_API_URL || 'http://127.0.0.1:8010', changeOrigin: true },
-        '/media': { target: env.VITE_API_URL || 'http://127.0.0.1:8010', changeOrigin: true },
+        '/api': { target: env.VITE_API_URL || 'http://127.0.0.1:8000', changeOrigin: true },
+        '/media': { target: env.VITE_API_URL || 'http://127.0.0.1:8000', changeOrigin: true },
       },
     },
     build: {

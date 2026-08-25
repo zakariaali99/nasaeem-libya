@@ -522,84 +522,109 @@ export default function WidgetBuilder() {
           )}
 
           {/* Live preview — the SAME renderers the storefront uses with device switcher */}
-          <section aria-label="معاينة مباشرة" className="rounded-xl border border-border bg-card p-5 shadow-xs space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
+          <section aria-label="معاينة مباشرة" className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-xs space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
               <div>
-                <h2 className="font-bold text-foreground">معاينة مباشرة للتخطيط</h2>
-                <p className="text-xs text-muted-foreground">شاهد كيف تبدو الواجهة على مختلف الأجهزة</p>
+                <div className="flex items-center gap-2">
+                  <div className="size-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <h2 className="font-bold text-foreground text-sm sm:text-base">معاينة مباشرة وتفاعلية للتخطيط</h2>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  شاهد التعديلات تنعكس فورياً كما ستظهر لزبائن المتجر على مختلف الشاشات
+                </p>
               </div>
 
               {/* Device Frame Switcher */}
-              <div className="flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+              <div className="flex items-center gap-1.5 rounded-2xl border border-border bg-muted/60 p-1.5 shadow-2xs">
                 <button
                   type="button"
                   onClick={() => setPreviewDevice('desktop')}
-                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+                  className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all ${
                     previewDevice === 'desktop'
-                      ? 'bg-card text-foreground shadow-2xs'
+                      ? 'bg-card text-foreground shadow-xs border border-border'
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  🖥️ شاشة كاملة
+                  🖥️ حاسوب (شاشة كاملة)
                 </button>
                 <button
                   type="button"
                   onClick={() => setPreviewDevice('tablet')}
-                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+                  className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all ${
                     previewDevice === 'tablet'
-                      ? 'bg-card text-foreground shadow-2xs'
+                      ? 'bg-card text-foreground shadow-xs border border-border'
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  📟 جهاز لوحي
+                  📟 جهاز لوحي (768px)
                 </button>
                 <button
                   type="button"
                   onClick={() => setPreviewDevice('mobile')}
-                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+                  className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all ${
                     previewDevice === 'mobile'
-                      ? 'bg-card text-foreground shadow-2xs'
+                      ? 'bg-card text-foreground shadow-xs border border-border'
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  📱 هاتف
+                  📱 هاتف ذكي (375px)
                 </button>
               </div>
             </div>
 
-            <div className="flex justify-center bg-muted/30 p-4 rounded-xl overflow-x-auto">
+            {/* Device Mockup Frame Container */}
+            <div className="flex justify-center bg-muted/30 p-3 sm:p-6 rounded-2xl overflow-x-auto border border-border/60">
               <div
-                className={`transition-all duration-300 space-y-4 overflow-hidden rounded-xl border border-border bg-background p-3 shadow-sm ${
+                className={`transition-all duration-300 overflow-hidden rounded-2xl border-2 border-border/80 bg-background shadow-lg ${
                   previewDevice === 'mobile'
                     ? 'w-[375px] shrink-0'
                     : previewDevice === 'tablet'
                     ? 'w-[768px] shrink-0'
-                    : 'w-full'
+                    : 'w-full max-w-5xl'
                 }`}
               >
-                {widgets.filter((w) => w.is_active).length === 0 ? (
-                  <p className="py-12 text-center text-sm text-muted-foreground">لا توجد أدوات نشطة للعرض</p>
-                ) : (
-                  widgets.filter((w) => w.is_active).map((widget, previewIndex) => (
-                    <WidgetRenderer
-                      key={widget.id ?? `preview-${previewIndex}`}
-                      widget={{
-                        id: widget.id ?? `preview-${previewIndex}`,
-                        type: widget.type as Widget['type'],
-                        data: widget.data as Widget['data'],
-                        order: previewIndex,
-                        is_active: true,
-                        style: null,
-                        targeting: null,
-                      }}
-                    />
-                  ))
-                )}
+                {/* Browser Mockup Chrome Bar */}
+                <div className="flex items-center justify-between border-b border-border bg-muted/40 px-3.5 py-2 text-[11px] text-muted-foreground">
+                  <div className="flex items-center gap-1.5">
+                    <span className="size-2.5 rounded-full bg-red-400/80" />
+                    <span className="size-2.5 rounded-full bg-amber-400/80" />
+                    <span className="size-2.5 rounded-full bg-emerald-400/80" />
+                  </div>
+                  <div className="flex items-center gap-1 font-mono text-[10px] bg-background/80 px-3 py-0.5 rounded-full border border-border/50 text-foreground">
+                    <span className="text-emerald-500">🔒</span>
+                    <span>nasaeemlibya.ly</span>
+                  </div>
+                  <span className="font-mono text-[10px] text-muted-foreground">
+                    {previewDevice === 'mobile' ? '375 × 812' : previewDevice === 'tablet' ? '768 × 1024' : '100%'}
+                  </span>
+                </div>
+
+                {/* Rendered Live Widgets Inside Mockup */}
+                <div className="p-3 sm:p-5 space-y-6">
+                  {widgets.filter((w) => w.is_active).length === 0 ? (
+                    <div className="py-16 text-center space-y-2">
+                      <p className="text-sm font-bold text-foreground">لا توجد أدوات نشطة للعرض حالياً</p>
+                      <p className="text-xs text-muted-foreground">قم بإضافة وتفعيل أدوات من القائمة الجانبية لتظهر في المعاينة.</p>
+                    </div>
+                  ) : (
+                    widgets.filter((w) => w.is_active).map((widget, previewIndex) => (
+                      <WidgetRenderer
+                        key={widget.id ?? `preview-${previewIndex}`}
+                        widget={{
+                          id: widget.id ?? `preview-${previewIndex}`,
+                          type: widget.type as Widget['type'],
+                          data: widget.data as Widget['data'],
+                          order: previewIndex,
+                          is_active: true,
+                          style: null,
+                          targeting: null,
+                        }}
+                      />
+                    ))
+                  )}
+                </div>
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">
-              الأدوات التي يملؤها النظام (منتجات، تصنيفات، مقترحات…) تُظهر محتواها بعد الحفظ على الصفحة الرئيسية الفعلية.
-            </p>
           </section>
         </div>
       </div>

@@ -28,4 +28,6 @@ test-results/
 .idea/
 .vscode/
 *.log
+backups/
+store-app/backend/backups/
 

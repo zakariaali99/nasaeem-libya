@@ -22,4 +22,6 @@ urlpatterns = [
         name="auth-password-reset-confirm",
     ),
     path("admin/users/<uuid:user_id>/", views.AdminUserDetailView.as_view(), name="admin-user-detail"),
+    path("admin/staff/", views.AdminStaffListView.as_view(), name="admin-staff-list"),
+    path("admin/staff/<uuid:user_id>/", views.AdminStaffDetailView.as_view(), name="admin-staff-detail"),
 ]

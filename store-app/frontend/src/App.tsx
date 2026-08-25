@@ -79,6 +79,8 @@ const AdminCustomization = lazy(() => import('@/pages/admin/AdminCustomization')
 const WidgetBuilder = lazy(() => import('@/pages/admin/WidgetBuilder'))
 const AdminAbandonedCarts = lazy(() => import('@/pages/admin/marketing/AbandonedCarts'))
 const AdminExecutiveAnalytics = lazy(() => import('@/pages/admin/analytics/ExecutiveAnalytics'))
+const AdminStaff = lazy(() => import('@/pages/admin/AdminStaff'))
+const AdminBackups = lazy(() => import('@/pages/admin/AdminBackups'))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -158,6 +160,9 @@ const router = createBrowserRouter([
               { path: 'orders/:orderIdOrNumber/invoice', element: withSuspense(<AdminOrderInvoice />) },
               { path: 'users', element: withSuspense(<AdminUsers />) },
               { path: 'users/:userId', element: withSuspense(<AdminUserDetail />) },
+              { path: 'staff', element: withSuspense(<AdminStaff />) },
+              { path: 'backup', element: withSuspense(<AdminBackups />) },
+              { path: 'backups', element: withSuspense(<AdminBackups />) },
               { path: 'discounts', element: withSuspense(<AdminDiscounts />) },
               { path: 'discounts/new', element: withSuspense(<DiscountForm />) },
               { path: 'discounts/:id', element: withSuspense(<DiscountEditPage />) },

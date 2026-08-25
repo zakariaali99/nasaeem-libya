@@ -285,3 +285,131 @@ class AdminUserListView(APIView):
         paginator = StandardPagination()
         page = paginator.paginate_queryset(users, request, view=self)
         return paginator.get_paginated_response(UserSerializer(page, many=True).data)
+
+
+class AdminStaffListView(APIView):
+    permission_classes = [IsAdminRole]
+
+    def get(self, request):
+        staff_roles = [Role.SUPPORT, Role.STAFF, Role.MANAGER, Role.ADMIN, Role.OWNER]
+        qs = User.objects.filter(Q(role__in=staff_roles) | Q(is_staff=True)).order_by("-date_joined")
+
+        if search := request.query_params.get("search", "").strip():
+            qs = qs.filter(
+                Q(phone_number__icontains=search) | Q(name__icontains=search) | Q(email__icontains=search)
+            )
+
+        if role := request.query_params.get("role", "").strip():
+            qs = qs.filter(role=role)
+
+        data = UserSerializer(qs, many=True).data
+        return Response({"items": data, "total": len(data)})
+
+    def post(self, request):
+        # Only admin or owner can create new staff
+        if request.user.role not in (Role.ADMIN, Role.OWNER) and not request.user.is_superuser:
+            return Response(
+                {"error": "فقط مدير النظام يمكنه إنشاء حسابات موظفين جديدة."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        phone = request.data.get("phone_number", "").strip()
+        name = request.data.get("name", "").strip()
+        email = request.data.get("email", "").strip() or None
+        role = request.data.get("role", Role.STAFF).strip()
+        password = request.data.get("password", "").strip()
+
+        if not phone or not password or not name:
+            return Response(
+                {"error": "الاسم، ورقم الهاتف، وكلمة المرور مطلوبة لإنشاء حساب الموظف."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if User.objects.filter(phone_number=phone).exists():
+            return Response(
+                {"error": "رقم الهاتف مسجل مسبقاً في النظام."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if email and User.objects.filter(email=email).exists():
+            return Response(
+                {"error": "البريد الإلكتروني مسجل مسبقاً."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        valid_roles = [Role.SUPPORT, Role.STAFF, Role.MANAGER, Role.ADMIN]
+        if role not in valid_roles:
+            role = Role.STAFF
+
+        user = User.objects.create(
+            phone_number=phone,
+            name=name,
+            email=email,
+            role=role,
+            is_staff=True,
+            is_active=True,
+            phone_verified=True,
+        )
+        user.set_password(password)
+        user.save()
+
+        logger.info("New staff created id=%s phone=%s by=%s", user.id, user.phone_number, request.user.phone_number)
+        return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
+
+
+class AdminStaffDetailView(APIView):
+    permission_classes = [IsAdminRole]
+
+    def patch(self, request, user_id):
+        if request.user.role not in (Role.ADMIN, Role.OWNER) and not request.user.is_superuser:
+            return Response(
+                {"error": "فقط مدير النظام يمكنه تعديل حسابات وصلاحيات الموظفين."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        user = User.objects.filter(pk=user_id).first()
+        if not user:
+            return Response({"error": "الموظف غير موجود."}, status=status.HTTP_404_NOT_FOUND)
+
+        data = request.data
+        if "name" in data:
+            user.name = data["name"].strip()
+        if "email" in data:
+            email_val = data["email"].strip() if data["email"] else None
+            if email_val and User.objects.filter(email=email_val).exclude(pk=user.pk).exists():
+                return Response({"error": "البريد الإلكتروني مستخدم بالفعل."}, status=status.HTTP_400_BAD_REQUEST)
+            user.email = email_val
+        if "role" in data and data["role"] in [Role.SUPPORT, Role.STAFF, Role.MANAGER, Role.ADMIN]:
+            user.role = data["role"]
+        if "is_active" in data:
+            if user.pk == request.user.pk and not data["is_active"]:
+                return Response({"error": "لا يمكنك تعطيل حسابك الشخصي."}, status=status.HTTP_400_BAD_REQUEST)
+            user.is_active = bool(data["is_active"])
+        if "password" in data and data["password"].strip():
+            user.set_password(data["password"].strip())
+
+        user.save()
+        return Response(UserSerializer(user).data)
+
+    def delete(self, request, user_id):
+        if request.user.role not in (Role.ADMIN, Role.OWNER) and not request.user.is_superuser:
+            return Response(
+                {"error": "فقط مدير النظام يمكنه حذف حسابات الموظفين."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        user = User.objects.filter(pk=user_id).first()
+        if not user:
+            return Response({"error": "الموظف غير موجود."}, status=status.HTTP_404_NOT_FOUND)
+
+        if user.pk == request.user.pk:
+            return Response({"error": "لا يمكنك حذف حسابك الشخصي الحالي."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if user.role == Role.OWNER or user.is_superuser:
+            return Response({"error": "لا يمكن حذف حساب مالك النظام."}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.is_active = False
+        user.role = Role.CUSTOMER
+        user.is_staff = False
+        user.save(update_fields=["is_active", "role", "is_staff"])
+        return Response({"deleted": True, "message": "تم إيقاف حساب الموظف وسحب الصلاحيات الإدارية."})

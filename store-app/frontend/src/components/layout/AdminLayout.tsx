@@ -1,4 +1,5 @@
 import {
+  Archive,
   ArrowUpRight,
   BarChart3,
   Blocks,
@@ -23,6 +24,7 @@ import {
   Tags,
   Truck,
   User,
+  UserCog,
   Users,
   Wallet,
   X,
@@ -75,14 +77,21 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    title: 'الشحن والمدفوعات',
+    title: 'الشحن والمالية',
     items: [
       { to: '/admin/cities', label: 'المدن والمناطق', icon: MapPin },
       { to: '/admin/delivery', label: 'شركات التوصيل', icon: Truck },
       { to: '/admin/delivery/reconciliation', label: 'مطابقة كشوفات COD', icon: FileSpreadsheet },
       { to: '/admin/payment_methods', label: 'بوابات الدفع', icon: CreditCard },
       { to: '/admin/ledger', label: 'دفتر الأستاذ والتسويات', icon: Wallet },
+    ],
+  },
+  {
+    title: 'التخصيص وإدارة النظام',
+    items: [
       { to: '/admin/customization', label: 'محرر الواجهة والقوالب', icon: Blocks },
+      { to: '/admin/staff', label: 'فريق العمل والموظفون', icon: UserCog },
+      { to: '/admin/backup', label: 'النسخ الاحتياطي للنظام', icon: Archive },
     ],
   },
 ]

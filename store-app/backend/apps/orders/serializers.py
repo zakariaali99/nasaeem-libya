@@ -267,6 +267,10 @@ class DashboardStatsSerializer(serializers.Serializer):
         from datetime import datetime, timedelta
         from decimal import Decimal
 
+    def build(self, days=14, timeframe=None, start_date=None, end_date=None):
+        from datetime import datetime, timedelta
+        from decimal import Decimal
+
         from django.db.models import F, Sum, Count
         from django.utils import timezone
 
@@ -277,22 +281,50 @@ class DashboardStatsSerializer(serializers.Serializer):
         today = timezone.localtime().date()
         month_start = today.replace(day=1)
 
-        # Parse days / timeframe parameter
-        num_days = 14
-        if timeframe == "7" or days == 7 or days == "7":
+        # Parse custom start/end dates or timeframe presets
+        parsed_end = today
+        if end_date:
+            try:
+                parsed_end = datetime.strptime(str(end_date).strip()[:10], "%Y-%m-%d").date()
+            except Exception:
+                parsed_end = today
+
+        parsed_start = None
+        if start_date:
+            try:
+                parsed_start = datetime.strptime(str(start_date).strip()[:10], "%Y-%m-%d").date()
+            except Exception:
+                parsed_start = None
+
+        if parsed_start and parsed_end and parsed_start <= parsed_end:
+            num_days = min((parsed_end - parsed_start).days + 1, 366)
+        elif days == "7" or timeframe == "7":
             num_days = 7
-        elif timeframe == "30" or days == 30 or days == "30":
+            parsed_start = today - timedelta(days=6)
+        elif days == "14" or timeframe == "14":
+            num_days = 14
+            parsed_start = today - timedelta(days=13)
+        elif days == "30" or timeframe == "30":
             num_days = 30
-        elif timeframe == "90" or days == 90 or days == "90":
+            parsed_start = today - timedelta(days=29)
+        elif days == "90" or timeframe == "90":
             num_days = 90
-        elif timeframe == "365" or days == 365 or days == "365":
+            parsed_start = today - timedelta(days=89)
+        elif days == "365" or timeframe == "365" or days == "year" or timeframe == "year":
             num_days = 365
+            parsed_start = today - timedelta(days=364)
         elif timeframe == "month" or days == "month":
-            num_days = max(1, today.day)
+            parsed_start = month_start
+            num_days = (today - month_start).days + 1
         elif isinstance(days, int) and days > 0:
             num_days = min(days, 365)
-        elif isinstance(days, str) and days.isdigit():
+            parsed_start = today - timedelta(days=num_days - 1)
+        elif isinstance(days, str) and days.isdigit() and int(days) > 0:
             num_days = min(int(days), 365)
+            parsed_start = today - timedelta(days=num_days - 1)
+        else:
+            num_days = 14
+            parsed_start = today - timedelta(days=13)
 
         by_status = dict(
             Order.objects.values_list("status").annotate(c=Count("id"))
@@ -302,15 +334,29 @@ class DashboardStatsSerializer(serializers.Serializer):
             .aggregate(s=Sum("total"))["s"]
         ) or Decimal("0.00")
 
-        # Build dynamic time series for the requested date window
+        # Build dynamic time series for the requested date window (Single Query Aggregation)
+        from django.db.models.functions import TruncDate
+        daily_stats = (
+            Order.objects.filter(created_at__date__gte=parsed_start, created_at__date__lte=parsed_end)
+            .annotate(day=TruncDate("created_at"))
+            .values("day")
+            .annotate(day_rev=Sum("total"), day_orders=Count("id"))
+        )
+        stats_map = {
+            row["day"]: (row["day_rev"] or Decimal("0.00"), row["day_orders"] or 0)
+            for row in daily_stats
+            if row["day"]
+        }
+
         series = []
-        for offset in range(num_days - 1, -1, -1):
-            day = today - timedelta(days=offset)
-            rows = Order.objects.filter(created_at__date=day)
-            day_rev = rows.aggregate(s=Sum("total"))["s"] or Decimal("0.00")
+        for offset in range(num_days):
+            day = parsed_start + timedelta(days=offset)
+            if day > parsed_end:
+                break
+            day_rev, day_orders = stats_map.get(day, (Decimal("0.00"), 0))
             series.append({
                 "date": day.isoformat(),
-                "orders": rows.count(),
+                "orders": day_orders,
                 "revenue": str(day_rev),
             })
 
@@ -334,6 +380,8 @@ class DashboardStatsSerializer(serializers.Serializer):
             "low_stock": Product.objects.filter(track_quantity=True).filter(
                 stock__lte=F("reserved_stock") + 5,
             ).count(),
+            "start_date": parsed_start.isoformat() if parsed_start else None,
+            "end_date": parsed_end.isoformat() if parsed_end else None,
             "timeframe_days": num_days,
             "timeframe_revenue": str(timeframe_revenue),
             "timeframe_orders": timeframe_orders,
@@ -344,8 +392,8 @@ class DashboardStatsSerializer(serializers.Serializer):
 class ExecutiveAnalyticsSerializer(serializers.Serializer):
     """Deep Business Intelligence, Profitability, City Cohorts & Retention Metrics (100% Real Live Data)."""
 
-    def build(self, days=None, timeframe=None):
-        from datetime import timedelta
+    def build(self, days=None, timeframe=None, start_date=None, end_date=None):
+        from datetime import datetime, timedelta
         from decimal import Decimal
         from django.db.models import Count, F, Sum, Avg
         from django.utils import timezone
@@ -353,31 +401,51 @@ class ExecutiveAnalyticsSerializer(serializers.Serializer):
         from apps.orders.models import Order, OrderItem, OrderStatus
 
         today = timezone.localtime().date()
+        month_start = today.replace(day=1)
 
-        # Parse timeframe window
-        start_date = None
-        num_days = None
-        if days == "7" or timeframe == "7":
+        # Parse custom start/end dates or timeframe presets
+        parsed_end = today
+        if end_date:
+            try:
+                parsed_end = datetime.strptime(str(end_date).strip()[:10], "%Y-%m-%d").date()
+            except Exception:
+                parsed_end = today
+
+        parsed_start = None
+        if start_date:
+            try:
+                parsed_start = datetime.strptime(str(start_date).strip()[:10], "%Y-%m-%d").date()
+            except Exception:
+                parsed_start = None
+
+        if parsed_start and parsed_end and parsed_start <= parsed_end:
+            num_days = min((parsed_end - parsed_start).days + 1, 366)
+        elif days == "7" or timeframe == "7":
             num_days = 7
-            start_date = today - timedelta(days=7)
+            parsed_start = today - timedelta(days=6)
+        elif days == "14" or timeframe == "14":
+            num_days = 14
+            parsed_start = today - timedelta(days=13)
         elif days == "30" or timeframe == "30":
             num_days = 30
-            start_date = today - timedelta(days=30)
+            parsed_start = today - timedelta(days=29)
         elif days == "90" or timeframe == "90":
             num_days = 90
-            start_date = today - timedelta(days=90)
+            parsed_start = today - timedelta(days=89)
         elif days == "365" or timeframe == "365" or days == "year" or timeframe == "year":
             num_days = 365
-            start_date = today - timedelta(days=365)
+            parsed_start = today - timedelta(days=364)
         elif days == "month" or timeframe == "month":
-            start_date = today.replace(day=1)
-            num_days = max(1, today.day)
+            parsed_start = month_start
+            num_days = (today - month_start).days + 1
         elif isinstance(days, int) and days > 0:
-            num_days = days
-            start_date = today - timedelta(days=days)
+            num_days = min(days, 365)
+            parsed_start = today - timedelta(days=num_days - 1)
         elif isinstance(days, str) and days.isdigit() and int(days) > 0:
-            num_days = int(days)
-            start_date = today - timedelta(days=int(days))
+            num_days = min(int(days), 365)
+            parsed_start = today - timedelta(days=num_days - 1)
+        else:
+            num_days = None
 
         # Base Query for Confirmed / Legitimate Orders in window
         confirmed_orders = Order.objects.filter(
@@ -385,9 +453,15 @@ class ExecutiveAnalyticsSerializer(serializers.Serializer):
         )
         all_window_orders = Order.objects.all()
 
-        if start_date:
-            confirmed_orders = confirmed_orders.filter(created_at__date__gte=start_date)
-            all_window_orders = all_window_orders.filter(created_at__date__gte=start_date)
+        if parsed_start:
+            confirmed_orders = confirmed_orders.filter(
+                created_at__date__gte=parsed_start,
+                created_at__date__lte=parsed_end,
+            )
+            all_window_orders = all_window_orders.filter(
+                created_at__date__gte=parsed_start,
+                created_at__date__lte=parsed_end,
+            )
 
         # 1. Real Financial Overview
         total_orders_count = confirmed_orders.count()
@@ -543,22 +617,40 @@ class ExecutiveAnalyticsSerializer(serializers.Serializer):
                 "revenue": str(d["revenue"] or Decimal("0.00")),
             })
 
-        # 8. Dynamic Periodic Trend Series
-        trend_days = num_days or 14
+        # 8. Dynamic Periodic Trend Series (Chronological Order - Single Query Aggregation)
+        trend_start = parsed_start or (today - timedelta(days=13))
+        trend_days_count = min(num_days or 14, 366)
+        
+        from django.db.models.functions import TruncDate
+        exec_daily_stats = (
+            confirmed_orders.filter(created_at__date__gte=trend_start, created_at__date__lte=parsed_end)
+            .annotate(day=TruncDate("created_at"))
+            .values("day")
+            .annotate(day_rev=Sum("total"), day_orders=Count("id"))
+        )
+        exec_stats_map = {
+            row["day"]: (row["day_rev"] or Decimal("0.00"), row["day_orders"] or 0)
+            for row in exec_daily_stats
+            if row["day"]
+        }
+
         trend_series = []
-        for offset in range(trend_days - 1, -1, -1):
-            day = today - timedelta(days=offset)
-            d_orders = confirmed_orders.filter(created_at__date=day)
-            d_rev = d_orders.aggregate(s=Sum("total"))["s"] or Decimal("0.00")
+        for offset in range(trend_days_count):
+            day = trend_start + timedelta(days=offset)
+            if day > parsed_end:
+                break
+            day_rev, day_orders = exec_stats_map.get(day, (Decimal("0.00"), 0))
             trend_series.append({
                 "date": day.isoformat(),
-                "orders": d_orders.count(),
-                "revenue": str(d_rev),
+                "orders": day_orders,
+                "revenue": str(day_rev),
             })
 
         return {
             "timeframe": timeframe or (str(num_days) if num_days else "all"),
             "timeframe_days": num_days,
+            "start_date": parsed_start.isoformat() if parsed_start else None,
+            "end_date": parsed_end.isoformat() if parsed_end else None,
             "total_revenue": str(total_revenue),
             "estimated_profit": str(estimated_profit),
             "total_orders_count": total_orders_count,

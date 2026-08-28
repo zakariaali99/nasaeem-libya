@@ -185,9 +185,9 @@ export function AdminLayout() {
       {/* Desktop & Mobile Sidebar Drawer */}
       <aside
         className={cn(
-          'border-border bg-sidebar text-sidebar-foreground transition-all duration-300 z-50',
-          // Desktop styles
-          'md:sticky md:top-0 md:flex md:h-dvh md:shrink-0 md:flex-col md:border-e',
+          'border-border bg-sidebar text-sidebar-foreground transition-all duration-300 z-40',
+          // Desktop Fixed sidebar styles
+          'md:fixed md:inset-y-0 md:right-0 md:flex md:h-screen md:flex-col md:border-s',
           isCollapsed ? 'md:w-20' : 'md:w-64',
           // Mobile Off-Canvas Drawer from the RIGHT (RTL start)
           mobileOpen
@@ -383,8 +383,13 @@ export function AdminLayout() {
         </div>
       </aside>
 
-      {/* Main Content Area */}
-      <div className="flex min-w-0 flex-1 flex-col w-full max-w-full overflow-x-clip">
+      {/* Main Content Area - with dynamic right offset for fixed sidebar */}
+      <div
+        className={cn(
+          'flex min-w-0 flex-1 flex-col w-full max-w-full overflow-x-clip transition-all duration-300 min-h-screen',
+          isCollapsed ? 'md:mr-20' : 'md:mr-64',
+        )}
+      >
         {/* Desktop Top Header Bar */}
         <header className="hidden md:flex h-16 items-center justify-between border-b border-border bg-card/80 backdrop-blur-md px-6 sticky top-0 z-20">
           <div className="flex items-center gap-4 min-w-0">

@@ -535,7 +535,14 @@ class DashboardStatsView(APIView):
     def get(self, request):
         days = request.GET.get("days")
         timeframe = request.GET.get("timeframe")
-        stats = DashboardStatsSerializer().build(days=days, timeframe=timeframe)
+        start_date = request.GET.get("start_date")
+        end_date = request.GET.get("end_date")
+        stats = DashboardStatsSerializer().build(
+            days=days,
+            timeframe=timeframe,
+            start_date=start_date,
+            end_date=end_date,
+        )
         return Response({"data": stats})
 
 
@@ -547,7 +554,14 @@ class ExecutiveAnalyticsView(APIView):
     def get(self, request):
         days = request.GET.get("days")
         timeframe = request.GET.get("timeframe")
-        data = ExecutiveAnalyticsSerializer().build(days=days, timeframe=timeframe)
+        start_date = request.GET.get("start_date")
+        end_date = request.GET.get("end_date")
+        data = ExecutiveAnalyticsSerializer().build(
+            days=days,
+            timeframe=timeframe,
+            start_date=start_date,
+            end_date=end_date,
+        )
         return Response({"data": data})
 
 
@@ -872,20 +886,49 @@ class AdminAbandonedCartsView(APIView):
 
     def get(self, request):
         from datetime import timedelta
+        from django.db.models import Count, Q
         from django.utils import timezone
         import urllib.parse
 
-        # Baskets with items not updated for 15+ minutes and not yet completed
-        cutoff = timezone.now() - timedelta(minutes=15)
-        carts = Cart.objects.filter(
-            items__isnull=False,
-            updated_at__lte=cutoff,
-        ).distinct().select_related("user").prefetch_related("items__product")
+        # Baskets with items not updated for N minutes (default 15) and not yet checked out
+        minutes_param = request.query_params.get("minutes", "15")
+        try:
+            minutes = max(0, int(minutes_param))
+        except (ValueError, TypeError):
+            minutes = 15
+
+        status_filter = request.query_params.get("status", "all").strip().lower()
+        search_query = request.query_params.get("q", "").strip()
+
+        cutoff = timezone.now() - timedelta(minutes=minutes)
+        carts_qs = (
+            Cart.objects.annotate(num_items=Count("items"))
+            .filter(num_items__gt=0, updated_at__lte=cutoff)
+            .distinct()
+            .select_related("user")
+            .prefetch_related("items__product")
+        )
+
+        if status_filter == "recovered":
+            carts_qs = carts_qs.filter(is_recovered=True)
+        elif status_filter == "reminded":
+            carts_qs = carts_qs.filter(is_recovered=False, recovery_sms_sent_at__isnull=False)
+        elif status_filter == "pending":
+            carts_qs = carts_qs.filter(is_recovered=False, recovery_sms_sent_at__isnull=True)
+
+        if search_query:
+            carts_qs = carts_qs.filter(
+                Q(customer_name__icontains=search_query)
+                | Q(phone_number__icontains=search_query)
+                | Q(user__name__icontains=search_query)
+                | Q(user__phone_number__icontains=search_query)
+                | Q(items__product__name__icontains=search_query)
+            ).distinct()
 
         total_abandoned_val = Decimal("0.00")
         cart_rows = []
 
-        for cart in carts:
+        for cart in carts_qs:
             items_list = []
             cart_total = Decimal("0.00")
             for ci in cart.items.all():
@@ -959,10 +1002,22 @@ class AdminSendAbandonedCartWhatsAppView(APIView):
     def post(self, request, pk):
         from django.utils import timezone
         import urllib.parse
+        from apps.orders.models import Discount, DiscountType
 
         cart = Cart.objects.filter(id=pk).first()
         if cart is None:
             return Response({"message": "السلة غير موجودة"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Ensure NASAEEM5 recovery discount code is active in the database
+        Discount.objects.get_or_create(
+            code="NASAEEM5",
+            defaults={
+                "name": "كوبون استرجاع السلة 5%",
+                "type": DiscountType.PERCENTAGE,
+                "percentage": Decimal("5.00"),
+                "is_active": True,
+            },
+        )
 
         cart.recovery_sms_sent_at = timezone.now()
         cart.recovery_discount_code = "NASAEEM5"

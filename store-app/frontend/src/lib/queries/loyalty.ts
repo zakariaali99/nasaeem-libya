@@ -7,7 +7,7 @@ export function useLoyaltySummary() {
   return useQuery({
     queryKey: ['loyalty-summary'],
     queryFn: async () => {
-      const res = await api.get<LoyaltySummary>('/orders/loyalty/me/')
+      const res = await api.get<LoyaltySummary>('/loyalty/me/')
       return res.data
     },
   })

@@ -105,11 +105,19 @@ export function useVerifyPayment(orderId: string) {
   })
 }
 
-export function useDashboardStats(days?: number | string) {
+export function useDashboardStats(
+  paramsInput?: number | string | { days?: number | string; start_date?: string; end_date?: string },
+) {
+  const params =
+    typeof paramsInput === 'object' && paramsInput !== null
+      ? paramsInput
+      : paramsInput !== undefined
+      ? { days: paramsInput }
+      : undefined
+
   return useQuery({
-    queryKey: ['dashboard', days],
+    queryKey: ['dashboard', params],
     queryFn: async () => {
-      const params = days ? { days } : undefined
       return (await api.get<DashboardStats>('/admin/dashboard/', { params })).data
     },
   })

@@ -37,7 +37,11 @@ urlpatterns = [
 
     # Plan 08 — VIP Loyalty Engine & Abandoned Cart Recovery
     path("loyalty/me/", views.LoyaltySummaryView.as_view(), name="loyalty-me"),
+    path("orders/loyalty/me/", views.LoyaltySummaryView.as_view(), name="orders-loyalty-me"),
     path("admin/marketing/abandoned-carts/", views.AdminAbandonedCartsView.as_view(), name="admin-abandoned-carts"),
     path("admin/marketing/abandoned-carts/<uuid:pk>/send-whatsapp/", views.AdminSendAbandonedCartWhatsAppView.as_view(), name="admin-abandoned-cart-send-wa"),
     path("admin/marketing/abandoned-carts/<uuid:pk>/mark-recovered/", views.AdminMarkAbandonedCartRecoveredView.as_view(), name="admin-abandoned-cart-mark-recovered"),
+    path("orders/admin/marketing/abandoned-carts/", views.AdminAbandonedCartsView.as_view(), name="orders-admin-abandoned-carts"),
+    path("orders/admin/marketing/abandoned-carts/<uuid:pk>/send-whatsapp/", views.AdminSendAbandonedCartWhatsAppView.as_view(), name="orders-admin-abandoned-cart-send-wa"),
+    path("orders/admin/marketing/abandoned-carts/<uuid:pk>/mark-recovered/", views.AdminMarkAbandonedCartRecoveredView.as_view(), name="orders-admin-abandoned-cart-mark-recovered"),
 ]

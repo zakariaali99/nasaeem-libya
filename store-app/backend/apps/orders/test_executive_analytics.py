@@ -132,6 +132,33 @@ def test_dashboard_stats_with_dynamic_days(api_client, admin_user, executive_dat
     assert len(data["series"]) == 7
 
 
+@pytest.mark.django_db
+def test_custom_date_range_endpoints(api_client, admin_user, executive_dataset):
+    from django.utils import timezone
+    from datetime import timedelta
+    today = timezone.localtime().date()
+    start_str = (today - timedelta(days=10)).isoformat()
+    end_str = today.isoformat()
+
+    api_client.force_authenticate(user=admin_user)
+
+    # 1. Executive Analytics with start_date & end_date
+    res_exec = api_client.get(f"/api/admin/analytics/executive/?start_date={start_str}&end_date={end_str}")
+    assert res_exec.status_code == 200
+    exec_data = res_exec.data["data"]
+    assert exec_data["start_date"] == start_str
+    assert exec_data["end_date"] == end_str
+    assert len(exec_data["trend_series"]) == 11
+
+    # 2. Dashboard Stats with start_date & end_date
+    res_dash = api_client.get(f"/api/admin/dashboard/?start_date={start_str}&end_date={end_str}")
+    assert res_dash.status_code == 200
+    dash_data = res_dash.data["data"]
+    assert dash_data["start_date"] == start_str
+    assert dash_data["end_date"] == end_str
+    assert len(dash_data["series"]) == 11
+
+
 def test_telegram_order_alert_formatting(executive_dataset):
     o1, _ = executive_dataset
     msg = format_order_telegram_message(o1)
@@ -139,3 +166,59 @@ def test_telegram_order_alert_formatting(executive_dataset):
     assert "طرابلس" in msg
     assert "كلوب دي نوي إنتنس" in msg
     assert "الدفع عند الاستلام كاش" in msg
+
+
+@pytest.mark.django_db
+def test_long_date_range_performance_and_series(api_client, admin_user, executive_dataset):
+    api_client.force_authenticate(user=admin_user)
+    res = api_client.get("/api/admin/analytics/executive/?start_date=2026-01-01&end_date=2026-08-30")
+    assert res.status_code == 200
+    data = res.data["data"]
+    assert data["start_date"] == "2026-01-01"
+    assert data["end_date"] == "2026-08-30"
+    assert len(data["trend_series"]) == 242
+    assert data["trend_series"][0]["date"] == "2026-01-01"
+    assert data["trend_series"][-1]["date"] == "2026-08-30"
+
+
+@pytest.mark.django_db
+def test_abandoned_carts_workflow_and_aliases(api_client, admin_user, executive_dataset):
+    from apps.orders.models import Cart, CartItem
+    from apps.catalog.models import Product
+    from django.utils import timezone
+    from datetime import timedelta
+
+    prod = Product.objects.filter(is_active=True).first()
+    cart = Cart.objects.create(
+        phone_number="0913334455",
+        customer_name="عميل سلة متروكة",
+    )
+    CartItem.objects.create(cart=cart, product=prod, quantity=2)
+    # Set cart updated_at in past (e.g. 30 minutes ago)
+    Cart.objects.filter(id=cart.id).update(updated_at=timezone.now() - timedelta(minutes=30))
+
+    api_client.force_authenticate(user=admin_user)
+
+    # 1. Main endpoint
+    res = api_client.get("/api/admin/marketing/abandoned-carts/")
+    assert res.status_code == 200
+    assert res.data["data"]["stats"]["abandoned_count"] >= 1
+    assert any(c["id"] == str(cart.id) for c in res.data["data"]["carts"])
+
+    # 2. Alias endpoint
+    res_alias = api_client.get("/api/orders/admin/marketing/abandoned-carts/")
+    assert res_alias.status_code == 200
+    assert any(c["id"] == str(cart.id) for c in res_alias.data["data"]["carts"])
+
+    # 3. Trigger WhatsApp reminder
+    res_wa = api_client.post(f"/api/admin/marketing/abandoned-carts/{cart.id}/send-whatsapp/")
+    assert res_wa.status_code == 200
+    assert "whatsapp_link" in res_wa.data
+    assert "NASAEEM5" in res_wa.data["whatsapp_link"]
+
+    # 4. Mark recovered
+    res_rec = api_client.post(f"/api/admin/marketing/abandoned-carts/{cart.id}/mark-recovered/")
+    assert res_rec.status_code == 200
+    cart.refresh_from_db()
+    assert cart.is_recovered is True
+

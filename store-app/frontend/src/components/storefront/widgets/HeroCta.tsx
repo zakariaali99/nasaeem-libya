@@ -23,7 +23,11 @@ export function HeroCta({ widget, priority = false }: { widget: Widget; priority
     mobileImageUrl,
   } = widget.data
 
-  if (!title && !subtitle && !buttonLabel && !desktopImageUrl && !mobileImageUrl) return null
+  const displayTitle = title || 'عطور شرقية وعالمية فاخرة'
+  const displaySubtitle =
+    subtitle || 'اكتشف أرقى العطور النيش والعالمية مع ضمان الجودة 100% والتوصيل الفوري لجميع المدن الليبية'
+  const displayButtonLabel = buttonLabel || 'استكشف التشكيلة الحصرية'
+  const displayButtonUrl = buttonUrl || '/products'
 
   const hasImage = Boolean(desktopImageUrl || mobileImageUrl)
 
@@ -37,7 +41,7 @@ export function HeroCta({ widget, priority = false }: { widget: Widget; priority
             ) : null}
             <img
               src={String(desktopImageUrl || mobileImageUrl)}
-              alt={String(title || 'نسائم ليبيا')}
+              alt={String(displayTitle)}
               width={1200}
               height={500}
               loading={priority ? 'eager' : 'lazy'}
@@ -67,7 +71,7 @@ export function HeroCta({ widget, priority = false }: { widget: Widget; priority
 
       <div
         className={cn(
-          'relative z-10 flex flex-col gap-6 px-6 py-14 sm:px-12 sm:py-20 max-w-4xl mx-auto',
+          'relative z-10 flex flex-col gap-6 px-6 py-12 sm:px-12 sm:py-16 max-w-4xl mx-auto',
           ALIGN[alignment ?? 'center'],
         )}
       >
@@ -81,47 +85,30 @@ export function HeroCta({ widget, priority = false }: { widget: Widget; priority
 
         {/* Hero Title & Subtitle */}
         <div className="space-y-3">
-          {title ? (
-            <h2 className="text-3xl font-black leading-tight tracking-tight sm:text-5xl lg:text-6xl text-background drop-shadow-sm">
-              {title}
-            </h2>
-          ) : null}
-          {subtitle ? (
-            <p className="max-w-2xl text-sm sm:text-lg leading-relaxed text-background/70 font-normal">
-              {subtitle}
-            </p>
-          ) : null}
+          <h2 className="text-3xl font-black leading-tight tracking-tight sm:text-5xl lg:text-6xl text-background drop-shadow-sm">
+            {displayTitle}
+          </h2>
+          <p className="max-w-2xl text-sm sm:text-lg leading-relaxed text-background/80 font-normal">
+            {displaySubtitle}
+          </p>
         </div>
 
         {/* CTA Buttons */}
         <div className="flex flex-wrap items-center gap-3 pt-2">
-          {buttonLabel && buttonUrl ? (
-            <Button
-              asChild
-              size="lg"
-              className="rounded-2xl font-extrabold text-sm sm:text-base px-8 h-13 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/25 gap-2 transition-all hover:scale-[1.02]"
-            >
-              <Link to={buttonUrl}>
-                <ShoppingBag className="size-5" />
-                <span>{buttonLabel}</span>
-              </Link>
-            </Button>
-          ) : (
-            <Button
-              asChild
-              size="lg"
-              className="rounded-2xl font-extrabold text-sm sm:text-base px-8 h-13 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/25 gap-2 transition-all hover:scale-[1.02]"
-            >
-              <Link to="/products">
-                <ShoppingBag className="size-5" />
-                <span>تصفّح تشكيلة العطور</span>
-              </Link>
-            </Button>
-          )}
+          <Button
+            asChild
+            size="lg"
+            className="rounded-2xl font-extrabold text-sm sm:text-base px-8 h-12 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/25 gap-2 transition-all hover:scale-[1.02]"
+          >
+            <Link to={displayButtonUrl}>
+              <ShoppingBag className="size-5" />
+              <span>{displayButtonLabel}</span>
+            </Link>
+          </Button>
 
           <Link
             to="/collections"
-            className="inline-flex h-13 items-center gap-2 rounded-2xl border border-secondary-foreground/20 bg-secondary-foreground/5 px-6 text-sm font-bold text-secondary-foreground hover:bg-secondary-foreground/10 hover:border-secondary-foreground/40 transition-all backdrop-blur-sm"
+            className="inline-flex h-12 items-center gap-2 rounded-2xl border border-secondary-foreground/20 bg-secondary-foreground/5 px-6 text-sm font-bold text-secondary-foreground hover:bg-secondary-foreground/10 hover:border-secondary-foreground/40 transition-all backdrop-blur-sm"
           >
             <span>أحدث المجموعات والعروض</span>
             <ArrowLeft className="size-4 rtl:rotate-0" />

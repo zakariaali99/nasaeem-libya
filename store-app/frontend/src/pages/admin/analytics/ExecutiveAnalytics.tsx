@@ -1,5 +1,7 @@
 import {
   BarChart3,
+  Calendar,
+  CalendarRange,
   CreditCard,
   Crown,
   DollarSign,
@@ -24,11 +26,30 @@ import { usePageTitle } from '@/lib/usePageTitle'
 export default function ExecutiveAnalytics() {
   usePageTitle('التحليلات التنفيذية والذكاء التجاري — لوحة التحكم')
   const [timeframe, setTimeframe] = React.useState<number | string>(30)
-  const { data, isLoading, refetch, isFetching } = useExecutiveAnalytics(timeframe)
-  const [hoveredTrend, setHoveredTrend] = React.useState<{ date: string; revenue: string; x: number; y: number } | null>(null)
+  const [isCustom, setIsCustom] = React.useState(false)
+  const [customStart, setCustomStart] = React.useState(() => {
+    const d = new Date()
+    d.setDate(d.getDate() - 30)
+    return d.toISOString().slice(0, 10)
+  })
+  const [customEnd, setCustomEnd] = React.useState(() => new Date().toISOString().slice(0, 10))
+
+  const queryParam = isCustom
+    ? { start_date: customStart, end_date: customEnd }
+    : timeframe
+
+  const { data, isLoading, refetch, isFetching } = useExecutiveAnalytics(queryParam)
+  const [hoveredTrend, setHoveredTrend] = React.useState<{
+    date: string
+    revenue: string
+    orders?: number
+    xPercent: number
+    yPercent: number
+  } | null>(null)
 
   const timeframes: { label: string; value: number | string }[] = [
     { label: '7 أيام', value: 7 },
+    { label: '14 يوماً', value: 14 },
     { label: '30 يوماً', value: 30 },
     { label: '90 يوماً', value: 90 },
     { label: 'الشهر الحالي', value: 'month' },
@@ -36,7 +57,9 @@ export default function ExecutiveAnalytics() {
     { label: 'كل الأوقات', value: 'all' },
   ]
 
-  const activeTimeframeLabel = timeframes.find((t) => t.value === timeframe)?.label || 'الفترة المحددة'
+  const activeTimeframeLabel = isCustom
+    ? `مخصص (${customStart} إلى ${customEnd})`
+    : timeframes.find((t) => t.value === timeframe)?.label || 'الفترة المحددة'
 
   if (isLoading || !data) {
     return (
@@ -58,37 +81,41 @@ export default function ExecutiveAnalytics() {
     )
   }
 
-  // Trend Chart Coordinate Calculations
-  const trendSeries = (data.trend_series && data.trend_series.length > 0) ? data.trend_series : []
+  // Trend Chart Coordinate Calculations (0..700 width, 0..200 height)
+  const trendSeries = data.trend_series && data.trend_series.length > 0 ? data.trend_series : []
   const trendRevenues = trendSeries.map((s) => Number(s.revenue))
   const maxTrendRevenue = Math.max(...trendRevenues, 100)
 
-  const chartWidth = 840
-  const chartHeight = 220
-  const paddingLeft = 130
-  const paddingRight = 25
-  const paddingTop = 20
-  const paddingBottom = 40
-
-  const plotWidth = chartWidth - paddingLeft - paddingRight
-  const plotHeight = chartHeight - paddingTop - paddingBottom
-
   const trendPoints = trendSeries.map((d, index) => {
-    const x = paddingLeft + (index / (trendSeries.length - 1 || 1)) * plotWidth
-    const y = paddingTop + plotHeight * (1 - Number(d.revenue) / maxTrendRevenue)
-    return { x, y, date: d.date, revenue: d.revenue }
+    const x = (index / (trendSeries.length - 1 || 1)) * 700
+    const y = 200 * (1 - (maxTrendRevenue > 0 ? Number(d.revenue) / maxTrendRevenue : 0))
+    return { x, y, date: d.date, orders: d.orders, revenue: d.revenue }
   })
 
   const trendLinePath = trendPoints
-    .map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`)
+    .map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`)
     .join(' ')
 
-  const trendAreaPath = trendPoints.length > 0 ? `
+  const trendAreaPath =
+    trendPoints.length > 0
+      ? `
     ${trendLinePath}
-    L ${paddingLeft + plotWidth} ${paddingTop + plotHeight}
-    L ${paddingLeft} ${paddingTop + plotHeight}
+    L 700 200
+    L 0 200
     Z
-  ` : ''
+  `
+      : ''
+
+  // Smart non-colliding X-axis date labels (5 to 7 evenly distributed)
+  const isLongTrendRange = trendSeries.length > 45
+  const sampleCount = Math.min(trendSeries.length, isLongTrendRange ? 6 : Math.min(trendSeries.length, 6))
+  const displayTrendDateLabels =
+    trendSeries.length <= 6
+      ? trendSeries.map((s) => s.date)
+      : Array.from({ length: sampleCount }, (_, i) => {
+          const idx = Math.round((i / (sampleCount - 1)) * (trendSeries.length - 1))
+          return trendSeries[idx]?.date || ''
+        })
 
   return (
     <div className="space-y-6 animate-fade-rise">
@@ -115,9 +142,12 @@ export default function ExecutiveAnalytics() {
               <button
                 key={tf.label}
                 type="button"
-                onClick={() => setTimeframe(tf.value)}
+                onClick={() => {
+                  setIsCustom(false)
+                  setTimeframe(tf.value)
+                }}
                 className={`rounded-lg px-2.5 py-1 transition-all ${
-                  timeframe === tf.value
+                  !isCustom && timeframe === tf.value
                     ? 'bg-card text-foreground font-bold shadow-2xs border border-border/50'
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
@@ -125,6 +155,20 @@ export default function ExecutiveAnalytics() {
                 {tf.label}
               </button>
             ))}
+
+            {/* Custom Range Toggle Button */}
+            <button
+              type="button"
+              onClick={() => setIsCustom((prev) => !prev)}
+              className={`flex items-center gap-1 rounded-lg px-2.5 py-1 transition-all ${
+                isCustom
+                  ? 'bg-primary text-primary-foreground font-bold shadow-2xs'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <CalendarRange className="size-3.5" />
+              <span>مخصص</span>
+            </button>
           </div>
 
           <Button
@@ -139,6 +183,37 @@ export default function ExecutiveAnalytics() {
           </Button>
         </div>
       </div>
+
+      {/* Custom Date Range Picker Bar (Shown when 'مخصص' is active) */}
+      {isCustom && (
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-3 text-xs animate-fade-rise">
+          <div className="flex items-center gap-2">
+            <Calendar className="size-4 text-primary" />
+            <span className="font-bold text-foreground">تحديد الفترة المخصصة للتحليلات:</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-muted-foreground font-medium">من:</label>
+            <input
+              type="date"
+              value={customStart}
+              onChange={(e) => setCustomStart(e.target.value)}
+              className="rounded-xl border border-border bg-card px-2.5 py-1 text-xs font-mono font-bold text-foreground focus:border-primary focus:outline-none shadow-2xs"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-muted-foreground font-medium">إلى:</label>
+            <input
+              type="date"
+              value={customEnd}
+              onChange={(e) => setCustomEnd(e.target.value)}
+              className="rounded-xl border border-border bg-card px-2.5 py-1 text-xs font-mono font-bold text-foreground focus:border-primary focus:outline-none shadow-2xs"
+            />
+          </div>
+          <span className="text-[11px] text-muted-foreground">
+            (يتم احتساب مؤشرات الأرباح وتوزيع المدن ومبيعات العطور اللحظية تلقائياً)
+          </span>
+        </div>
+      )}
 
       {/* Top Financial & Operational Metric Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -196,7 +271,7 @@ export default function ExecutiveAnalytics() {
         </div>
       </div>
 
-      {/* Periodic Trend Chart Section */}
+      {/* Periodic Trend Chart Section - Isolated 2-Column HTML Layout */}
       {trendSeries.length > 0 && (
         <div className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-2xs space-y-4">
           <div className="flex items-center justify-between border-b border-border/80 pb-3.5">
@@ -211,111 +286,137 @@ export default function ExecutiveAnalytics() {
             </span>
           </div>
 
-          <div className="relative w-full overflow-x-auto overflow-y-hidden pt-2 no-scrollbar">
-            <div className="min-w-[600px] sm:min-w-full">
-              <svg
-                viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-                preserveAspectRatio="xMidYMid meet"
-                className="w-full h-44 sm:h-56"
-                onMouseLeave={() => setHoveredTrend(null)}
-              >
-                <defs>
-                  <linearGradient id="execTrendGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--color-primary)" stopOpacity="0.28" />
-                    <stop offset="100%" stopColor="var(--color-primary)" stopOpacity="0.0" />
-                  </linearGradient>
-                </defs>
-
-                {/* Horizontal Grid lines & Left Isolated Price Labels */}
-                {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
-                  const y = paddingTop + plotHeight * (1 - ratio)
+          <div className="space-y-2 select-none" dir="ltr">
+            <div className="flex items-stretch gap-0 h-52 sm:h-60">
+              {/* Left Column: Dedicated Y-Axis Scale (Physical HTML Column) */}
+              <div className="w-24 sm:w-28 shrink-0 flex flex-col justify-between py-1 pr-3 text-right border-r border-border/70 select-none">
+                {[1, 0.75, 0.5, 0.25, 0].map((ratio) => {
                   const val = maxTrendRevenue * ratio
                   return (
-                    <g key={ratio}>
+                    <span key={ratio} className="font-mono text-[11px] font-bold text-muted-foreground leading-none">
+                      {formatPrice(val)}
+                    </span>
+                  )
+                })}
+              </div>
+
+              {/* Right Column: Isolated SVG Canvas */}
+              <div className="flex-1 min-w-0 relative h-full">
+                <svg
+                  viewBox="0 0 700 200"
+                  preserveAspectRatio="none"
+                  className="w-full h-full cursor-crosshair"
+                  onMouseLeave={() => setHoveredTrend(null)}
+                  onMouseMove={(e) => {
+                    if (trendPoints.length === 0) return
+                    const rect = e.currentTarget.getBoundingClientRect()
+                    const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+                    const idx = Math.round(pct * (trendPoints.length - 1))
+                    const point = trendPoints[idx]
+                    if (point) {
+                      setHoveredTrend({
+                        date: point.date,
+                        revenue: point.revenue,
+                        orders: point.orders,
+                        xPercent: (point.x / 700) * 100,
+                        yPercent: (point.y / 200) * 100,
+                      })
+                    }
+                  }}
+                >
+                  <defs>
+                    <linearGradient id="execTrendGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--color-primary)" stopOpacity="0.28" />
+                      <stop offset="100%" stopColor="var(--color-primary)" stopOpacity="0.0" />
+                    </linearGradient>
+                  </defs>
+
+                  {/* 5 Horizontal Grid Lines */}
+                  {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+                    const y = 200 * (1 - ratio)
+                    return (
                       <line
-                        x1={paddingLeft}
+                        key={ratio}
+                        x1={0}
                         y1={y}
-                        x2={chartWidth - paddingRight}
+                        x2={700}
                         y2={y}
                         stroke="var(--color-border)"
                         strokeDasharray="4 4"
-                        strokeOpacity={0.7}
+                        strokeOpacity={0.65}
                       />
-                      <text
-                        x={paddingLeft - 16}
-                        y={y + 4}
-                        textAnchor="end"
-                        className="text-[11px] fill-muted-foreground font-mono font-bold"
-                      >
-                        {formatPrice(val)}
-                      </text>
-                    </g>
-                  )
-                })}
+                    )
+                  })}
 
-                {/* Area Fill */}
-                <path d={trendAreaPath} fill="url(#execTrendGradient)" />
+                  {/* Area Fill */}
+                  {trendAreaPath && <path d={trendAreaPath} fill="url(#execTrendGradient)" />}
 
-                {/* Line */}
-                <path
-                  d={trendLinePath}
-                  fill="none"
-                  stroke="var(--color-primary)"
-                  strokeWidth={2.5}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
+                  {/* Line */}
+                  {trendLinePath && (
+                    <path
+                      d={trendLinePath}
+                      fill="none"
+                      stroke="var(--color-primary)"
+                      strokeWidth={2.5}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  )}
 
-                {/* Points */}
-                {trendPoints.map((point, idx) => {
-                  const step = trendSeries.length > 25 ? Math.ceil(trendSeries.length / 8) : trendSeries.length > 14 ? 2 : 1
-                  const showXLabel = idx % step === 0 || idx === trendSeries.length - 1
-
-                  return (
-                    <g key={point.date}>
-                      <circle
-                        cx={point.x}
-                        cy={point.y}
-                        r={hoveredTrend?.date === point.date ? 5.5 : 3.5}
-                        className="fill-card stroke-primary transition-all duration-150 cursor-pointer"
-                        strokeWidth={2}
-                        onMouseEnter={() =>
-                          setHoveredTrend({
-                            date: point.date,
-                            revenue: point.revenue,
-                            x: point.x,
-                            y: point.y,
-                          })
-                        }
-                      />
-                      {showXLabel && (
-                        <text
-                          x={point.x}
-                          y={chartHeight - 10}
-                          textAnchor="middle"
-                          className="text-[10px] fill-muted-foreground font-mono font-medium"
-                        >
-                          {point.date.slice(5)}
-                        </text>
+                  {/* Data Point Circles - Render all for short range, active on hover for long range */}
+                  {!isLongTrendRange
+                    ? trendPoints.map((point) => (
+                        <circle
+                          key={point.date}
+                          cx={point.x}
+                          cy={point.y}
+                          r={hoveredTrend?.date === point.date ? 5.5 : 3}
+                          className="fill-card stroke-primary transition-all duration-150 cursor-pointer"
+                          strokeWidth={2}
+                        />
+                      ))
+                    : hoveredTrend && (
+                        <circle
+                          cx={(hoveredTrend.xPercent / 100) * 700}
+                          cy={(hoveredTrend.yPercent / 100) * 200}
+                          r={6}
+                          className="fill-card stroke-primary transition-all duration-75"
+                          strokeWidth={2.5}
+                        />
                       )}
-                    </g>
-                  )
-                })}
-              </svg>
+                </svg>
 
-              {/* Tooltip */}
-              {hoveredTrend && (
-                <div
-                  className="pointer-events-none absolute rounded-xl border border-border bg-popover/95 px-3 py-1.5 text-xs shadow-lg backdrop-blur-md transition-all -translate-x-1/2 -translate-y-full z-10"
-                  style={{
-                    left: `${(hoveredTrend.x / chartWidth) * 100}%`,
-                    top: `${(hoveredTrend.y / chartHeight) * 100}%`,
-                  }}
-                >
-                  <p className="font-mono text-[10px] text-muted-foreground">{hoveredTrend.date}</p>
-                  <p className="font-mono text-xs font-bold text-price">{formatPrice(hoveredTrend.revenue)}</p>
-                </div>
-              )}
+                {/* Floating Hover Tooltip */}
+                {hoveredTrend && (
+                  <div
+                    className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-full rounded-xl border border-border bg-popover/95 px-3 py-1.5 text-xs shadow-xl backdrop-blur-md transition-all font-sans whitespace-nowrap mb-2"
+                    style={{
+                      left: `${hoveredTrend.xPercent}%`,
+                      top: `${hoveredTrend.yPercent}%`,
+                    }}
+                  >
+                    <div className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
+                      <Calendar className="size-3" />
+                      <span>{hoveredTrend.date}</span>
+                    </div>
+                    <div className="mt-0.5 flex items-center gap-2 font-mono">
+                      <span className="font-bold text-price text-xs">{formatPrice(hoveredTrend.revenue)}</span>
+                      {hoveredTrend.orders !== undefined && (
+                        <span className="text-[10px] text-muted-foreground font-sans">({hoveredTrend.orders} طلب)</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Dedicated Non-Colliding X-Axis Labels Row */}
+            <div className="flex items-center justify-between font-mono text-[10px] text-muted-foreground pt-2.5 border-t border-border/60 ml-24 sm:ml-28">
+              {displayTrendDateLabels.map((item, idx) => (
+                <span key={idx} className="truncate">
+                  {item}
+                </span>
+              ))}
             </div>
           </div>
         </div>

@@ -1,7 +1,9 @@
 import {
   CheckCircle2,
+  Clock,
   MessageCircle,
   RefreshCw,
+  Search,
   ShoppingBag,
   TrendingUp,
 } from 'lucide-react'
@@ -9,6 +11,7 @@ import { useState } from 'react'
 
 import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { formatPrice } from '@/lib/format'
 import {
   useAbandonedCarts,
@@ -20,7 +23,15 @@ import { usePageTitle } from '@/lib/usePageTitle'
 export default function AbandonedCartsPage() {
   usePageTitle('السلات المتروكة واسترجاع المبيعات — لوحة الإدارة', 'متابعة السلات المتروكة ومراسلة العملاء عبر الواتساب.')
 
-  const { data: abandonedData, isLoading, refetch } = useAbandonedCarts()
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'reminded' | 'recovered'>('all')
+  const [minutesCutoff, setMinutesCutoff] = useState<number>(15)
+  const [searchQuery, setSearchQuery] = useState<string>('')
+
+  const { data: abandonedData, isLoading, refetch } = useAbandonedCarts({
+    status: statusFilter,
+    minutes: minutesCutoff,
+    q: searchQuery || undefined,
+  })
   const sendWhatsApp = useSendAbandonedWhatsApp()
   const markRecovered = useMarkCartRecovered()
 
@@ -37,7 +48,7 @@ export default function AbandonedCartsPage() {
   const handleSendWhatsApp = async (cartId: string, whatsappLink: string) => {
     try {
       const res = await sendWhatsApp.mutateAsync(cartId)
-      setActionSuccess(res?.message || 'تم إرسال التذكير بنجاح')
+      setActionSuccess(res?.message || 'تم إرسال التذكير بنجاح وتجهيز رسالة الواتساب')
       const targetUrl = res?.whatsapp_link || whatsappLink
       if (targetUrl) {
         window.open(targetUrl, '_blank')
@@ -67,7 +78,7 @@ export default function AbandonedCartsPage() {
             </span>
           </h1>
           <p className="text-xs text-muted-foreground mt-1">
-            متابعة الزوار الذين لم يكملوا الدفع ومراسلتهم مباشرة بكوبونات مخصصة
+            متابعة الزوار الذين لم يكملوا الدفع ومراسلتهم مباشرة بكوبونات مخصصة (NASAEEM5)
           </p>
         </div>
 
@@ -131,13 +142,97 @@ export default function AbandonedCartsPage() {
         </div>
       </div>
 
+      {/* Filter and Search Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card p-3 shadow-2xs">
+        {/* Status Filter Tabs */}
+        <div className="flex flex-wrap items-center gap-1.5 rounded-xl bg-muted/60 p-1 border border-border text-xs font-bold">
+          <button
+            type="button"
+            onClick={() => setStatusFilter('all')}
+            className={`rounded-lg px-3 py-1.5 transition-all ${
+              statusFilter === 'all'
+                ? 'bg-card text-foreground font-bold shadow-2xs border border-border/50'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            جميع السلات
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter('pending')}
+            className={`rounded-lg px-3 py-1.5 transition-all ${
+              statusFilter === 'pending'
+                ? 'bg-card text-amber-600 dark:text-amber-400 font-bold shadow-2xs border border-border/50'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            بانتظار المتابعة
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter('reminded')}
+            className={`rounded-lg px-3 py-1.5 transition-all ${
+              statusFilter === 'reminded'
+                ? 'bg-card text-primary font-bold shadow-2xs border border-border/50'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            تم إرسال تذكير
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter('recovered')}
+            className={`rounded-lg px-3 py-1.5 transition-all ${
+              statusFilter === 'recovered'
+                ? 'bg-card text-emerald-600 dark:text-emerald-400 font-bold shadow-2xs border border-border/50'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            مسترجعة
+          </button>
+        </div>
+
+        {/* Timeframe & Search Input */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Clock className="size-3.5" />
+            <select
+              value={minutesCutoff}
+              onChange={(e) => setMinutesCutoff(Number(e.target.value))}
+              className="rounded-xl border border-border bg-background px-2.5 py-1.5 text-xs font-bold text-foreground focus:border-primary focus:outline-none shadow-2xs"
+            >
+              <option value={0}>كافة السلات (بما فيها الحالية)</option>
+              <option value={15}>غير نشطة منذ 15 دقيقة</option>
+              <option value={60}>غير نشطة منذ ساعة</option>
+              <option value={360}>غير نشطة منذ 6 ساعات</option>
+              <option value={1440}>غير نشطة منذ 24 ساعة</option>
+            </select>
+          </div>
+
+          <div className="relative min-w-48 sm:min-w-64">
+            <Search className="size-3.5 absolute start-3 top-3 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="ابحث بالاسم، الهاتف، أو العطر..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="ps-8 h-9 text-xs rounded-xl"
+            />
+          </div>
+        </div>
+      </div>
+
       {/* Abandoned Carts Table */}
       <div className="rounded-2xl border border-border bg-card shadow-2xs overflow-hidden">
         {isLoading ? (
           <div className="p-8 text-center text-xs text-muted-foreground">جاري تحميل السلات المتروكة...</div>
         ) : carts.length === 0 ? (
-          <div className="p-8 text-center text-xs font-bold text-muted-foreground">
-            لا توجد سلات متروكة حالياً! كافة العمليات مكتملة بنجاح 🎉
+          <div className="p-12 text-center text-xs font-bold text-muted-foreground space-y-2">
+            <ShoppingBag className="size-8 mx-auto text-muted-foreground/50" />
+            <p>لا توجد سلات متروكة مطابقة للفلترة الحالية.</p>
+            <p className="text-[11px] text-muted-foreground/80 font-normal">
+              كافة عمليات التسوق جارية بنجاح أو تم استرجاعها 🎉
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -157,7 +252,9 @@ export default function AbandonedCartsPage() {
                   <tr key={cart.id} className="hover:bg-muted/20 transition-colors">
                     <td className="p-3.5 font-medium text-foreground">
                       <div className="font-bold">{cart.customer_name}</div>
-                      <div className="font-mono text-[11px] text-muted-foreground">{cart.phone_number || 'غير متوفر'}</div>
+                      <div className="font-mono text-[11px] text-muted-foreground dir-ltr text-start">
+                        {cart.phone_number || 'غير متوفر'}
+                      </div>
                     </td>
                     <td className="p-3.5">
                       <div className="space-y-0.5 max-w-xs">
@@ -172,7 +269,12 @@ export default function AbandonedCartsPage() {
                       {formatPrice(cart.cart_total)}
                     </td>
                     <td className="p-3.5 text-muted-foreground font-mono text-[11px]">
-                      {new Date(cart.last_activity_at).toLocaleTimeString('ar-LY', { hour: '2-digit', minute: '2-digit' })}
+                      {new Date(cart.last_activity_at).toLocaleDateString('ar-LY', {
+                        month: 'numeric',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
                     </td>
                     <td className="p-3.5">
                       {cart.is_recovered ? (
@@ -195,9 +297,10 @@ export default function AbandonedCartsPage() {
                       <div className="flex items-center justify-end gap-2">
                         <Button
                           size="sm"
+                          disabled={!cart.phone_number}
                           onClick={() => handleSendWhatsApp(cart.id, cart.whatsapp_link)}
                           loading={sendWhatsApp.isPending}
-                          className="min-h-11 rounded-xl text-xs font-bold gap-1 px-3 shadow-2xs"
+                          className="min-h-9 rounded-xl text-xs font-bold gap-1 px-3 shadow-2xs"
                         >
                           <MessageCircle className="size-3.5" />
                           <span>مراسلة بالواتساب</span>
@@ -208,9 +311,10 @@ export default function AbandonedCartsPage() {
                             size="sm"
                             variant="outline"
                             onClick={() => handleMarkRecovered(cart.id)}
-                            className="min-h-11 rounded-xl text-xs font-bold"
+                            loading={markRecovered.isPending}
+                            className="min-h-9 rounded-xl text-xs font-bold"
                           >
-                            <span>مسترجعة</span>
+                            <span>تأكيد الاسترجاع</span>
                           </Button>
                         )}
                       </div>

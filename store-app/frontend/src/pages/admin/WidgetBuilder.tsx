@@ -325,7 +325,7 @@ export default function WidgetBuilder() {
           </div>
         </section>
 
-      <div className="grid gap-6 lg:grid-cols-[20rem_1fr]">
+      <div className="grid gap-6 lg:grid-cols-[20rem_minmax(0,1fr)] max-w-full">
         {/* ---- widget list: drag with a mouse, reorder with the keyboard ---- */}
         <section aria-label="أدوات الصفحة" className="space-y-2">
           <ul className="space-y-1" onDragOver={(e) => e.preventDefault()}>
@@ -391,7 +391,7 @@ export default function WidgetBuilder() {
         </section>
 
         {/* ---- editor + live preview ---- */}
-        <div className="space-y-6">
+        <div className="space-y-6 min-w-0 max-w-full overflow-hidden">
           {current ? (
             <section className="space-y-4 rounded-lg border border-border bg-card p-4" aria-label={`تعديل ${TYPE_LABELS[current.type] ?? current.type}`}>
               <div className="flex items-center justify-between">
@@ -573,13 +573,13 @@ export default function WidgetBuilder() {
             </div>
 
             {/* Device Mockup Frame Container */}
-            <div className="flex justify-center bg-muted/30 p-3 sm:p-6 rounded-2xl overflow-x-auto border border-border/60">
+            <div className="flex justify-center bg-muted/30 p-2 sm:p-5 rounded-2xl overflow-x-auto border border-border/60 max-w-full">
               <div
-                className={`transition-all duration-300 overflow-hidden rounded-2xl border-2 border-border/80 bg-background shadow-lg ${
+                className={`transition-all duration-300 overflow-hidden rounded-2xl border-2 border-border/80 bg-background shadow-lg max-w-full ${
                   previewDevice === 'mobile'
                     ? 'w-[375px] shrink-0'
                     : previewDevice === 'tablet'
-                    ? 'w-[768px] shrink-0'
+                    ? 'w-[720px] max-w-full shrink-0'
                     : 'w-full max-w-5xl'
                 }`}
               >

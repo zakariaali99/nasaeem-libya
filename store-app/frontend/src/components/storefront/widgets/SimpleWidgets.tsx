@@ -7,8 +7,9 @@ import type { Widget } from '@/types/api'
 
 /** Text Block with refined typography */
 export function TextBlock({ widget }: { widget: Widget }) {
-  const content = widget.data.content
-  if (!content) return null
+  const content =
+    widget.data.content ||
+    'نسائم ليبيا — وجهتكم الأولى لأفخم العطور الشرقية والغربية المضمونة بنسبة 100% مع تجربة تسوق استثنائية.'
   return (
     <div className="mx-auto max-w-3xl rounded-3xl border border-border/70 bg-card/60 p-6 sm:p-8 text-center shadow-xs">
       <div className="text-sm sm:text-base leading-loose text-foreground/90 font-medium">
@@ -22,18 +23,20 @@ export function TextBlock({ widget }: { widget: Widget }) {
 
 export function ImageWidget({ widget, priority = false }: { widget: Widget; priority?: boolean }) {
   const { imageUrl, altText, linkUrl } = widget.data
-  if (!imageUrl) return null
+  const displayUrl = imageUrl || '/brand/logo.svg'
 
   const image = (
-    <img
-      src={imageUrl}
-      alt={altText || ''}
-      width={1200}
-      height={675}
-      loading={priority ? 'eager' : 'lazy'}
-      fetchPriority={priority ? 'high' : undefined}
-      className="mx-auto max-h-96 w-full rounded-3xl object-contain shadow-sm border border-border"
-    />
+    <div className="mx-auto max-h-96 w-full rounded-3xl overflow-hidden shadow-sm border border-border bg-muted/20 flex items-center justify-center p-6">
+      <img
+        src={displayUrl}
+        alt={altText || 'صورة المتجر'}
+        width={1200}
+        height={675}
+        loading={priority ? 'eager' : 'lazy'}
+        fetchPriority={priority ? 'high' : undefined}
+        className="max-h-80 w-auto object-contain"
+      />
+    </div>
   )
 
   return linkUrl ? (
@@ -54,9 +57,16 @@ export function Spacer({ widget }: { widget: Widget }) {
   return <div className={cn('w-full', HEIGHTS[widget.data.height ?? 'md'])} aria-hidden="true" />
 }
 
+const PREVIEW_GRID_ITEMS = [
+  { label: 'دار ديور (Dior)', imageUrl: '/brand/logo.svg', linkUrl: '/products' },
+  { label: 'دار شانيل (Chanel)', imageUrl: '/brand/logo.svg', linkUrl: '/products' },
+  { label: 'توم فورد (Tom Ford)', imageUrl: '/brand/logo.svg', linkUrl: '/products' },
+  { label: 'كريد الملكية (Creed)', imageUrl: '/brand/logo.svg', linkUrl: '/products' },
+]
+
 export function PhotoLinkGrid({ widget }: { widget: Widget }) {
-  const items = widget.data.items ?? []
-  if (items.length === 0) return null
+  const rawItems = widget.data.items ?? []
+  const items = rawItems.length > 0 ? rawItems : PREVIEW_GRID_ITEMS
 
   return (
     <div className="space-y-4">

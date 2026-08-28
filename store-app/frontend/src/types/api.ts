@@ -469,6 +469,8 @@ export interface DashboardStats {
   revenue_total: string
   customers: number
   low_stock: number
+  start_date?: string
+  end_date?: string
   timeframe_days?: number
   timeframe_revenue?: string
   timeframe_orders?: number
@@ -609,6 +611,8 @@ export interface DeliveryCourierBreakdownRow {
 export interface ExecutiveAnalyticsData {
   timeframe?: string
   timeframe_days?: number
+  start_date?: string
+  end_date?: string
   total_revenue: string
   estimated_profit: string
   total_orders_count: number

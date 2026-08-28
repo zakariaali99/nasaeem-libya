@@ -26,7 +26,10 @@ export function AnnouncementBar({ widget }: { widget: Widget }) {
     }
   })
 
-  if (dismissed || !message) return null
+  if (dismissed) return null
+
+  const displayMessage = message || 'عرض حصري: شحن مجاني لكافة المدن الليبية عند الطلب بقيمة 200 د.ل أو أكثر'
+  const displayTitle = title || 'تنبيه حصري'
 
   const Icon = ICONS[(icon as keyof typeof ICONS) ?? 'megaphone'] ?? Sparkles
 
@@ -47,13 +50,13 @@ export function AnnouncementBar({ widget }: { widget: Widget }) {
             <Icon className="size-4" aria-hidden="true" />
           </div>
           <div className="min-w-0 flex-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-            {title && (
+            {displayTitle && (
               <span className="text-xs sm:text-sm font-extrabold text-foreground tracking-tight">
-                {title}:
+                {displayTitle}:
               </span>
             )}
             <span className="text-xs sm:text-sm text-foreground/90 font-medium">
-              {message}
+              {displayMessage}
             </span>
           </div>
         </div>

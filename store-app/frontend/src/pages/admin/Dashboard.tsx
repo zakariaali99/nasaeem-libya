@@ -2,6 +2,8 @@ import {
   AlertTriangle,
   ArrowUpRight,
   Boxes,
+  Calendar,
+  CalendarRange,
   CheckCircle2,
   Clock,
   Coins,
@@ -24,9 +26,27 @@ import type { Order } from '@/types/api'
 export default function Dashboard() {
   usePageTitle('لوحة الإدارة والتحكم')
   const [timeframe, setTimeframe] = React.useState<number | string>(14)
-  const { data, isPending } = useDashboardStats(timeframe)
+  const [isCustom, setIsCustom] = React.useState(false)
+  const [customStart, setCustomStart] = React.useState(() => {
+    const d = new Date()
+    d.setDate(d.getDate() - 14)
+    return d.toISOString().slice(0, 10)
+  })
+  const [customEnd, setCustomEnd] = React.useState(() => new Date().toISOString().slice(0, 10))
+
+  const queryParam = isCustom
+    ? { start_date: customStart, end_date: customEnd }
+    : timeframe
+
+  const { data, isPending } = useDashboardStats(queryParam)
   const { data: recentOrdersData, isPending: ordersPending } = useMyOrders({ limit: 5 })
-  const [hoveredPoint, setHoveredPoint] = React.useState<{ date: string; revenue: string; x: number; y: number } | null>(null)
+  const [hoveredPoint, setHoveredPoint] = React.useState<{
+    date: string
+    revenue: string
+    orders?: number
+    xPercent: number
+    yPercent: number
+  } | null>(null)
 
   if (isPending || !data) {
     return (
@@ -42,40 +62,45 @@ export default function Dashboard() {
     )
   }
 
-  const series = [...data.series].reverse() // chronological order
+  const series = data.series && data.series.length > 0 ? data.series : []
   const revenueValues = series.map((d) => Number(d.revenue))
   const maxRevenue = Math.max(...revenueValues, 100)
   const totalPeriodRevenue = data.timeframe_revenue
     ? Number(data.timeframe_revenue)
     : revenueValues.reduce((a, b) => a + b, 0)
 
-  // Chart coordinate calculations - generous left gutter (140px) so prices have their own dedicated column
-  const chartWidth = 840
-  const chartHeight = 240
-  const paddingLeft = 140
-  const paddingRight = 25
-  const paddingTop = 24
-  const paddingBottom = 45
-
-  const plotWidth = chartWidth - paddingLeft - paddingRight
-  const plotHeight = chartHeight - paddingTop - paddingBottom
-
+  // Pure SVG coordinate points (0..700 width, 0..200 height)
+  // Left Column numbers are completely in HTML outside this SVG
   const chartPoints = series.map((d, index) => {
-    const x = paddingLeft + (index / (series.length - 1 || 1)) * plotWidth
-    const y = paddingTop + plotHeight * (1 - Number(d.revenue) / maxRevenue)
-    return { x, y, date: d.date, revenue: d.revenue }
+    const x = (index / (series.length - 1 || 1)) * 700
+    const y = 200 * (1 - (maxRevenue > 0 ? Number(d.revenue) / maxRevenue : 0))
+    return { x, y, date: d.date, orders: d.orders, revenue: d.revenue }
   })
 
   const linePath = chartPoints
-    .map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`)
+    .map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`)
     .join(' ')
 
-  const areaPath = `
+  const areaPath =
+    chartPoints.length > 0
+      ? `
     ${linePath}
-    L ${paddingLeft + plotWidth} ${paddingTop + plotHeight}
-    L ${paddingLeft} ${paddingTop + plotHeight}
+    L 700 200
+    L 0 200
     Z
   `
+      : ''
+
+  // Smart non-colliding X-axis date labels (5 to 7 evenly distributed)
+  const isLongRange = series.length > 45
+  const sampleCount = Math.min(series.length, isLongRange ? 6 : Math.min(series.length, 6))
+  const displayDateLabels =
+    series.length <= 6
+      ? series.map((s) => s.date)
+      : Array.from({ length: sampleCount }, (_, i) => {
+          const idx = Math.round((i / (sampleCount - 1)) * (series.length - 1))
+          return series[idx]?.date || ''
+        })
 
   const totalOrders =
     data.pending_orders + data.processing_orders + data.completed_orders + data.cancelled_orders
@@ -94,7 +119,9 @@ export default function Dashboard() {
     { label: 'السنة الحالية', value: 'year' },
   ]
 
-  const activeTimeframeLabel = timeframes.find((t) => t.value === timeframe)?.label || 'الفترة المحددة'
+  const activeTimeframeLabel = isCustom
+    ? `مخصص (${customStart} إلى ${customEnd})`
+    : timeframes.find((t) => t.value === timeframe)?.label || 'الفترة المحددة'
 
   return (
     <div className="space-y-8 animate-fade-rise">
@@ -232,12 +259,19 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Earnings Over Time Chart Section with Dedicated Y-Axis Column & Dynamic Timeframes */}
-      <section className="rounded-2xl border border-border bg-card p-4 sm:p-6 shadow-2xs space-y-4 max-w-full overflow-hidden">
+      {/* Earnings Over Time Chart Section with Dedicated Y-Axis Column & Custom Date Range */}
+      <section className="rounded-3xl border border-border bg-card p-4 sm:p-6 shadow-2xs space-y-5 max-w-full overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/60 pb-4">
           <div>
-            <h2 className="text-base font-bold text-foreground">مخطط الإيرادات والمبيعات</h2>
-            <p className="text-xs text-muted-foreground">تطور إجمالي الإيرادات اليومية بالدينار الليبي (د.ل) — {activeTimeframeLabel}</p>
+            <div className="flex items-center gap-2">
+              <span className="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <TrendingUp className="size-4" />
+              </span>
+              <h2 className="text-base font-bold text-foreground">مخطط الإيرادات والمبيعات</h2>
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              تطور إجمالي الإيرادات اليومية بالدينار الليبي (د.ل) — {activeTimeframeLabel}
+            </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -247,9 +281,12 @@ export default function Dashboard() {
                 <button
                   key={tf.label}
                   type="button"
-                  onClick={() => setTimeframe(tf.value)}
+                  onClick={() => {
+                    setIsCustom(false)
+                    setTimeframe(tf.value)
+                  }}
                   className={`rounded-lg px-2.5 py-1 transition-all ${
-                    timeframe === tf.value
+                    !isCustom && timeframe === tf.value
                       ? 'bg-card text-foreground font-bold shadow-2xs border border-border/50'
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
@@ -257,136 +294,192 @@ export default function Dashboard() {
                   {tf.label}
                 </button>
               ))}
+
+              {/* Custom Range Toggle Button */}
+              <button
+                type="button"
+                onClick={() => setIsCustom((prev) => !prev)}
+                className={`flex items-center gap-1 rounded-lg px-2.5 py-1 transition-all ${
+                  isCustom
+                    ? 'bg-primary text-primary-foreground font-bold shadow-2xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <CalendarRange className="size-3.5" />
+                <span>مخصص</span>
+              </button>
             </div>
 
-            <span className="inline-flex items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary font-mono">
-              <TrendingUp className="size-3.5" />
-              <span>إجمالي {activeTimeframeLabel}: {formatPrice(totalPeriodRevenue)}</span>
+            <span className="inline-flex items-center gap-1.5 rounded-xl border border-primary/20 bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary font-mono shadow-2xs">
+              <DollarSign className="size-3.5" />
+              <span>إجمالي الفترة: {formatPrice(totalPeriodRevenue)}</span>
             </span>
           </div>
         </div>
 
-        {/* SVG Area Chart - Isolated Left Column for Prices & Zero Collision */}
-        <div className="relative w-full overflow-x-auto overflow-y-hidden pt-2 no-scrollbar">
-          <div className="min-w-[620px] sm:min-w-full">
-            <svg
-              viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-              preserveAspectRatio="xMidYMid meet"
-              className="w-full h-52 sm:h-64 md:h-76"
-              onMouseLeave={() => setHoveredPoint(null)}
-            >
-              <defs>
-                <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--color-primary)" stopOpacity="0.25" />
-                  <stop offset="100%" stopColor="var(--color-primary)" stopOpacity="0.0" />
-                </linearGradient>
-              </defs>
-
-              {/* Dedicated Left Y-Axis Shaded Column Guide */}
-              <rect
-                x={0}
-                y={0}
-                width={paddingLeft - 10}
-                height={chartHeight}
-                className="fill-transparent"
+        {/* Custom Date Range Picker Bar (Shown when 'مخصص' is active) */}
+        {isCustom && (
+          <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-3 text-xs animate-fade-rise">
+            <div className="flex items-center gap-2">
+              <Calendar className="size-4 text-primary" />
+              <span className="font-bold text-foreground">تحديد الفترة المخصصة:</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-muted-foreground font-medium">من:</label>
+              <input
+                type="date"
+                value={customStart}
+                onChange={(e) => setCustomStart(e.target.value)}
+                className="rounded-xl border border-border bg-card px-2.5 py-1 text-xs font-mono font-bold text-foreground focus:border-primary focus:outline-none shadow-2xs"
               />
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-muted-foreground font-medium">إلى:</label>
+              <input
+                type="date"
+                value={customEnd}
+                onChange={(e) => setCustomEnd(e.target.value)}
+                className="rounded-xl border border-border bg-card px-2.5 py-1 text-xs font-mono font-bold text-foreground focus:border-primary focus:outline-none shadow-2xs"
+              />
+            </div>
+            <span className="text-[11px] text-muted-foreground">
+              (يتم تحديث البيانات والإحصائيات مباشرة عند تغيير التواريخ)
+            </span>
+          </div>
+        )}
 
-              {/* Horizontal Grid lines & Isolated Price Labels */}
-              {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
-                const y = paddingTop + plotHeight * (1 - ratio)
+        {/* HTML 2-Column Chart Layout - Physically Isolated Left Price Column & Zero Collisions */}
+        <div className="space-y-2 select-none" dir="ltr">
+          <div className="flex items-stretch gap-0 h-56 sm:h-64 md:h-72">
+            {/* Left Column: Dedicated Y-Axis Scale (Physical HTML Column) */}
+            <div className="w-24 sm:w-28 shrink-0 flex flex-col justify-between py-1 pr-3 text-right border-r border-border/70 select-none">
+              {[1, 0.75, 0.5, 0.25, 0].map((ratio) => {
                 const val = maxRevenue * ratio
                 return (
-                  <g key={ratio}>
-                    {/* Grid line starting cleanly at paddingLeft */}
+                  <span key={ratio} className="font-mono text-[11px] font-bold text-muted-foreground leading-none">
+                    {formatPrice(val)}
+                  </span>
+                )
+              })}
+            </div>
+
+            {/* Right Column: Isolated SVG Canvas */}
+            <div className="flex-1 min-w-0 relative h-full">
+              <svg
+                viewBox="0 0 700 200"
+                preserveAspectRatio="none"
+                className="w-full h-full cursor-crosshair"
+                onMouseLeave={() => setHoveredPoint(null)}
+                onMouseMove={(e) => {
+                  if (chartPoints.length === 0) return
+                  const rect = e.currentTarget.getBoundingClientRect()
+                  const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+                  const idx = Math.round(pct * (chartPoints.length - 1))
+                  const point = chartPoints[idx]
+                  if (point) {
+                    setHoveredPoint({
+                      date: point.date,
+                      revenue: point.revenue,
+                      orders: point.orders,
+                      xPercent: (point.x / 700) * 100,
+                      yPercent: (point.y / 200) * 100,
+                    })
+                  }
+                }}
+              >
+                <defs>
+                  <linearGradient id="dashboardRevenueGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="var(--color-primary)" stopOpacity="0.25" />
+                    <stop offset="100%" stopColor="var(--color-primary)" stopOpacity="0.0" />
+                  </linearGradient>
+                </defs>
+
+                {/* 5 Horizontal Grid Lines */}
+                {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+                  const y = 200 * (1 - ratio)
+                  return (
                     <line
-                      x1={paddingLeft}
+                      key={ratio}
+                      x1={0}
                       y1={y}
-                      x2={chartWidth - paddingRight}
+                      x2={700}
                       y2={y}
                       stroke="var(--color-border)"
                       strokeDasharray="4 4"
-                      strokeOpacity={0.7}
+                      strokeOpacity={0.65}
                     />
-                    {/* Dedicated Y-Axis Price Label strictly left of paddingLeft */}
-                    <text
-                      x={paddingLeft - 18}
-                      y={y + 4}
-                      textAnchor="end"
-                      className="text-[11px] fill-muted-foreground font-mono font-bold"
-                    >
-                      {formatPrice(val)}
-                    </text>
-                  </g>
-                )
-              })}
+                  )
+                })}
 
-              {/* Area Fill */}
-              <path d={areaPath} fill="url(#revenueGradient)" />
+                {/* Area Fill */}
+                {areaPath && <path d={areaPath} fill="url(#dashboardRevenueGradient)" />}
 
-              {/* Line Path */}
-              <path
-                d={linePath}
-                fill="none"
-                stroke="var(--color-primary)"
-                strokeWidth={2.5}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
+                {/* Line */}
+                {linePath && (
+                  <path
+                    d={linePath}
+                    fill="none"
+                    stroke="var(--color-primary)"
+                    strokeWidth={2.5}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                )}
 
-              {/* Data Point Circles & Smart X-Axis Labels */}
-              {chartPoints.map((point, idx) => {
-                // Smart sampling for X-Axis labels to avoid overlapping on dense ranges
-                const step = series.length > 30 ? Math.ceil(series.length / 10) : series.length > 15 ? 2 : 1
-                const showXLabel = idx % step === 0 || idx === series.length - 1
-
-                return (
-                  <g key={point.date}>
-                    <circle
-                      cx={point.x}
-                      cy={point.y}
-                      r={hoveredPoint?.date === point.date ? 6 : 3.5}
-                      className="fill-card stroke-primary transition-all duration-150 cursor-pointer"
-                      strokeWidth={2}
-                      onMouseEnter={() =>
-                        setHoveredPoint({
-                          date: point.date,
-                          revenue: point.revenue,
-                          x: point.x,
-                          y: point.y,
-                        })
-                      }
-                    />
-                    {/* Date labels at bottom */}
-                    {showXLabel && (
-                      <text
-                        x={point.x}
-                        y={chartHeight - 12}
-                        textAnchor="middle"
-                        className="text-[11px] fill-muted-foreground font-mono font-medium"
-                      >
-                        {point.date.slice(5)}
-                      </text>
+                {/* Data Point Circles - Render all for short range, active on hover for long range */}
+                {!isLongRange
+                  ? chartPoints.map((point) => (
+                      <circle
+                        key={point.date}
+                        cx={point.x}
+                        cy={point.y}
+                        r={hoveredPoint?.date === point.date ? 5.5 : 3}
+                        className="fill-card stroke-primary transition-all duration-150 cursor-pointer"
+                        strokeWidth={2}
+                      />
+                    ))
+                  : hoveredPoint && (
+                      <circle
+                        cx={(hoveredPoint.xPercent / 100) * 700}
+                        cy={(hoveredPoint.yPercent / 100) * 200}
+                        r={6}
+                        className="fill-card stroke-primary transition-all duration-75"
+                        strokeWidth={2.5}
+                      />
                     )}
-                  </g>
-                )
-              })}
-            </svg>
+              </svg>
 
-            {/* Interactive Tooltip */}
-            {hoveredPoint && (
-              <div
-                className="pointer-events-none absolute rounded-xl border border-border bg-popover/95 px-3 py-2 text-xs shadow-lg backdrop-blur-md transition-all -translate-x-1/2 -translate-y-full z-10"
-                style={{
-                  left: `${(hoveredPoint.x / chartWidth) * 100}%`,
-                  top: `${(hoveredPoint.y / chartHeight) * 100}%`,
-                }}
-              >
-                <p className="font-mono text-[11px] text-muted-foreground">{hoveredPoint.date}</p>
-                <p className="font-mono text-xs font-bold text-price mt-0.5">
-                  {formatPrice(hoveredPoint.revenue)}
-                </p>
-              </div>
-            )}
+              {/* Floating Hover Tooltip */}
+              {hoveredPoint && (
+                <div
+                  className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-full rounded-xl border border-border bg-popover/95 px-3 py-1.5 text-xs shadow-xl backdrop-blur-md transition-all font-sans whitespace-nowrap mb-2"
+                  style={{
+                    left: `${hoveredPoint.xPercent}%`,
+                    top: `${hoveredPoint.yPercent}%`,
+                  }}
+                >
+                  <div className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
+                    <Calendar className="size-3" />
+                    <span>{hoveredPoint.date}</span>
+                  </div>
+                  <div className="mt-0.5 flex items-center gap-2 font-mono">
+                    <span className="font-bold text-price text-xs">{formatPrice(hoveredPoint.revenue)}</span>
+                    {hoveredPoint.orders !== undefined && (
+                      <span className="text-[10px] text-muted-foreground font-sans">({hoveredPoint.orders} طلب)</span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Dedicated Non-Colliding X-Axis Labels Row */}
+          <div className="flex items-center justify-between font-mono text-[10px] text-muted-foreground pt-2.5 border-t border-border/60 ml-24 sm:ml-28">
+            {displayDateLabels.map((item, idx) => (
+              <span key={idx} className="truncate">
+                {item}
+              </span>
+            ))}
           </div>
         </div>
       </section>

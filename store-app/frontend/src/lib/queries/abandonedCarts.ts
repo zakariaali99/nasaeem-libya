@@ -3,11 +3,19 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import type { AbandonedCartsResponse } from '@/types/api'
 
-export function useAbandonedCarts() {
+export interface AbandonedCartsParams {
+  minutes?: number
+  status?: 'all' | 'pending' | 'reminded' | 'recovered'
+  q?: string
+}
+
+export function useAbandonedCarts(params?: AbandonedCartsParams) {
   return useQuery({
-    queryKey: ['admin-abandoned-carts'],
+    queryKey: ['admin-abandoned-carts', params],
     queryFn: async () => {
-      const res = await api.get<AbandonedCartsResponse>('/orders/admin/marketing/abandoned-carts/')
+      const res = await api.get<AbandonedCartsResponse>('/admin/marketing/abandoned-carts/', {
+        params: params as Record<string, string | number | boolean | undefined | null>,
+      })
       return res.data
     },
   })
@@ -18,7 +26,7 @@ export function useSendAbandonedWhatsApp() {
   return useMutation({
     mutationFn: async (cartId: string) => {
       const res = await api.post<{ message: string; whatsapp_link: string; discount_code: string }>(
-        `/orders/admin/marketing/abandoned-carts/${cartId}/send-whatsapp/`,
+        `/admin/marketing/abandoned-carts/${cartId}/send-whatsapp/`,
         {},
       )
       return res.data
@@ -34,10 +42,10 @@ export function useMarkCartRecovered() {
   return useMutation({
     mutationFn: async (cartId: string) => {
       const res = await api.post<{ message: string }>(
-        `/orders/admin/marketing/abandoned-carts/${cartId}/mark-recovered/`,
+        `/admin/marketing/abandoned-carts/${cartId}/mark-recovered/`,
         {},
       )
-      return res
+      return res.data
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-abandoned-carts'] })

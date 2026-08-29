@@ -71,26 +71,29 @@ class TestInventoryLogIsAppendOnly:
 
 
 class TestRelationalIntegrity:
-    def test_deleting_a_product_with_a_cart_item_is_blocked(self, product, customer):
+    def test_deleting_a_product_with_a_cart_item_cleans_cart(self, product, customer):
         from apps.orders.models import Cart, CartItem
 
         cart = Cart.objects.create(user=customer)
         CartItem.objects.create(cart=cart, product=product, quantity=1)
-        with pytest.raises(ProtectedError):
-            product.delete()
+        product.delete()
+        assert CartItem.objects.filter(cart=cart, product_id=product.id).count() == 0
 
-    def test_deleting_a_product_with_an_order_item_is_blocked(self, product, customer):
+    def test_deleting_a_product_with_an_order_item_preserves_order_history(self, product, customer):
         """Order history must survive a product being removed from the catalogue."""
         from apps.orders.models import Order, OrderItem
 
         order = Order.objects.create(order_number="202608MOA0001", user=customer)
-        OrderItem.objects.create(
+        item = OrderItem.objects.create(
             order=order, product=product, quantity=1,
             unit_price=Decimal("450.00"), total_price=Decimal("450.00"),
             product_name=product.name,
         )
-        with pytest.raises(ProtectedError):
-            product.delete()
+        product.delete()
+        item.refresh_from_db()
+        assert item.product is None
+        assert item.product_name == "عود ملكي"
+        assert item.total_price == Decimal("450.00")
 
     def test_a_product_cannot_be_in_the_same_category_twice(self, product, category):
         from apps.catalog.models import ProductCategory
@@ -310,20 +313,22 @@ class TestProductWrites:
         product.refresh_from_db()
         assert product.stock == 10
 
-    def test_deleting_a_product_with_order_history_deactivates_it_instead(
+    def test_deleting_a_product_with_order_history_deletes_product_safely(
         self, admin_api, product, customer
     ):
         from apps.orders.models import Order, OrderItem
 
         order = Order.objects.create(order_number="202608TST0001", user=customer)
-        OrderItem.objects.create(
+        item = OrderItem.objects.create(
             order=order, product=product, quantity=1, unit_price=Decimal("450.00"),
             total_price=Decimal("450.00"), product_name=product.name,
         )
         response = admin_api.delete(reverse("product-detail", args=[product.slug]))
         assert response.status_code == 200
-        product.refresh_from_db()
-        assert product.is_active is False
+        assert not Product.objects.filter(id=product.id).exists()
+        item.refresh_from_db()
+        assert item.product is None
+        assert item.product_name == "عود ملكي"
 
     def test_slugs_do_not_collide(self, admin_api):
         first = admin_api.post(reverse("product-list"), {"name": "عطر", "price": "10.00"}, format="json")

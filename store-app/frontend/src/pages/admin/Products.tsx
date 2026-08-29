@@ -298,14 +298,15 @@ export default function AdminProductsPage() {
       <ConfirmDialog
         open={pendingDelete !== null}
         onOpenChange={(open) => !open && setPendingDelete(null)}
-        title="حذف المنتج"
-        description={`هل أنت متأكد من حذف "${pendingDelete?.name}"؟ إذا كان المنتج مرتبطاً بسجلات سابقة فسيتم إخفاؤه تلقائياً للحفاظ على السجلات المالية.`}
+        title="حذف المنتج نهائياً"
+        description={`هل أنت متأكد من حذف «${pendingDelete?.name}»؟ سيتم حذف المنتج نهائياً من الكتالوج وقاعدة البيانات وتحديث المتجر فوراً.`}
         confirmLabel="حذف نهائي"
         loading={remove.isPending}
         onConfirm={async () => {
           if (!pendingDelete) return
           await remove.mutateAsync(pendingDelete.slug)
           setPendingDelete(null)
+          query.refetch()
         }}
       />
     </div>

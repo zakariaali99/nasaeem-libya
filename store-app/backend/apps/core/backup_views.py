@@ -77,6 +77,7 @@ class AdminBackupRestoreView(APIView):
     def post(self, request):
         uploaded_file = request.FILES.get("file")
         filename = request.data.get("filename")
+        temp_path = None
 
         if uploaded_file:
             # Save uploaded zip temporarily

@@ -9,6 +9,9 @@ bug, and `assertNumQueries` in the tests is what keeps it one.
 """
 
 from decimal import Decimal, InvalidOperation
+import logging
+
+logger = logging.getLogger(__name__)
 
 from django.core.cache import cache
 from django.db.models import Prefetch, Q
@@ -223,21 +226,36 @@ class ProductDetailView(APIView):
         product = self.get_object(lookup, admin=True)
         if product is None:
             return Response({"message": "المنتج غير موجود"}, status=status.HTTP_404_NOT_FOUND)
-        from django.db.models import ProtectedError
 
+        product_slug = product.slug
+        product_name = product.name
+
+        # Invalidate related product and storefront caches
         cache.delete(f"store:product:{lookup}")
-        if product.slug:
-            cache.delete(f"store:product:{product.slug}")
+        if product_slug:
+            cache.delete(f"store:product:{product_slug}")
+        cache.delete("store:categories:tree")
+
+        # Clean any ephemeral cart items for this product
+        try:
+            from apps.orders.models import CartItem
+            CartItem.objects.filter(product=product).delete()
+        except Exception:
+            pass
+
         try:
             product.delete()
-        except ProtectedError:
-            # PROTECT on order lines: deactivate instead of destroying history.
-            product.is_active = False
-            product.save(update_fields=["is_active", "updated_at"])
+        except Exception as e:
+            logger.error(f"Failed to delete product {product_name}: {e}")
             return Response(
-                {"data": None, "message": "المنتج مرتبط بطلبات سابقة، تم إخفاؤه بدل حذفه"}
+                {"error": f"تعذر حذف المنتج: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-        return Response(status=status.HTTP_204_NO_CONTENT)
+
+        return Response(
+            {"deleted": True, "message": f"تم حذف المنتج «{product_name}» نهائياً من المتجر"},
+            status=status.HTTP_200_OK,
+        )
 
 
 class CategoryListView(APIView):

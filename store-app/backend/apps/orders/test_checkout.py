@@ -224,11 +224,11 @@ class TestServerSideTotals:
 
 
 class TestCheckoutRefusals:
-    def test_checkout_requires_an_account(self, api, product, region):
+    def test_guest_can_checkout_without_account(self, api, product, region):
         api.post(reverse("cart"), {"product_id": str(product.id)}, format="json")
         response = api.post(reverse("cart-checkout"),
                             {"region_id": region.id, "address": "شارع"}, format="json")
-        assert response.status_code == 401
+        assert response.status_code == 201
 
     def test_an_empty_cart_cannot_be_checked_out(self, buyer_api, region):
         response = buyer_api.post(reverse("cart-checkout"),

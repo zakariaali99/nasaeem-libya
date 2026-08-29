@@ -153,7 +153,7 @@ class CheckoutSerializer(serializers.Serializer):
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
-    slug = serializers.CharField(source="product.slug", read_only=True)
+    slug = serializers.CharField(source="product.slug", read_only=True, default="")
     image = serializers.SerializerMethodField()
     variant_label = serializers.SerializerMethodField()
 
@@ -165,6 +165,8 @@ class OrderItemSerializer(serializers.ModelSerializer):
         ]
 
     def get_image(self, item):
+        if not item.product:
+            return None
         image = item.product.images.first()
         return ProductImageSerializer(image, context=self.context).data if image else None
 

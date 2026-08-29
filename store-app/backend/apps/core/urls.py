@@ -11,7 +11,7 @@ urlpatterns = [
     path("admin/backups/", backup_views.AdminBackupListView.as_view(), name="admin-backups-list"),
     path("admin/backups/export/", backup_views.AdminBackupExportView.as_view(), name="admin-backup-export"),
     path("admin/backups/download/<str:filename>/", backup_views.AdminBackupDownloadView.as_view(), name="admin-backup-download"),
-    path("admin/backups/<str:filename>/", backup_views.AdminBackupDeleteView.as_view(), name="admin-backup-delete"),
     path("admin/backups/restore/", backup_views.AdminBackupRestoreView.as_view(), name="admin-backup-restore"),
+    path("admin/backups/<str:filename>/", backup_views.AdminBackupDeleteView.as_view(), name="admin-backup-delete"),
 ]
 

@@ -183,13 +183,13 @@ class CartItem(TimestampedModel):
     cart = models.ForeignKey(
         Cart, on_delete=models.CASCADE, related_name="items", verbose_name="السلة"
     )
-    # PROTECT: deleting a product must never destroy a basket silently.
+    # CASCADE: if a product is deleted from the catalog, clean it from shopping carts.
     product = models.ForeignKey(
-        Product, on_delete=models.PROTECT, related_name="cart_items", verbose_name="المنتج"
+        Product, on_delete=models.CASCADE, related_name="cart_items", verbose_name="المنتج"
     )
     variant = models.ForeignKey(
         ProductVariant,
-        on_delete=models.PROTECT,
+        on_delete=models.CASCADE,
         null=True,
         blank=True,
         related_name="cart_items",
@@ -309,11 +309,16 @@ class OrderItem(TimestampedModel):
         Order, on_delete=models.CASCADE, related_name="items", verbose_name="الطلب"
     )
     product = models.ForeignKey(
-        Product, on_delete=models.PROTECT, related_name="order_items", verbose_name="المنتج"
+        Product,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="order_items",
+        verbose_name="المنتج",
     )
     variant = models.ForeignKey(
         ProductVariant,
-        on_delete=models.PROTECT,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="order_items",

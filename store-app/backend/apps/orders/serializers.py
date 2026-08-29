@@ -131,6 +131,8 @@ class CheckoutDraftSerializer(serializers.Serializer):
 
 
 class CheckoutSerializer(serializers.Serializer):
+    customer_name = serializers.CharField(required=False, allow_blank=True, max_length=150, default="")
+    customer_phone = serializers.CharField(required=False, allow_blank=True, max_length=50, default="")
     city_id = serializers.CharField(required=False, allow_blank=True, default="")
     region_id = serializers.CharField(required=False, allow_blank=True, default="")
     address = serializers.CharField(max_length=500, allow_blank=True, required=False, default="")

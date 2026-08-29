@@ -174,13 +174,24 @@ export function useCreateOrder() {
   })
 }
 
+export interface CheckoutConfirmResult {
+  order: Order
+  whatsapp_link?: string
+  whatsapp_invoice_message?: string
+  account_whatsapp_message?: string
+  new_account_created?: boolean
+}
+
 export function useConfirmCheckout() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (input: Record<string, string>) =>
-      (await api.post<Order>('/checkout/', input)).data,
+    mutationFn: async (input: Record<string, string>) => {
+      const res = (await api.post<any>('/checkout/', input)).data
+      return res as CheckoutConfirmResult & Order
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] })
+      queryClient.invalidateQueries({ queryKey: ['me'] })
     },
   })
 }

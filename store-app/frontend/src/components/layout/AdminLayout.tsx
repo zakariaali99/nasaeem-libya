@@ -7,8 +7,6 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardList,
-  CreditCard,
-  FileSpreadsheet,
   FolderTree,
   LayoutGrid,
   LogOut,
@@ -22,7 +20,6 @@ import {
   ShoppingCart,
   Store,
   Tags,
-  Truck,
   User,
   UserCog,
   Users,
@@ -79,11 +76,8 @@ const NAV_GROUPS: NavGroup[] = [
   {
     title: 'الشحن والمالية',
     items: [
-      { to: '/admin/cities', label: 'المدن والمناطق', icon: MapPin },
-      { to: '/admin/delivery', label: 'شركات التوصيل', icon: Truck },
-      { to: '/admin/delivery/reconciliation', label: 'مطابقة كشوفات COD', icon: FileSpreadsheet },
-      { to: '/admin/payment_methods', label: 'بوابات الدفع', icon: CreditCard },
-      { to: '/admin/ledger', label: 'دفتر الأستاذ والتسويات', icon: Wallet },
+      { to: '/admin/cities', label: 'المدن ومناطق التوصيل', icon: MapPin },
+      { to: '/admin/ledger', label: 'دفتر الأستاذ والمبيعات', icon: Wallet },
     ],
   },
   {

@@ -35,7 +35,7 @@ const TRUST_BADGES = [
   {
     icon: ShieldCheck,
     title: 'دفع آمن ومريح',
-    description: 'سداد، معاملات، بطاقات، أو كاش',
+    description: 'الدفع عند الاستلام كاش أو تحويل مصرفي مباشر',
   },
 ]
 
@@ -133,17 +133,11 @@ export function Footer() {
           <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3">
             <span className="text-[11px] font-semibold text-foreground shrink-0">طرق الدفع المعتمدة:</span>
             <div className="flex flex-wrap items-center justify-center gap-1.5">
-              <span className="rounded-lg border border-border bg-card px-2 py-1 text-[10px] font-bold font-mono">
-                سداد Sadad
+              <span className="rounded-lg border border-border bg-card px-2.5 py-1 text-[11px] font-bold text-foreground">
+                الدفع عند الاستلام كاش
               </span>
-              <span className="rounded-lg border border-border bg-card px-2 py-1 text-[10px] font-bold font-mono">
-                معاملات Moamalat
-              </span>
-              <span className="rounded-lg border border-border bg-card px-2 py-1 text-[10px] font-bold font-mono">
-                تداول Tadawul
-              </span>
-              <span className="rounded-lg border border-border bg-card px-2 py-1 text-[10px] font-bold">
-                الدفع عند الاستلام
+              <span className="rounded-lg border border-border bg-card px-2.5 py-1 text-[11px] font-bold text-foreground">
+                تحويل مصرفي مباشر
               </span>
             </div>
           </div>

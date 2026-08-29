@@ -210,58 +210,12 @@ class ProductDetailSerializer(ProductListSerializer):
         db_bundles = obj.bundles_as_main.filter(is_active=True)
         if db_bundles.exists():
             return ProductBundleSerializer(db_bundles, many=True, context=self.context).data
-
-        # Generate intelligent dynamic bundle if none explicitly configured
-        other_products = Product.objects.filter(is_active=True, stock__gt=0).exclude(id=obj.id)[:2]
-        if not other_products.exists():
-            other_products = Product.objects.filter(is_active=True).exclude(id=obj.id)[:2]
-        if not other_products.exists():
-            return []
-
-        base_price = Decimal(str(obj.price or 220))
-        addon_prices = sum((Decimal(str(p.price or 80)) for p in other_products), Decimal(0))
-        original = base_price + addon_prices
-        # 18% bundling discount
-        bundle_price = round(original * Decimal("0.82"), 2)
-
-        return [{
-            "id": f"dynamic-bundle-{obj.id}",
-            "name": f"حزمة العناية الملكية المتكاملة مع {obj.name}",
-            "slug": f"royal-bundle-{obj.slug}",
-            "description": "تشمل العطر الأصلي مع معطر شعر فاخر وعينة سفر مميزة بسعر توفيري خاص.",
-            "bundle_price": str(bundle_price),
-            "original_price": str(original),
-            "savings_amount": str(original - bundle_price),
-            "badge_text": "وفر 18% + شحن مجاني",
-            "included_products": ProductListSerializer(other_products, many=True, context=self.context).data,
-        }]
+        return []
 
     def get_perfume_details(self, obj):
-        if hasattr(obj, "perfume_details"):
+        if hasattr(obj, "perfume_details") and obj.perfume_details is not None:
             return PerfumeAttributeSerializer(obj.perfume_details).data
-        return {
-            "fragrance_family": "شرقي خشبي فاخر",
-            "gender": "UNISEX",
-            "concentration": "Eau de Parfum",
-            "origin_country": "فرنسا",
-            "top_notes": [
-                {"name": "البرغموت الإيطالي", "icon": "citrus", "desc": "افتتاحية منعشة وحيوية"},
-                {"name": "الفلفل الوردي", "icon": "spice", "desc": "لمسة توابل أنيقة"},
-            ],
-            "heart_notes": [
-                {"name": "العود الكمبودي المعتق", "icon": "oud", "desc": "قلب دافئ وفاخر"},
-                {"name": "الورد الجوري الدمشقي", "icon": "rose", "desc": "أناقة مخملية ساحرة"},
-            ],
-            "base_notes": [
-                {"name": "المسك الأبيض الفاخر", "icon": "musk", "desc": "أثر دائم وناعم"},
-                {"name": "العنبر الملكي", "icon": "amber", "desc": "عمق وثبات استثنائي"},
-            ],
-            "longevity_score": 5,
-            "longevity_hours": "14 إلى 18 ساعة",
-            "sillage_score": 4,
-            "seasons": ["winter", "autumn", "spring"],
-            "occasions": ["formal", "evening", "special_dates"],
-        }
+        return None
 
 
 class ProductWriteSerializer(serializers.ModelSerializer):
@@ -272,6 +226,7 @@ class ProductWriteSerializer(serializers.ModelSerializer):
         queryset=Collection.objects.all(), many=True, required=False, write_only=True,
     )
     images = serializers.ListField(child=serializers.DictField(), required=False, write_only=True)
+    perfume_details = serializers.DictField(required=False, write_only=True)
 
     class Meta:
         model = Product
@@ -279,7 +234,7 @@ class ProductWriteSerializer(serializers.ModelSerializer):
             "id", "name", "slug", "description", "price", "compare_at_price",
             "sku", "barcode", "is_active", "has_variants", "track_quantity",
             "meta_title", "meta_description", "width", "length", "height", "weight",
-            "category_ids", "collection_ids", "images",
+            "category_ids", "collection_ids", "images", "perfume_details",
         ]
         extra_kwargs = {"slug": {"required": False}}
         # `stock` is deliberately absent: stock only ever moves through
@@ -294,7 +249,7 @@ class ProductWriteSerializer(serializers.ModelSerializer):
             })
         return attrs
 
-    def _apply_relations(self, product, categories, collections, images):
+    def _apply_relations(self, product, categories, collections, images, perfume_details=None):
         if categories is not None:
             product.categories.set(categories)
         if collections is not None:
@@ -311,22 +266,44 @@ class ProductWriteSerializer(serializers.ModelSerializer):
                 for index, item in enumerate(images)
                 if item.get("url")
             ])
+        if perfume_details is not None:
+            from .models import PerfumeAttribute
+            defaults = {
+                "fragrance_family": perfume_details.get("fragrance_family", "شرقي فاخر"),
+                "gender": perfume_details.get("gender", "UNISEX"),
+                "concentration": perfume_details.get("concentration", "Eau de Parfum"),
+                "origin_country": perfume_details.get("origin_country", "فرنسا"),
+                "top_notes": perfume_details.get("top_notes", []),
+                "heart_notes": perfume_details.get("heart_notes", []),
+                "base_notes": perfume_details.get("base_notes", []),
+                "longevity_score": int(perfume_details.get("longevity_score") or 5),
+                "longevity_hours": str(perfume_details.get("longevity_hours") or "12 إلى 18 ساعة"),
+                "sillage_score": int(perfume_details.get("sillage_score") or 4),
+                "seasons": perfume_details.get("seasons", []),
+                "occasions": perfume_details.get("occasions", []),
+            }
+            PerfumeAttribute.objects.update_or_create(
+                product=product,
+                defaults=defaults,
+            )
 
     def create(self, validated_data):
         categories = validated_data.pop("category_ids", None)
         collections = validated_data.pop("collection_ids", None)
         images = validated_data.pop("images", None)
+        perfume_details = validated_data.pop("perfume_details", None)
         validated_data.setdefault("slug", unique_slug(Product, validated_data["name"]))
         product = Product.objects.create(**validated_data)
-        self._apply_relations(product, categories, collections, images)
+        self._apply_relations(product, categories, collections, images, perfume_details)
         return product
 
     def update(self, instance, validated_data):
         categories = validated_data.pop("category_ids", None)
         collections = validated_data.pop("collection_ids", None)
         images = validated_data.pop("images", None)
+        perfume_details = validated_data.pop("perfume_details", None)
         product = super().update(instance, validated_data)
-        self._apply_relations(product, categories, collections, images)
+        self._apply_relations(product, categories, collections, images, perfume_details)
         return product
 
     def to_representation(self, instance):

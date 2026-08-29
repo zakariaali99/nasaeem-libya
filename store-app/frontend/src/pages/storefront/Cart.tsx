@@ -13,7 +13,6 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ApiError } from '@/lib/api'
 import { formatPrice } from '@/lib/format'
-import { useMe } from '@/lib/queries/auth'
 import {
   useApplyDiscount,
   useCart,
@@ -26,12 +25,11 @@ import { usePageTitle } from '@/lib/usePageTitle'
 import type { CartLine } from '@/types/api'
 
 export default function CartPage() {
-  usePageTitle('سلة التسوّق — نسائم ليبيا', 'راجع المنتجات والعطور قبل إتمام عملية الشراء.')
+  usePageTitle('سلة المشتريات — نسائم ليبيا', 'راجع المنتجات والعطور المختارة قبل إتمام الدفع.')
 
   const navigate = useNavigate()
   const { data: cart, isPending, isError, error, refetch } = useCart()
   const { data: layoutData } = useStorefrontLayout()
-  const { data: user } = useMe()
   const createOrder = useCreateOrder()
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
 
@@ -69,10 +67,6 @@ export default function CartPage() {
 
   const proceed = async () => {
     setCheckoutError(null)
-    if (!user) {
-      navigate('/login?next=%2Fcart')
-      return
-    }
     try {
       const order = await createOrder.mutateAsync({})
       navigate(`/checkout/${order.id}`)

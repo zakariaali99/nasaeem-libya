@@ -1,4 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import { Eye, EyeOff } from 'lucide-react'
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
@@ -18,6 +20,7 @@ export default function LoginPage() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const login = useLogin()
+  const [showPassword, setShowPassword] = useState(false)
 
   const {
     register,
@@ -66,7 +69,7 @@ export default function LoginPage() {
               inputMode="numeric"
               autoComplete="tel"
               dir="ltr"
-              className="text-start"
+              className="text-start font-mono"
               placeholder="0912345678"
             />
           )}
@@ -74,7 +77,23 @@ export default function LoginPage() {
 
         <Field id="password" label="كلمة المرور" error={errors.password?.message}>
           {(field) => (
-            <Input {...field} {...register('password')} type="password" autoComplete="current-password" />
+            <div className="relative">
+              <Input
+                {...field}
+                {...register('password')}
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
+                className="pe-11"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="absolute end-0 top-0 flex h-full items-center px-3 text-muted-foreground hover:text-foreground focus:outline-hidden transition-colors"
+                aria-label={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+              >
+                {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              </button>
+            </div>
           )}
         </Field>
 

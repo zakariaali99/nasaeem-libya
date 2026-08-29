@@ -8,7 +8,6 @@ import { ErrorState } from '@/components/storefront/ErrorState'
 import { DiscountBadge } from '@/components/storefront/DiscountBadge'
 import { FragrancePyramid } from '@/components/storefront/FragrancePyramid'
 import { FrequentlyBoughtTogether } from '@/components/storefront/FrequentlyBoughtTogether'
-import { LiveSocialProof } from '@/components/storefront/LiveSocialProof'
 import { Price } from '@/components/storefront/Price'
 import { ProductGallery } from '@/components/storefront/ProductGallery'
 import { ProductGrid } from '@/components/storefront/ProductGrid'
@@ -186,8 +185,6 @@ function ProductView({
             ) : null}
           </div>
 
-          <LiveSocialProof product={product} />
-
           <div className="flex flex-wrap items-center gap-3">
             <Price price={price} compareAtPrice={compareAt} size="lg" />
             <DiscountBadge price={price} compareAtPrice={compareAt} />
@@ -267,10 +264,12 @@ function ProductView({
       ) : null}
 
       {/* Sensory Olfactory Pyramid & Performance Radar */}
-      <section className="mt-10 space-y-6">
-        <FragrancePyramid details={product.perfume_details} />
-        <SensoryPerformanceRadar details={product.perfume_details} />
-      </section>
+      {product.perfume_details && (
+        <section className="mt-10 space-y-6">
+          <FragrancePyramid details={product.perfume_details} />
+          <SensoryPerformanceRadar details={product.perfume_details} />
+        </section>
+      )}
 
       {/* Frequently Bought Together & Bundles */}
       {product.bundles && product.bundles[0] ? (

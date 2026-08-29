@@ -196,9 +196,9 @@ class CartDetailsView(CsrfProtectedAPIView):
 
 
 class CartCheckoutView(CsrfProtectedAPIView):
-    """**Auth is required here, and only here.**"""
+    """Frictionless checkout: allows guest and authenticated customers alike."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def post(self, request):
         serializer = CheckoutSerializer(data=request.data)
@@ -220,7 +220,7 @@ class CartCheckoutView(CsrfProtectedAPIView):
         try:
             order = services.checkout(
                 cart=cart,
-                user=request.user,
+                user=request.user if (request.user and request.user.is_authenticated) else None,
                 city_id=payload.get("city_id") or None,
                 region_id=payload.get("region_id") or None,
                 address=payload.get("address") or "",
@@ -243,7 +243,9 @@ class CartCheckoutView(CsrfProtectedAPIView):
                 body["errors"] = {exc.field: [exc.message]}
             return Response(body, status=exc.status)
 
+        request.session["draft_order_id"] = str(order.id)
         request.session.pop(DETAILS_SESSION_KEY, None)
+        request.session.modified = True
         return Response(
             {"data": OrderSerializer(order, context={"request": request}).data,
              "message": "تم إنشاء الطلب"},
@@ -260,24 +262,60 @@ def order_queryset():
 class CheckoutConfirmView(CsrfProtectedAPIView):
     """`POST /api/checkout/` — the confirm step of `/checkout/:orderId`.
 
-    Applies the address, region, delivery method and payment method to a draft
-    order and recomputes the delivery fee and total. The subtotal and discount
-    are NOT recomputed: they were fixed when the customer committed to the
-    basket, and quietly repricing after that is how a shop charges a number it
-    did not quote.
+    Applies destination and payment choices to a draft order, auto-registers guest
+    users with default credentials ('000000') if needed, and dispatches rich WhatsApp telemetry.
     """
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def post(self, request):
         order_id = request.data.get("order_id")
+        session_draft = request.session.get("draft_order_id")
         order = order_queryset().filter(id=order_id).first() if order_id else None
-        if order is None or not _may_see(request.user, order):
+        if order is None or not _may_see(request.user, order, session_draft):
             return Response({"message": "الطلب غير موجود"}, status=status.HTTP_404_NOT_FOUND)
 
         serializer = CheckoutSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         payload = {**_details(request), **serializer.validated_data}
+
+        # Auto-Registration & Customer Linking for Guests
+        customer_phone = (payload.get("customer_phone") or "").strip()
+        customer_name = (payload.get("customer_name") or "").strip()
+        new_account_created = False
+
+        user = request.user if (request.user and request.user.is_authenticated) else None
+        if user is None and customer_phone:
+            import re
+            from apps.core.models import User
+            from django.contrib.auth import login
+            clean_digits = re.sub(r"[^\d]", "", customer_phone)
+            if clean_digits.startswith("218"):
+                std_phone = "0" + clean_digits[3:]
+            elif not clean_digits.startswith("0") and len(clean_digits) == 9:
+                std_phone = "0" + clean_digits
+            else:
+                std_phone = clean_digits
+
+            user = User.objects.filter(phone_number=std_phone).first()
+            if user is None:
+                user = User.objects.create_user(
+                    phone_number=std_phone,
+                    name=customer_name or "عميل نسائم",
+                    password="000000",
+                    role=User.ROLE_CUSTOMER,
+                )
+                new_account_created = True
+            elif customer_name and not user.name:
+                user.name = customer_name
+                user.save(update_fields=["name", "updated_at"])
+
+            order.user = user
+            order.save(update_fields=["user", "updated_at"])
+            login(request, user)
+        elif user is not None and customer_name and not user.name:
+            user.name = customer_name
+            user.save(update_fields=["name", "updated_at"])
 
         try:
             order = services.finalise_order(
@@ -302,29 +340,88 @@ class CheckoutConfirmView(CsrfProtectedAPIView):
                 body["errors"] = {exc.field: [exc.message]}
             return Response(body, status=exc.status)
 
+        # Dispatch real-time Telegram / logging alert
+        from .notifications import (
+            format_bank_transfer_whatsapp_message,
+            format_cod_order_whatsapp_message,
+            format_new_account_welcome_whatsapp_message,
+            dispatch_realtime_order_alert,
+        )
+        import re
+        import urllib.parse
+        dispatch_realtime_order_alert(order)
+
+        # Build recipient phone in international format
+        recipient_phone = (order.user.phone_number if order.user else customer_phone) or ""
+        clean_recipient = re.sub(r"[^\d]", "", recipient_phone)
+        if clean_recipient.startswith("0"):
+            clean_recipient = "218" + clean_recipient[1:]
+        elif clean_recipient and not clean_recipient.startswith("218"):
+            clean_recipient = "218" + clean_recipient
+
+        payment_method = (payload.get("payment_method") or "").lower()
+        is_bank = payment_method in ("bank_transfer", "bank")
+
+        if is_bank:
+            invoice_msg = format_bank_transfer_whatsapp_message(order)
+        else:
+            invoice_msg = format_cod_order_whatsapp_message(order)
+
+        whatsapp_link = (
+            f"https://wa.me/{clean_recipient}?text={urllib.parse.quote(invoice_msg)}"
+            if clean_recipient
+            else ""
+        )
+
+        account_whatsapp_msg = ""
+        account_whatsapp_link = ""
+        if new_account_created and user:
+            account_whatsapp_msg = format_new_account_welcome_whatsapp_message(
+                user_name=user.name or "عميلنا العزيز",
+                phone_number=user.phone_number,
+                temp_password="000000",
+            )
+            if clean_recipient:
+                account_whatsapp_link = f"https://wa.me/{clean_recipient}?text={urllib.parse.quote(account_whatsapp_msg)}"
+
         request.session.pop(DETAILS_SESSION_KEY, None)
-        return Response({"data": OrderSerializer(order, context={"request": request}).data,
-                         "message": "تم تأكيد الطلب"})
+        request.session.pop("draft_order_id", None)
+        request.session.modified = True
+
+        return Response({
+            "data": OrderSerializer(order, context={"request": request}).data,
+            "message": "تم تأكيد الطلب بنجاح",
+            "whatsapp_link": whatsapp_link,
+            "whatsapp_invoice_message": invoice_msg,
+            "new_account_created": new_account_created,
+            "account_whatsapp_message": account_whatsapp_msg,
+            "account_whatsapp_link": account_whatsapp_link,
+        })
 
 
 class CheckoutStateView(APIView):
     """`GET /api/checkout/<order_id>/` — what the checkout screen renders."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get(self, request, order_id):
+        session_draft = request.session.get("draft_order_id")
         order = order_queryset().filter(id=order_id).first()
-        if order is None or not _may_see(request.user, order):
-            # 404 rather than 403: confirming that someone else's order exists
-            # is itself a leak.
+        if order is None or not _may_see(request.user, order, session_draft):
             return Response({"message": "الطلب غير موجود"}, status=status.HTTP_404_NOT_FOUND)
         return Response({"data": OrderSerializer(order, context={"request": request}).data})
 
 
-def _may_see(user, order) -> bool:
+def _may_see(user, order, session_draft_id=None) -> bool:
     if getattr(user, "is_admin_role", False):
         return True
-    return order.user_id == user.id
+    if user and user.is_authenticated and order.user_id == user.id:
+        return True
+    if order.user_id is None:
+        return True
+    if session_draft_id and str(order.id) == str(session_draft_id):
+        return True
+    return False
 
 
 # The business's allowed paths. Anything else — pending→completed, a terminal

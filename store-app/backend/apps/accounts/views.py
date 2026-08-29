@@ -217,6 +217,17 @@ class AdminUserDetailView(APIView):
         if user is None:
             return Response({"message": "المستخدم غير موجود"}, status=status.HTTP_404_NOT_FOUND)
 
+        data = request.data
+        if "name" in data and str(data["name"]).strip():
+            user.name = str(data["name"]).strip()
+            user.save(update_fields=["name", "updated_at"])
+
+        if "phone_number" in data:
+            new_phone = str(data["phone_number"]).strip()
+            if new_phone and not User.objects.filter(phone_number=new_phone).exclude(pk=user.pk).exists():
+                user.phone_number = new_phone
+                user.save(update_fields=["phone_number", "updated_at"])
+
         serializer = AdminUserUpdateSerializer(user, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         if serializer.validated_data.get("banned") and not user.ban_expires_at:
@@ -226,7 +237,65 @@ class AdminUserDetailView(APIView):
             "admin updated user id=%s by=%s at=%s",
             user.id, request.user.phone_number, timezone.now().isoformat(),
         )
-        return Response({"data": UserSerializer(user).data, "message": "تم تحديث المستخدم"})
+        return Response({"data": UserSerializer(user).data, "message": "تم تحديث بيانات المستخدم بنجاح"})
+
+
+class AdminUserResetPasswordView(APIView):
+    """Allows administrators to set or reset a customer's password (e.g. to '000000')."""
+    permission_classes = [IsAdminRole]
+
+    def post(self, request, user_id):
+        user = User.objects.filter(pk=user_id).first()
+        if user is None:
+            return Response({"message": "المستخدم غير موجود"}, status=status.HTTP_404_NOT_FOUND)
+
+        new_password = str(request.data.get("password", "")).strip()
+        if not new_password:
+            new_password = "000000"
+
+        if len(new_password) < 6:
+            return Response(
+                {"message": "كلمة المرور يجب أن تكون 6 خانات على الأقل"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user.set_password(new_password)
+        user.save(update_fields=["password", "updated_at"])
+        logger.info(
+            "admin reset password for user id=%s by=%s at=%s",
+            user.id, request.user.phone_number, timezone.now().isoformat(),
+        )
+        return Response({
+            "message": f"تم تعيين كلمة المرور بنجاح ({new_password})",
+            "password": new_password,
+        })
+
+
+class ChangePasswordView(CsrfProtectedAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        current_password = request.data.get("current_password", "")
+        new_password = str(request.data.get("new_password", "")).strip()
+
+        if len(new_password) < 6:
+            return Response(
+                {"message": "كلمة المرور الجديدة يجب أن تكون 6 خانات على الأقل"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if request.user.has_usable_password() and not request.user.check_password(current_password):
+            return Response(
+                {"message": "كلمة المرور الحالية غير صحيحة"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        request.user.set_password(new_password)
+        request.user.save(update_fields=["password", "updated_at"])
+        from django.contrib.auth import update_session_auth_hash
+        update_session_auth_hash(request, request.user)
+
+        return Response({"message": "تم تغيير كلمة المرور بنجاح"})
 
 
 class AddressListCreateView(CsrfProtectedAPIView):

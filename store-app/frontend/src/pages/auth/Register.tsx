@@ -1,4 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import { Eye, EyeOff } from 'lucide-react'
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router-dom'
 
@@ -16,6 +18,7 @@ export default function RegisterPage() {
   usePageTitle('إنشاء حساب', 'أنشئ حساباً جديداً في متجر نسائم ليبيا')
   const navigate = useNavigate()
   const signUp = useRegister()
+  const [showPassword, setShowPassword] = useState(false)
 
   const {
     register,
@@ -65,7 +68,7 @@ export default function RegisterPage() {
               inputMode="numeric"
               autoComplete="tel"
               dir="ltr"
-              className="text-start"
+              className="text-start font-mono"
               placeholder="0912345678"
             />
           )}
@@ -77,7 +80,25 @@ export default function RegisterPage() {
           error={errors.password?.message ?? fieldErrors?.password?.[0]}
           hint="8 أحرف على الأقل، ولا تكون أرقاماً فقط"
         >
-          {(field) => <Input {...field} {...register('password')} type="password" autoComplete="new-password" />}
+          {(field) => (
+            <div className="relative">
+              <Input
+                {...field}
+                {...register('password')}
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="new-password"
+                className="pe-11"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="absolute end-0 top-0 flex h-full items-center px-3 text-muted-foreground hover:text-foreground focus:outline-hidden transition-colors"
+                aria-label={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+              >
+                {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              </button>
+            </div>
+          )}
         </Field>
 
         <Button type="submit" block size="lg" loading={isSubmitting || signUp.isPending}>

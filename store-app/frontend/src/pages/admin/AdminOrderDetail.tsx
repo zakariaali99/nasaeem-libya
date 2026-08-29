@@ -27,7 +27,6 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatDateTime, formatPrice } from '@/lib/format'
-import { useCreateShipment } from '@/lib/queries/delivery'
 import { useOrder, useUpdateOrder } from '@/lib/queries/orders'
 import { useVerifyPayment } from '@/lib/queries/payments'
 import { usePageTitle } from '@/lib/usePageTitle'
@@ -44,7 +43,6 @@ export default function AdminOrderDetail() {
   const { orderIdOrNumber = '' } = useParams()
   const { data: order, isPending } = useOrder(orderIdOrNumber)
   const update = useUpdateOrder(orderIdOrNumber)
-  const createShipment = useCreateShipment(order?.id)
   const verifyPayment = useVerifyPayment(orderIdOrNumber)
   const [copied, setCopied] = useState(false)
   const [copiedTracking, setCopiedTracking] = useState(false)
@@ -297,52 +295,128 @@ export default function AdminOrderDetail() {
             </div>
           </div>
 
-          {/* Operational Status Workflow Manager */}
-          <div className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-xs space-y-4 print:hidden">
+          {/* Operational Status Linear Pipeline Manager */}
+          <div className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-xs space-y-5 print:hidden">
             <div className="flex items-center justify-between border-b border-border pb-3">
-              <h3 className="font-bold text-sm sm:text-base text-foreground">الإجراءات والتحويلات التشغيلية</h3>
+              <div className="space-y-0.5">
+                <h3 className="font-bold text-sm sm:text-base text-foreground">مسار معالجة وتسليم الطلب</h3>
+                <p className="text-xs text-muted-foreground">خطوات واضحة وبنقرة واحدة لتحديث حالة الطلب والشحن</p>
+              </div>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">الحالة الحالية:</span>
+                <span className="text-xs font-semibold text-muted-foreground">الحالة:</span>
                 <StatusBadge status={order.status} />
               </div>
             </div>
 
-            <div className="space-y-3">
-              <p className="text-xs text-muted-foreground">
-                نقل حالة الطلب التشغيلية مباشرة مع تحديث سجل الحركات:
-              </p>
+            {/* Visual Step Indicator */}
+            <div className="grid grid-cols-4 gap-2 pt-1 text-center">
+              {[
+                { key: 'new', label: '1. طلب جديد', active: true, done: order.status !== 'pending' && order.status !== 'cancelled' },
+                { key: 'processing', label: '2. قيد التجهيز', active: order.status === 'processing' || order.shipping_status === 'accepted' || order.status === 'completed', done: order.shipping_status === 'accepted' || order.status === 'completed' },
+                { key: 'shipping', label: '3. مع المندوب', active: order.shipping_status === 'accepted' || order.status === 'completed', done: order.status === 'completed' },
+                { key: 'completed', label: '4. تم التسليم', active: order.status === 'completed', done: order.status === 'completed' },
+              ].map((step) => (
+                <div
+                  key={step.key}
+                  className={cn(
+                    'p-2.5 rounded-2xl border text-xs font-bold transition-all',
+                    step.done
+                      ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                      : step.active
+                      ? 'border-primary bg-primary/10 text-primary shadow-xs ring-1 ring-primary/30'
+                      : 'border-border/60 bg-muted/20 text-muted-foreground/60'
+                  )}
+                >
+                  <span className="block text-xs">{step.label}</span>
+                </div>
+              ))}
+            </div>
 
-              <div className="flex flex-wrap gap-2.5">
-                {order.status === 'pending' && (
+            {/* One Clear Primary Next Action Button */}
+            <div className="p-4 rounded-2xl border border-primary/20 bg-primary/5 space-y-3">
+              {order.status === 'pending' && (
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h4 className="font-bold text-sm text-foreground">الإجراء التالي المطلوب:</h4>
+                    <p className="text-xs text-muted-foreground">تأكيد توفر العطور في المخزن والبدء في تعبئتها وتجهيزها.</p>
+                  </div>
                   <Button
                     loading={update.isPending}
                     onClick={() => update.mutate({ status: 'processing' })}
-                    className="rounded-xl text-xs font-bold h-10 px-5 gap-1.5 shadow-sm"
+                    className="rounded-xl text-xs font-bold h-11 px-6 gap-2 shadow-sm"
                   >
                     <Package className="size-4" />
-                    <span>بدء التجهيز والمعالجة</span>
+                    <span>تأكيد الطلب وبدء التجهيز الفوري 📦</span>
                   </Button>
-                )}
+                </div>
+              )}
 
-                {order.status === 'processing' && (
+              {order.status === 'processing' && order.shipping_status !== 'accepted' && (
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h4 className="font-bold text-sm text-foreground">الإجراء التالي المطلوب:</h4>
+                    <p className="text-xs text-muted-foreground">تم تجهيز كيس العطور الفاخر وتغليفه وجاهز للتسليم لمندوب التوصيل.</p>
+                  </div>
                   <Button
                     loading={update.isPending}
-                    onClick={() => update.mutate({ status: 'completed' })}
-                    className="rounded-xl text-xs font-bold h-10 px-5 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                    onClick={() => update.mutate({ shipping_status: 'accepted' })}
+                    className="rounded-xl text-xs font-bold h-11 px-6 gap-2 bg-sky-600 hover:bg-sky-700 text-white shadow-sm"
+                  >
+                    <Truck className="size-4" />
+                    <span>تسليم للمندوب (خروج للتوصيل 🚚)</span>
+                  </Button>
+                </div>
+              )}
+
+              {(order.shipping_status === 'accepted' || (order.status === 'processing' && order.shipping_status === 'accepted')) && order.status !== 'completed' && (
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h4 className="font-bold text-sm text-foreground">الإجراء التالي المطلوب:</h4>
+                    <p className="text-xs text-muted-foreground">أكد المندوب تسليم العطر للعميل واستلام المبلغ كاش أو تأكيد التحويل.</p>
+                  </div>
+                  <Button
+                    loading={update.isPending}
+                    onClick={() => update.mutate({ status: 'completed', shipping_status: 'delivered' })}
+                    className="rounded-xl text-xs font-bold h-11 px-6 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
                   >
                     <CheckCircle2 className="size-4" />
-                    <span>تأكيد إكمال وتسليم الطلب</span>
+                    <span>تأكيد التسليم واستلام الكاش (اكتمل الطلب) ✅</span>
                   </Button>
-                )}
+                </div>
+              )}
 
+              {order.status === 'completed' && (
+                <div className="flex items-center gap-2.5 text-emerald-700 dark:text-emerald-300 text-xs font-bold">
+                  <CheckCircle2 className="size-5" />
+                  <span>الطلب مكتمل بنجاح، وتم تسليم العطر للعميل وتحصيل القيمة.</span>
+                </div>
+              )}
+
+              {order.status === 'cancelled' && (
+                <div className="flex items-center gap-2.5 text-destructive text-xs font-bold">
+                  <XCircle className="size-5" />
+                  <span>تم إلغاء هذا الطلب وإرجاع المنتجات للمخزون.</span>
+                </div>
+              )}
+            </div>
+
+            {/* Secondary Actions (Cancel / Refund) */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-border">
+              <span className="text-xs text-muted-foreground">إجراءات استثنائية:</span>
+              <div className="flex items-center gap-2">
                 {order.status !== 'cancelled' && order.status !== 'completed' && (
                   <Button
                     variant="outline"
+                    size="sm"
                     loading={update.isPending}
-                    onClick={() => update.mutate({ status: 'cancelled' })}
-                    className="rounded-xl text-xs font-bold h-10 px-4 text-destructive border-destructive/30 hover:bg-destructive/10 gap-1.5"
+                    onClick={() => {
+                      if (window.confirm('هل أنت متأكد من رغبتك في إلغاء هذا الطلب؟')) {
+                        update.mutate({ status: 'cancelled' })
+                      }
+                    }}
+                    className="rounded-xl text-xs font-bold h-9 px-3.5 text-destructive border-destructive/30 hover:bg-destructive/10 gap-1.5"
                   >
-                    <XCircle className="size-4" />
+                    <XCircle className="size-3.5" />
                     <span>إلغاء الطلب</span>
                   </Button>
                 )}
@@ -350,74 +424,17 @@ export default function AdminOrderDetail() {
                 {order.status === 'completed' && (
                   <Button
                     variant="outline"
+                    size="sm"
                     loading={update.isPending}
-                    onClick={() => update.mutate({ status: 'refunded' })}
-                    className="rounded-xl text-xs font-bold h-10 px-4 gap-1.5"
-                  >
-                    <RotateCcw className="size-4" />
-                    <span>تسجيل استرجاع (Refund)</span>
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            {/* Shipping Status Workflow */}
-            <div className="border-t border-border pt-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-foreground">حالة الشحن والتوصيل:</span>
-                <StatusBadge status={order.shipping_status} />
-              </div>
-
-              <div className="flex flex-wrap gap-2.5">
-                {/* Courier Shipment Dispatch Button */}
-                {!order.tracking_number ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    loading={createShipment.isPending}
-                    onClick={() => createShipment.mutate({ force: false })}
-                    className="rounded-xl text-xs font-bold h-9 px-4 gap-1.5 border-primary/30 text-primary bg-primary/5 hover:bg-primary/10"
-                  >
-                    <Truck className="size-3.5" />
-                    <span>إنشاء بوليصة شحن وتوليد رقم التتبع</span>
-                  </Button>
-                ) : (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    loading={createShipment.isPending}
-                    onClick={() => createShipment.mutate({ force: true })}
-                    className="rounded-xl text-xs font-bold h-9 px-3 gap-1.5 text-muted-foreground hover:text-foreground"
-                    title="إعادة إنشاء بوليصة شحن جديدة وإلغاء القديمة"
+                    onClick={() => {
+                      if (window.confirm('هل أنت متأكد من تسجيل إرجاع (Refund) لهذا الطلب؟')) {
+                        update.mutate({ status: 'refunded' })
+                      }
+                    }}
+                    className="rounded-xl text-xs font-bold h-9 px-3.5 gap-1.5 text-amber-600 border-amber-500/30 hover:bg-amber-500/10"
                   >
                     <RotateCcw className="size-3.5" />
-                    <span>إعادة توليد البوليصة (Force)</span>
-                  </Button>
-                )}
-
-                {order.shipping_status === 'pending' && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    loading={update.isPending}
-                    onClick={() => update.mutate({ shipping_status: 'accepted' })}
-                    className="rounded-xl text-xs font-bold h-9 px-4 gap-1.5 border-sky-500/40 text-sky-600 dark:text-sky-400 bg-sky-500/10 hover:bg-sky-500/20"
-                  >
-                    <Truck className="size-3.5" />
-                    <span>تسليم للمندوب / الشحن</span>
-                  </Button>
-                )}
-
-                {order.shipping_status === 'accepted' && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    loading={update.isPending}
-                    onClick={() => update.mutate({ shipping_status: 'delivered' })}
-                    className="rounded-xl text-xs font-bold h-9 px-4 gap-1.5 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20"
-                  >
-                    <CheckCircle2 className="size-3.5" />
-                    <span>تم التوصيل للعميل</span>
+                    <span>تسجيل استرجاع (Refund)</span>
                   </Button>
                 )}
               </div>

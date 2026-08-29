@@ -1,21 +1,27 @@
 import {
   ArrowRight,
   Calendar,
+  CheckCircle2,
   DollarSign,
+  KeyRound,
   Mail,
+  MessageSquare,
   Package,
   Phone,
+  RotateCcw,
   ShieldAlert,
   ShieldCheck,
   User,
   UserCheck,
 } from 'lucide-react'
+import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { StatusBadge } from '@/components/admin/StatusBadge'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import { formatDateTime, formatNumber, formatPrice } from '@/lib/format'
@@ -45,10 +51,30 @@ export default function AdminUserDetail() {
   const queryClient = useQueryClient()
   usePageTitle('ملف العميل — لوحة التحكم')
 
+  const [customPassword, setCustomPassword] = useState('')
+  const [passwordFeedback, setPasswordFeedback] = useState<string | null>(null)
+  const [lastSetPassword, setLastSetPassword] = useState<string>('')
+
   const userQuery = useQuery({
     queryKey: ['admin-user', userId],
     queryFn: async () => (await api.get<AdminUser>(`/admin/users/${userId}/`)).data,
     enabled: Boolean(userId),
+  })
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: async (password: string) => {
+      const res = await api.post<{ message: string; password: string }>(
+        `/admin/users/${userId}/reset-password/`,
+        { password }
+      )
+      return res.data
+    },
+    onSuccess: (data) => {
+      setPasswordFeedback(data.message)
+      setLastSetPassword(data.password)
+      setCustomPassword('')
+      setTimeout(() => setPasswordFeedback(null), 6000)
+    },
   })
 
   const updateSecurity = useMutation({
@@ -195,6 +221,77 @@ export default function AdminUserDetail() {
               <UserCheck className="size-4 text-primary shrink-0" />
               <span>الصلاحية:</span>
               <span className="font-semibold text-foreground">{user.role}</span>
+            </div>
+          </div>
+
+          {/* Customer Password & Credentials Governance */}
+          <div className="mt-4 pt-4 border-t border-border space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                <KeyRound className="size-4 text-primary" />
+                <span>إدارة أمان وكلمة مرور الحساب</span>
+              </span>
+            </div>
+
+            {passwordFeedback && (
+              <div className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 text-xs font-bold flex items-center gap-2 animate-fade-rise">
+                <CheckCircle2 className="size-4 shrink-0 text-emerald-600" />
+                <span>{passwordFeedback}</span>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Button
+                size="sm"
+                variant="outline"
+                loading={resetPasswordMutation.isPending}
+                onClick={() => {
+                  if (window.confirm(`هل تريد إعادة تعيين كلمة مرور العميل (${user.name || user.phone_number}) إلى الأصفار الافتراضية (000000)؟`)) {
+                    resetPasswordMutation.mutate('000000')
+                  }
+                }}
+                className="w-full min-h-10 rounded-xl text-xs font-bold gap-1.5 border-primary/30 text-primary bg-primary/5 hover:bg-primary/10"
+              >
+                <RotateCcw className="size-3.5" />
+                <span>إعادة التعيين السريع لكلمة المرور (000000)</span>
+              </Button>
+
+              <div className="flex gap-2">
+                <Input
+                  type="text"
+                  value={customPassword}
+                  onChange={(e) => setCustomPassword(e.target.value)}
+                  placeholder="تعيين كلمة مرور مخصصة (6+ خانات)..."
+                  className="h-10 text-xs rounded-xl font-mono"
+                />
+                <Button
+                  size="sm"
+                  loading={resetPasswordMutation.isPending}
+                  disabled={!customPassword.trim() || customPassword.trim().length < 6}
+                  onClick={() => resetPasswordMutation.mutate(customPassword.trim())}
+                  className="h-10 px-4 rounded-xl text-xs font-bold shrink-0"
+                >
+                  حفظ
+                </Button>
+              </div>
+
+              {/* WhatsApp Share Credentials */}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const cleanPhone = user.phone_number.replace(/\D/g, '')
+                  const intlPhone = cleanPhone.startsWith('0') ? '218' + cleanPhone.slice(1) : (cleanPhone.startsWith('218') ? cleanPhone : '218' + cleanPhone)
+                  const msg = encodeURIComponent(
+                    `مرحباً ${user.name || 'عميلنا العزيز'}، تم تحديث بيانات حسابك في متجر نسائم ليبيا:\n📱 الهاتف: ${user.phone_number}\n🔑 كلمة المرور: ${lastSetPassword || '000000'}\n\nننصحك بتسجيل الدخول وتغييرها من حسابك:\nhttps://nasaim.ly/profile`
+                  )
+                  window.open(`https://wa.me/${intlPhone}?text=${msg}`, '_blank')
+                }}
+                className="w-full min-h-10 rounded-xl text-xs font-bold gap-1.5 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20"
+              >
+                <MessageSquare className="size-3.5" />
+                <span>إرسال بيانات الدخول المحدثة عبر واتساب</span>
+              </Button>
             </div>
           </div>
 

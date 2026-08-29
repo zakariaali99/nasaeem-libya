@@ -1,4 +1,4 @@
-import { CreditCard, ShieldCheck, Sparkles, Truck } from 'lucide-react'
+import { Banknote, ShieldCheck, Sparkles, Truck } from 'lucide-react'
 
 export function ProductTrustBadges() {
   return (
@@ -39,11 +39,11 @@ export function ProductTrustBadges() {
       {/* 4. Flexible Payment Options */}
       <div className="flex items-center gap-2.5 rounded-2xl border border-border bg-card p-3 shadow-2xs">
         <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-          <CreditCard className="size-4" />
+          <Banknote className="size-4" />
         </div>
         <div>
-          <span className="block text-xs font-black text-foreground">كاش أو بطاقات دفع</span>
-          <span className="block text-[10px] text-muted-foreground">سداد، بطاقات، كاش</span>
+          <span className="block text-xs font-black text-foreground">دفع نقداً أو تحويل</span>
+          <span className="block text-[10px] text-muted-foreground">كاش عند الاستلام أو تحويل</span>
         </div>
       </div>
     </div>

@@ -148,6 +148,12 @@ def find_fragrance_recommendations(gender: str = "ALL", vibe: str = "ORIENTAL", 
     if max_budget and max_budget > 0:
         queryset = queryset.filter(price__lte=Decimal(str(max_budget)))
 
+    # Match by gender if specified
+    if gender and gender.upper() in ["MEN", "WOMEN"]:
+        queryset = queryset.filter(
+            Q(perfume_details__gender=gender.upper()) | Q(perfume_details__gender="UNISEX") | Q(perfume_details__isnull=True)
+        )
+
     # Match by olfactory family / vibe
     vibe_map = {
         "ORIENTAL": ["عود", "عنبر", "بخور", "شرقي", "توابل"],
@@ -164,6 +170,7 @@ def find_fragrance_recommendations(gender: str = "ALL", vibe: str = "ORIENTAL", 
             | Q(description__icontains=kw)
             | Q(categories__name__icontains=kw)
             | Q(collections__name__icontains=kw)
+            | Q(perfume_details__fragrance_family__icontains=kw)
         )
 
     matched = list(queryset.filter(vibe_filter).distinct()[:3])
@@ -189,10 +196,11 @@ def find_fragrance_recommendations(gender: str = "ALL", vibe: str = "ORIENTAL", 
     serialized_products = ProductListSerializer(matched, many=True).data
 
     results = []
-    for item in serialized_products:
+    base_scores = [97, 93, 89]
+    for idx, item in enumerate(serialized_products):
         results.append({
             "product": item,
-            "match_score": 96,
+            "match_score": base_scores[idx] if idx < len(base_scores) else 88,
             "reason": justification,
             "vibe_label": vibe,
         })

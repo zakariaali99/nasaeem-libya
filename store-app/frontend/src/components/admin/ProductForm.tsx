@@ -3,9 +3,14 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  Clock,
   Percent,
+  Plus,
+  Sparkles,
   Trash2,
   Upload,
+  Wind,
+  X,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
@@ -22,7 +27,7 @@ import { ApiError } from '@/lib/api'
 import { formatPrice } from '@/lib/format'
 import { uploadImage, useCategories, useCollections } from '@/lib/queries/catalog'
 import { cn } from '@/lib/utils'
-import type { Product, ProductImage } from '@/types/api'
+import type { PerfumeNote, Product, ProductImage } from '@/types/api'
 
 const schema = z
   .object({
@@ -85,6 +90,51 @@ export function ProductForm({
   const [uploadError, setUploadError] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const dragIndex = useRef<number | null>(null)
+
+  // Perfume Details & Olfactory Pyramid States
+  const [hasPerfumeDetails, setHasPerfumeDetails] = useState<boolean>(
+    Boolean(product?.perfume_details)
+  )
+  const [perfumeGender, setPerfumeGender] = useState<'MEN' | 'WOMEN' | 'UNISEX'>(
+    product?.perfume_details?.gender ?? 'UNISEX'
+  )
+  const [perfumeFamily, setPerfumeFamily] = useState<string>(
+    product?.perfume_details?.fragrance_family ?? 'شرقي خشبي فاخر'
+  )
+  const [perfumeConcentration, setPerfumeConcentration] = useState<string>(
+    product?.perfume_details?.concentration ?? 'Eau de Parfum'
+  )
+  const [perfumeOrigin, setPerfumeOrigin] = useState<string>(
+    product?.perfume_details?.origin_country ?? 'فرنسا'
+  )
+  const [topNotes, setTopNotes] = useState<PerfumeNote[]>(
+    product?.perfume_details?.top_notes ?? []
+  )
+  const [heartNotes, setHeartNotes] = useState<PerfumeNote[]>(
+    product?.perfume_details?.heart_notes ?? []
+  )
+  const [baseNotes, setBaseNotes] = useState<PerfumeNote[]>(
+    product?.perfume_details?.base_notes ?? []
+  )
+  const [longevityScore, setLongevityScore] = useState<number>(
+    product?.perfume_details?.longevity_score ?? 4
+  )
+  const [longevityHours, setLongevityHours] = useState<string>(
+    product?.perfume_details?.longevity_hours ?? '12 إلى 18 ساعة'
+  )
+  const [sillageScore, setSillageScore] = useState<number>(
+    product?.perfume_details?.sillage_score ?? 4
+  )
+  const [selectedSeasons, setSelectedSeasons] = useState<string[]>(
+    product?.perfume_details?.seasons ?? ['winter', 'autumn']
+  )
+  const [selectedOccasions, setSelectedOccasions] = useState<string[]>(
+    product?.perfume_details?.occasions ?? ['formal', 'evening']
+  )
+
+  const [topInput, setTopInput] = useState('')
+  const [heartInput, setHeartInput] = useState('')
+  const [baseInput, setBaseInput] = useState('')
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(schema),
@@ -177,6 +227,22 @@ export function ProductForm({
         alt_text: img.alt_text,
         order,
       })),
+      perfume_details: hasPerfumeDetails
+        ? {
+            gender: perfumeGender,
+            fragrance_family: perfumeFamily,
+            concentration: perfumeConcentration,
+            origin_country: perfumeOrigin,
+            top_notes: topNotes,
+            heart_notes: heartNotes,
+            base_notes: baseNotes,
+            longevity_score: longevityScore,
+            longevity_hours: longevityHours,
+            sillage_score: sillageScore,
+            seasons: selectedSeasons,
+            occasions: selectedOccasions,
+          }
+        : null,
     })
   })
 
@@ -219,6 +285,488 @@ export function ProductForm({
                 />
               )}
             </Field>
+          </Section>
+
+          {/* Perfume Attributes & Pyramid Section */}
+          <Section title="مواصفات وهرم العطر الحسي">
+            <div className="flex items-center justify-between p-3.5 rounded-2xl border border-border/80 bg-muted/20">
+              <div className="space-y-0.5">
+                <span className="font-bold text-sm text-foreground flex items-center gap-2">
+                  <Sparkles className="size-4 text-primary" />
+                  تفعيل بيانات وهرم العطر التفصيلي
+                </span>
+                <p className="text-xs text-muted-foreground">
+                  عند التفعيل، يعرض المتجر هرم النوتات ومؤشرات الثبات والفوحان الحقيقية في صفحة العطر.
+                </p>
+              </div>
+              <Checkbox
+                id="has_perfume_details"
+                checked={hasPerfumeDetails}
+                onCheckedChange={(v) => setHasPerfumeDetails(Boolean(v))}
+              />
+            </div>
+
+            {hasPerfumeDetails && (
+              <div className="space-y-6 pt-2 animate-fade-rise">
+                {/* Gender / Target Group */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-foreground block">
+                    الفئة المستهدفة (الجنس) *
+                  </label>
+                  <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                    {[
+                      { value: 'MEN', label: 'عطر رجالي', emoji: '🧔‍♂️' },
+                      { value: 'WOMEN', label: 'عطر نسائي', emoji: '🧕' },
+                      { value: 'UNISEX', label: 'للجنسين (محايد)', emoji: '✨' },
+                    ].map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setPerfumeGender(opt.value as any)}
+                        className={cn(
+                          'flex items-center justify-center gap-2 p-3 rounded-2xl border text-xs font-bold transition-all',
+                          perfumeGender === opt.value
+                            ? 'border-primary bg-primary/10 text-primary shadow-xs ring-1 ring-primary'
+                            : 'border-border bg-card text-muted-foreground hover:border-border/80 hover:text-foreground'
+                        )}
+                      >
+                        <span className="text-base">{opt.emoji}</span>
+                        <span>{opt.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Fragrance Family, Concentration & Origin Country */}
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-foreground">العائلة العطرية</label>
+                    <Input
+                      value={perfumeFamily}
+                      onChange={(e) => setPerfumeFamily(e.target.value)}
+                      placeholder="شرقي خشبي، زهري فاخر..."
+                      className="h-10 rounded-xl text-xs font-bold"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-foreground">درجة التركيز</label>
+                    <select
+                      value={perfumeConcentration}
+                      onChange={(e) => setPerfumeConcentration(e.target.value)}
+                      className="h-10 w-full rounded-xl border border-border bg-background px-3 text-xs font-bold text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/20"
+                    >
+                      <option value="Parfum Extrait">Parfum Extrait (خلاصة العطر)</option>
+                      <option value="Eau de Parfum">Eau de Parfum (EDP)</option>
+                      <option value="Eau de Toilette">Eau de Toilette (EDT)</option>
+                      <option value="Eau de Cologne">Eau de Cologne</option>
+                      <option value="معطر شعر وجسم">معطر شعر وجسم</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-foreground">بلد المنشأ</label>
+                    <Input
+                      value={perfumeOrigin}
+                      onChange={(e) => setPerfumeOrigin(e.target.value)}
+                      placeholder="فرنسا، إيطاليا، عُمان، الإمارات..."
+                      className="h-10 rounded-xl text-xs font-bold"
+                    />
+                  </div>
+                </div>
+
+                {/* Olfactory Pyramid Builders */}
+                <div className="space-y-4 rounded-2xl border border-border/80 bg-card/60 p-4">
+                  <h4 className="font-bold text-xs sm:text-sm text-foreground flex items-center gap-1.5">
+                    <span>الهرم العطري التفاعلي</span>
+                    <span className="text-[10px] text-muted-foreground font-normal">
+                      (أضف النوتات الفردية لكل مستوى من مستويات العطر)
+                    </span>
+                  </h4>
+
+                  {/* Top Notes */}
+                  <div className="space-y-2 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-amber-700 dark:text-amber-300">
+                        1. قمة العطر (الافتتاحية - أول 15 دقيقة)
+                      </span>
+                      <span className="text-[10px] text-muted-foreground font-mono">
+                        {topNotes.length} نوتات
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 min-h-7">
+                      {topNotes.map((note, idx) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center gap-1 rounded-lg bg-amber-500/20 px-2 py-0.5 text-xs font-bold text-amber-800 dark:text-amber-200"
+                        >
+                          <span>{note.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => setTopNotes(topNotes.filter((_, i) => i !== idx))}
+                            className="hover:text-destructive"
+                          >
+                            <X className="size-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        value={topInput}
+                        onChange={(e) => setTopInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            if (topInput.trim()) {
+                              setTopNotes([...topNotes, { name: topInput.trim() }])
+                              setTopInput('')
+                            }
+                          }
+                        }}
+                        placeholder="اكتب اسم النوتة ثم اضغط إضافة (مثال: برغموت إيطالي)..."
+                        className="h-8 text-xs rounded-lg"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => {
+                          if (topInput.trim()) {
+                            setTopNotes([...topNotes, { name: topInput.trim() }])
+                            setTopInput('')
+                          }
+                        }}
+                        className="h-8 px-3 rounded-lg text-xs font-bold shrink-0"
+                      >
+                        <Plus className="size-3.5 me-1" />
+                        إضافة
+                      </Button>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1 pt-1 text-[11px] text-muted-foreground">
+                      <span className="font-semibold text-[10px]">اقتراحات سريعة:</span>
+                      {['برغموت', 'فلفل وردي', 'حمضيات صقلية', 'زعفران', 'تفاح أخضر'].map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => {
+                            if (!topNotes.some((n) => n.name === s)) {
+                              setTopNotes([...topNotes, { name: s }])
+                            }
+                          }}
+                          className="rounded-md border border-border/80 bg-background/80 px-1.5 py-0.5 text-[10px] hover:border-primary hover:text-primary transition-colors"
+                        >
+                          + {s}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Heart Notes */}
+                  <div className="space-y-2 rounded-xl border border-rose-500/20 bg-rose-500/5 p-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-rose-700 dark:text-rose-300">
+                        2. قلب العطر (الجوهر - من ساعتين إلى 4 ساعات)
+                      </span>
+                      <span className="text-[10px] text-muted-foreground font-mono">
+                        {heartNotes.length} نوتات
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 min-h-7">
+                      {heartNotes.map((note, idx) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center gap-1 rounded-lg bg-rose-500/20 px-2 py-0.5 text-xs font-bold text-rose-800 dark:text-rose-200"
+                        >
+                          <span>{note.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => setHeartNotes(heartNotes.filter((_, i) => i !== idx))}
+                            className="hover:text-destructive"
+                          >
+                            <X className="size-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        value={heartInput}
+                        onChange={(e) => setHeartInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            if (heartInput.trim()) {
+                              setHeartNotes([...heartNotes, { name: heartInput.trim() }])
+                              setHeartInput('')
+                            }
+                          }
+                        }}
+                        placeholder="اسم نوتة قلب العطر (مثال: ورد دمشقي، ياسمين هندي)..."
+                        className="h-8 text-xs rounded-lg"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => {
+                          if (heartInput.trim()) {
+                            setHeartNotes([...heartNotes, { name: heartInput.trim() }])
+                            setHeartInput('')
+                          }
+                        }}
+                        className="h-8 px-3 rounded-lg text-xs font-bold shrink-0"
+                      >
+                        <Plus className="size-3.5 me-1" />
+                        إضافة
+                      </Button>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1 pt-1 text-[11px] text-muted-foreground">
+                      <span className="font-semibold text-[10px]">اقتراحات سريعة:</span>
+                      {['ورد جوري دمشقي', 'ياسمين سامباك', 'حبوب الهيل', 'لافندر فرنسي', 'قرفة سيلانية'].map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => {
+                            if (!heartNotes.some((n) => n.name === s)) {
+                              setHeartNotes([...heartNotes, { name: s }])
+                            }
+                          }}
+                          className="rounded-md border border-border/80 bg-background/80 px-1.5 py-0.5 text-[10px] hover:border-primary hover:text-primary transition-colors"
+                        >
+                          + {s}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Base Notes */}
+                  <div className="space-y-2 rounded-xl border border-amber-900/20 bg-amber-900/5 p-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-amber-900 dark:text-amber-200">
+                        3. قاعدة العطر (الثبات والعمق - أطول أثر عتري)
+                      </span>
+                      <span className="text-[10px] text-muted-foreground font-mono">
+                        {baseNotes.length} نوتات
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 min-h-7">
+                      {baseNotes.map((note, idx) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center gap-1 rounded-lg bg-amber-900/20 px-2 py-0.5 text-xs font-bold text-amber-900 dark:text-amber-100"
+                        >
+                          <span>{note.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => setBaseNotes(baseNotes.filter((_, i) => i !== idx))}
+                            className="hover:text-destructive"
+                          >
+                            <X className="size-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        value={baseInput}
+                        onChange={(e) => setBaseInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            if (baseInput.trim()) {
+                              setBaseNotes([...baseNotes, { name: baseInput.trim() }])
+                              setBaseInput('')
+                            }
+                          }
+                        }}
+                        placeholder="اسم نوتة قاعدة العطر (مثال: عود كمبودي، عنبر ملكي)..."
+                        className="h-8 text-xs rounded-lg"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => {
+                          if (baseInput.trim()) {
+                            setBaseNotes([...baseNotes, { name: baseInput.trim() }])
+                            setBaseInput('')
+                          }
+                        }}
+                        className="h-8 px-3 rounded-lg text-xs font-bold shrink-0"
+                      >
+                        <Plus className="size-3.5 me-1" />
+                        إضافة
+                      </Button>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1 pt-1 text-[11px] text-muted-foreground">
+                      <span className="font-semibold text-[10px]">اقتراحات سريعة:</span>
+                      {['عود كمبودي معتق', 'عنبر ملكي', 'مسك أبيض فاخر', 'خشب الصندل', 'فانيليا مدغشقر', 'حبوب التونكا'].map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => {
+                            if (!baseNotes.some((n) => n.name === s)) {
+                              setBaseNotes([...baseNotes, { name: s }])
+                            }
+                          }}
+                          className="rounded-md border border-border/80 bg-background/80 px-1.5 py-0.5 text-[10px] hover:border-primary hover:text-primary transition-colors"
+                        >
+                          + {s}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Longevity & Sillage Performance */}
+                <div className="grid gap-4 sm:grid-cols-2 rounded-2xl border border-border/80 bg-card p-4">
+                  {/* Longevity */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                        <Clock className="size-3.5 text-primary" />
+                        درجة الثبات (من 1 إلى 5)
+                      </label>
+                      <span className="font-mono text-xs font-bold text-primary">
+                        {longevityScore} / 5
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {[1, 2, 3, 4, 5].map((score) => (
+                        <button
+                          key={score}
+                          type="button"
+                          onClick={() => setLongevityScore(score)}
+                          className={cn(
+                            'h-9 rounded-xl text-xs font-bold border transition-all',
+                            longevityScore === score
+                              ? 'border-primary bg-primary text-primary-foreground shadow-xs'
+                              : 'border-border bg-muted/40 text-muted-foreground hover:bg-muted'
+                          )}
+                        >
+                          ★ {score}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="pt-1.5">
+                      <label className="text-[11px] text-muted-foreground block mb-1">
+                        مدة الثبات التقريبية
+                      </label>
+                      <Input
+                        value={longevityHours}
+                        onChange={(e) => setLongevityHours(e.target.value)}
+                        placeholder="مثال: 12 إلى 18 ساعة، يدوم حتى يومين..."
+                        className="h-9 rounded-xl text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Sillage */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                        <Wind className="size-3.5 text-primary" />
+                        قوة الفوحان وانتشار الأثر
+                      </label>
+                      <span className="font-mono text-xs font-bold text-primary">
+                        {sillageScore} / 5
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {[1, 2, 3, 4, 5].map((score) => (
+                        <button
+                          key={score}
+                          type="button"
+                          onClick={() => setSillageScore(score)}
+                          className={cn(
+                            'h-9 rounded-xl text-xs font-bold border transition-all',
+                            sillageScore === score
+                              ? 'border-primary bg-primary text-primary-foreground shadow-xs'
+                              : 'border-border bg-muted/40 text-muted-foreground hover:bg-muted'
+                          )}
+                        >
+                          ★ {score}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="pt-2 text-[11px] text-muted-foreground">
+                      {sillageScore <= 2 && 'فوحان خفيف حميمي (على مسافة قريبة)'}
+                      {sillageScore === 3 && 'فوحان متوسط متوازن (يملأ محيط الشخص)'}
+                      {sillageScore >= 4 && 'فوحان هائل فواح يترك أثراً واضحاً في المكان'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Seasons & Occasions */}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-foreground">الفصول الموصى بها</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        { key: 'winter', label: 'شتاء ❄️' },
+                        { key: 'autumn', label: 'خريف 🍂' },
+                        { key: 'spring', label: 'ربيع 🌸' },
+                        { key: 'summer', label: 'صيف ☀️' },
+                      ].map((s) => {
+                        const active = selectedSeasons.includes(s.key)
+                        return (
+                          <button
+                            key={s.key}
+                            type="button"
+                            onClick={() =>
+                              setSelectedSeasons(
+                                active
+                                  ? selectedSeasons.filter((k) => k !== s.key)
+                                  : [...selectedSeasons, s.key]
+                              )
+                            }
+                            className={cn(
+                              'rounded-xl border px-3 py-1.5 text-xs font-bold transition-all',
+                              active
+                                ? 'border-primary bg-primary/10 text-primary'
+                                : 'border-border bg-muted/20 text-muted-foreground hover:bg-muted/40'
+                            )}
+                          >
+                            {s.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-foreground">المناسبات الملائمة</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        { key: 'formal', label: 'لقاءات رسمية 👔' },
+                        { key: 'evening', label: 'سهرات ومساء 🌙' },
+                        { key: 'daily', label: 'استخدام يومي 💼' },
+                        { key: 'special_dates', label: 'أعراس واحتفالات 💍' },
+                      ].map((o) => {
+                        const active = selectedOccasions.includes(o.key)
+                        return (
+                          <button
+                            key={o.key}
+                            type="button"
+                            onClick={() =>
+                              setSelectedOccasions(
+                                active
+                                  ? selectedOccasions.filter((k) => k !== o.key)
+                                  : [...selectedOccasions, o.key]
+                              )
+                            }
+                            className={cn(
+                              'rounded-xl border px-3 py-1.5 text-xs font-bold transition-all',
+                              active
+                                ? 'border-primary bg-primary/10 text-primary'
+                                : 'border-border bg-muted/20 text-muted-foreground hover:bg-muted/40'
+                            )}
+                          >
+                            {o.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </Section>
 
           {/* Pricing & Discounts Section */}

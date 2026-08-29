@@ -1,9 +1,12 @@
 import {
   AlertTriangle,
-  CreditCard,
+  Banknote,
+  Building2,
   MapPin,
+  MessageSquare,
   ShieldCheck,
   Truck,
+  User,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
@@ -21,28 +24,29 @@ import { formatPrice } from '@/lib/format'
 import { useConfirmCheckout } from '@/lib/queries/cart'
 import { useCities, useDeliveryMethods, useOrder, useRegions } from '@/lib/queries/delivery'
 import { useActiveCartPromotion } from '@/lib/queries/orders'
-import { useInitiatePayment, usePublicPaymentMethods } from '@/lib/queries/payments'
+import { useMe } from '@/lib/queries/auth'
 import { LuxuryGiftingSection, type GiftingState } from '@/components/storefront/LuxuryGiftingSection'
 import { usePageTitle } from '@/lib/usePageTitle'
+import { cn } from '@/lib/utils'
 
 export default function CheckoutPage() {
   const { orderId = '' } = useParams()
   const navigate = useNavigate()
   usePageTitle('إتمام الطلب والدفع — نسائم ليبيا', 'أدخل عنوان التوصيل واختر طريقة الدفع.')
 
+  const { data: user } = useMe()
   const { data: order, isPending, isError, error, refetch } = useOrder(orderId)
   const { data: promo } = useActiveCartPromotion()
   const confirm = useConfirmCheckout()
-  const initiatePayment = useInitiatePayment()
-  const { data: availablePaymentMethods } = usePublicPaymentMethods()
 
+  const [customerName, setCustomerName] = useState('')
+  const [customerPhone, setCustomerPhone] = useState('')
   const [cityId, setCityId] = useState('')
   const [regionId, setRegionId] = useState('')
   const [address, setAddress] = useState('')
   const [notes, setNotes] = useState('')
   const [method, setMethod] = useState('')
   const [payment, setPayment] = useState('manual_payment')
-  const [transferReceipt, setTransferReceipt] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
   const [formError, setFormError] = useState<string | null>(null)
   const [gifting, setGifting] = useState<GiftingState>({
@@ -53,6 +57,11 @@ export default function CheckoutPage() {
     gift_message: '',
     hide_invoice_prices: false,
   })
+
+  useEffect(() => {
+    if (user?.name && !customerName) setCustomerName(user.name)
+    if (user?.phone_number && !customerPhone) setCustomerPhone(user.phone_number)
+  }, [user])
 
   const {
     data: cityData,
@@ -120,14 +129,38 @@ export default function CheckoutPage() {
     event.preventDefault()
     setFieldErrors({})
     setFormError(null)
+
+    // Validation for guest customer name & phone
+    const errs: Record<string, string[]> = {}
+    if (!customerName.trim() && !user?.name) {
+      errs.customer_name = ['الاسم الثلاثي مطلوب لإتمام الطلب']
+    }
+    if (!customerPhone.trim() && !user?.phone_number) {
+      errs.customer_phone = ['رقم الهاتف مطلوب للتواصل والتسليم']
+    }
+    if (!cityId) {
+      errs.city_id = ['يرجى اختيار مدينة التوصيل']
+    }
+    if (!address.trim()) {
+      errs.address = ['يرجى كتابة العنوان التفصيلي للتوصيل']
+    }
+
+    if (Object.keys(errs).length > 0) {
+      setFieldErrors(errs)
+      setFormError('يرجى استكمال البيانات المطلوبة قبل إتمام الطلب.')
+      return
+    }
+
     try {
-      await confirm.mutateAsync({
+      const result = await confirm.mutateAsync({
         order_id: order.id,
         city_id: cityId,
         region_id: regionId || '',
         address,
         delivery_method_code: method,
         payment_method: payment,
+        customer_name: customerName || user?.name || '',
+        customer_phone: customerPhone || user?.phone_number || '',
         customer_notes: notes,
         is_gift: String(gifting.is_gift),
         gift_wrap_type: gifting.gift_wrap_type,
@@ -137,37 +170,15 @@ export default function CheckoutPage() {
         hide_invoice_prices: String(gifting.hide_invoice_prices),
       })
 
-      if (['moamalat', 'plutu', 'sadad_pay', 'binance_pay'].includes(payment)) {
-        try {
-          const initResult = await initiatePayment.mutateAsync({
-            order_id: order.id,
-            method_code: payment,
-          })
-          if (initResult.action === 'redirect' && initResult.gateway_url) {
-            window.location.href = initResult.gateway_url
-            return
-          }
-          navigate(`/checkout/redirect?order_id=${encodeURIComponent(order.id)}`)
-          return
-        } catch {
-          navigate(`/checkout/redirect?order_id=${encodeURIComponent(order.id)}`)
-          return
-        }
+      const confirmedOrder = (result as any).order || result
+      const whatsappLink = (result as any).whatsapp_link
+
+      if (whatsappLink) {
+        sessionStorage.setItem('last_whatsapp_link', whatsappLink)
+        window.open(whatsappLink, '_blank')
       }
 
-      if (payment === 'manual_payment') {
-        try {
-          await initiatePayment.mutateAsync({
-            order_id: order.id,
-            method_code: payment,
-            user_input: transferReceipt ? { transferReceipt } : {},
-          })
-        } catch {
-          // Manual payment record created during initiation
-        }
-      }
-
-      navigate(`/checkout/complete?order=${encodeURIComponent(order.order_number)}`)
+      navigate(`/checkout/complete?order=${encodeURIComponent(confirmedOrder.order_number || order.order_number)}`)
     } catch (failure) {
       if (failure instanceof ApiError) {
         setFieldErrors(failure.errors ?? {})
@@ -221,6 +232,54 @@ export default function CheckoutPage() {
 
       <form className="grid gap-8 lg:grid-cols-[1fr_24rem] xl:grid-cols-[1fr_26rem] items-start" onSubmit={submit} noValidate>
         <div className="space-y-6">
+          {/* Customer Identification (Name & Libyan Phone) */}
+          <section className="space-y-4 rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-xs">
+            <div className="flex items-center justify-between border-b border-border/80 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <User className="size-4" />
+                </div>
+                <h2 className="text-base sm:text-lg font-bold text-foreground">بيانات العميل المستلم</h2>
+              </div>
+              {!user && (
+                <span className="text-[11px] font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-full">
+                  شراء مباشر وسريع
+                </span>
+              )}
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="الاسم الثلاثي بالكامل *" htmlFor="customer_name" error={fieldErrors.customer_name?.[0]}>
+                <Input
+                  id="customer_name"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder="مثال: أحمد عبد الله المحمودي"
+                  className="h-11 rounded-xl text-xs font-bold"
+                  required
+                />
+              </Field>
+
+              <Field label="رقم هاتف الواتساب الليبي *" htmlFor="customer_phone" error={fieldErrors.customer_phone?.[0]}>
+                <Input
+                  id="customer_phone"
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  placeholder="0912345678 أو 0921234567"
+                  dir="ltr"
+                  className="h-11 rounded-xl text-xs font-mono font-bold"
+                  required
+                />
+              </Field>
+            </div>
+
+            {!user && (
+              <p className="text-[11px] text-muted-foreground bg-muted/40 p-2.5 rounded-xl">
+                💡 سيتم إنشاء حساب لك تلقائياً بكلمة مرور مؤقتة (000000) وتزويدك بالفاتورة التفصيلية عبر واتساب، ويمكنك تغيير كلمة المرور متى شئت.
+              </p>
+            )}
+          </section>
+
           {/* Shipping Address Section */}
           <section className="space-y-4 rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-xs">
             <div className="flex items-center gap-2.5 border-b border-border/80 pb-3">
@@ -251,7 +310,7 @@ export default function CheckoutPage() {
                     <option value="">اختر المدينة</option>
                     {cities.map((city) => (
                       <option key={city.id} value={city.id}>
-                        {city.name} ({formatPrice(city.delivery_fee)})
+                        {city.name}
                       </option>
                     ))}
                   </Select>
@@ -267,10 +326,10 @@ export default function CheckoutPage() {
                       aria-invalid={Boolean(fieldErrors.region_id)}
                       className="h-11 rounded-xl"
                     >
-                      <option value="">{cityId ? 'كل مناطق المدينة (افتراضي)' : 'اختر المدينة أولاً'}</option>
+                      <option value="">{cityId ? 'كل أحياء ومناطق المدينة' : 'اختر المدينة أولاً'}</option>
                       {regions.map((region) => (
                         <option key={region.id} value={region.id}>
-                          {region.name} — توصيل {formatPrice(region.delivery_fee)}
+                          {region.name}
                         </option>
                       ))}
                     </Select>
@@ -282,8 +341,8 @@ export default function CheckoutPage() {
                       <Truck className="size-4 shrink-0" />
                       <span>
                         {selectedCity
-                          ? `توصيل لكافة أحياء ${selectedCity.name} (${formatPrice(selectedCity.delivery_fee)})`
-                          : 'اختر المدينة لعرض رسوم التوصيل'}
+                          ? `توصيل سريع لكافة أحياء ${selectedCity.name}`
+                          : 'اختر المدينة لتحديد التوصيل'}
                       </span>
                     </div>
                   </div>
@@ -316,37 +375,6 @@ export default function CheckoutPage() {
             </Field>
           </section>
 
-          {/* Delivery Courier Section */}
-          <section className="space-y-4 rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-xs">
-            <div className="flex items-center gap-2.5 border-b border-border/80 pb-3">
-              <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <Truck className="size-4" />
-              </div>
-              <h2 className="text-base sm:text-lg font-bold text-foreground">شركة التوصيل والشحن</h2>
-            </div>
-
-            {methods?.length ? (
-              <Field label="اختر شركة التوصيل" htmlFor="method">
-                <Select
-                  id="method"
-                  value={method}
-                  onChange={(event) => setMethod(event.target.value)}
-                  className="h-11 rounded-xl"
-                >
-                  {methods.map((option) => (
-                    <option key={option.id} value={option.code}>
-                      {option.name}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                التوصيل المباشر عبر أسطول نسائم ليبيا إلى عنوانك.
-              </p>
-            )}
-          </section>
-
           {/* Luxury Gifting Suite */}
           <LuxuryGiftingSection value={gifting} onChange={setGifting} />
 
@@ -354,56 +382,78 @@ export default function CheckoutPage() {
           <section className="space-y-4 rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-xs">
             <div className="flex items-center gap-2.5 border-b border-border/80 pb-3">
               <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <CreditCard className="size-4" />
+                <Banknote className="size-4" />
               </div>
               <h2 className="text-base sm:text-lg font-bold text-foreground">طريقة الدفع</h2>
             </div>
 
-            <div className="space-y-2.5">
-              {availablePaymentMethods && availablePaymentMethods.length > 0 ? (
-                availablePaymentMethods.map((m) => (
-                  <PaymentChoice
-                    key={m.id}
-                    value={m.method_code}
-                    checked={payment === m.method_code}
-                    onChange={setPayment}
-                    title={m.display_name}
-                    description={m.description || ''}
-                  />
-                ))
-              ) : (
-                <>
-                  <PaymentChoice
-                    value="manual_payment"
-                    checked={payment === 'manual_payment'}
-                    onChange={setPayment}
-                    title="تحويل مصرفي مباشر"
-                    description="إرسال إيصال التحويل عبر التطبيق بعد تأكيد الطلب."
-                  />
-                  <PaymentChoice
-                    value="bank_cards_on_delivery"
-                    checked={payment === 'bank_cards_on_delivery'}
-                    onChange={setPayment}
-                    title="الدفع بالبطاقة عند الاستلام (POS)"
-                    description="الدفع بالبطاقة المصرفية عبر جهاز نقاط البيع لدى مندوب التوصيل."
-                  />
-                </>
-              )}
-
-              {payment === 'manual_payment' && (
-                <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-2.5 animate-fade-rise">
-                  <p className="text-xs text-primary font-medium">
-                    يرجى تحويل قيمة الطلب إلى الحساب المصرفي المعتمد للمتجر، وإدخال رقم الإشعار أو مرجع التحويل لتسريع التحقق وتجهيز طلبك:
+            <div className="space-y-3">
+              {/* Cash On Delivery Option */}
+              <label
+                className={cn(
+                  'flex items-start gap-3.5 p-4 rounded-2xl border cursor-pointer transition-all',
+                  payment === 'manual_payment'
+                    ? 'border-primary bg-primary/5 ring-1 ring-primary shadow-xs'
+                    : 'border-border bg-background hover:bg-muted/30'
+                )}
+              >
+                <input
+                  type="radio"
+                  name="payment_choice"
+                  value="manual_payment"
+                  checked={payment === 'manual_payment'}
+                  onChange={() => setPayment('manual_payment')}
+                  className="mt-1 size-4 accent-primary"
+                />
+                <div className="flex-1 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Banknote className="size-4 text-emerald-600 dark:text-emerald-400" />
+                    <span className="font-bold text-sm text-foreground">الدفع عند الاستلام كاش</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    الدفع نقداً للمندوب عند استلام العطر ومعاينته والتأكد من جودته.
                   </p>
-                  <Field label="رقم مرجع التحويل أو إشعار الإيداع (اختياري)" htmlFor="transferReceipt">
-                    <Input
-                      id="transferReceipt"
-                      value={transferReceipt}
-                      onChange={(e) => setTransferReceipt(e.target.value)}
-                      placeholder="مثال: TRX-884920 أو رقم إشعار موبي كاش / سداد"
-                      className="h-10 text-xs font-mono"
-                    />
-                  </Field>
+                </div>
+              </label>
+
+              {/* Bank Transfer Option */}
+              <label
+                className={cn(
+                  'flex items-start gap-3.5 p-4 rounded-2xl border cursor-pointer transition-all',
+                  payment === 'bank_transfer'
+                    ? 'border-primary bg-primary/5 ring-1 ring-primary shadow-xs'
+                    : 'border-border bg-background hover:bg-muted/30'
+                )}
+              >
+                <input
+                  type="radio"
+                  name="payment_choice"
+                  value="bank_transfer"
+                  checked={payment === 'bank_transfer'}
+                  onChange={() => setPayment('bank_transfer')}
+                  className="mt-1 size-4 accent-primary"
+                />
+                <div className="flex-1 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="size-4 text-primary" />
+                    <span className="font-bold text-sm text-foreground">تحويل مصرفي مباشر</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    تحويل قيمة العطر عبر تطبيق مصرفك (الجمهورية، التجاري الوطني، شمال أفريقيا، النوران، إلخ).
+                  </p>
+                </div>
+              </label>
+
+              {/* Prominent WhatsApp Bank Transfer Notice */}
+              {payment === 'bank_transfer' && (
+                <div className="rounded-2xl border border-primary/30 bg-primary/10 p-4 space-y-2 animate-fade-rise">
+                  <div className="flex items-center gap-2 text-primary font-bold text-xs sm:text-sm">
+                    <MessageSquare className="size-4 shrink-0" />
+                    <span>إشعار التحويل المصرفي التلقائي عبر واتساب</span>
+                  </div>
+                  <p className="text-xs text-foreground/90 leading-relaxed font-medium">
+                    سيتم التواصل معك تلقائياً عبر واتساب لتزويدك ببيانات الحساب المصرفي ورقم الآيبان (IBAN) للتحويل، وإرسال الفاتورة التفصيلية بعد إتمام الطلب مباشرة.
+                  </p>
                 </div>
               )}
             </div>
@@ -452,7 +502,7 @@ export default function CheckoutPage() {
               type="submit"
               size="lg"
               block
-              loading={confirm.isPending || initiatePayment.isPending}
+              loading={confirm.isPending}
               className="rounded-xl font-bold text-sm h-12 shadow-sm"
             >
               تأكيد الطلب الآن
@@ -481,7 +531,7 @@ export default function CheckoutPage() {
               e.preventDefault()
               submit(e)
             }}
-            loading={confirm.isPending || initiatePayment.isPending}
+            loading={confirm.isPending}
             className="rounded-xl font-bold h-11 px-6 text-xs shadow-md gap-1.5"
           >
             <span>تأكيد الطلب</span>
@@ -490,45 +540,6 @@ export default function CheckoutPage() {
       </div>
       <div className="h-16 lg:hidden" aria-hidden="true" />
     </div>
-  )
-}
-
-function PaymentChoice({
-  value,
-  checked,
-  onChange,
-  title,
-  description,
-}: {
-  value: string
-  checked: boolean
-  onChange: (value: string) => void
-  title: string
-  description: string
-}) {
-  return (
-    <label
-      className={`flex cursor-pointer items-start gap-3.5 rounded-2xl border p-4 transition-all shadow-2xs ${
-        checked
-          ? 'border-primary bg-primary/5 shadow-xs ring-1 ring-primary/30'
-          : 'border-border bg-card hover:border-primary/40'
-      }`}
-    >
-      <input
-        type="radio"
-        name="payment_method"
-        value={value}
-        checked={checked}
-        onChange={() => onChange(value)}
-        className="mt-0.5 size-4 accent-primary"
-      />
-      <div className="min-w-0 flex-1">
-        <span className="block text-xs sm:text-sm font-bold text-foreground">{title}</span>
-        {description && (
-          <span className="block text-[11px] text-muted-foreground mt-0.5">{description}</span>
-        )}
-      </div>
-    </label>
   )
 }
 

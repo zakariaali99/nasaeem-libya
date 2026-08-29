@@ -88,10 +88,11 @@ export default function AdminStaff() {
       setNewEmail('')
       setNewPassword('')
       refetch()
-    } catch (err: unknown) {
+    } catch (err: any) {
       const errorMsg =
-        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
-        'حدث خطأ أثناء إنشاء حساب الموظف.'
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        (typeof err?.message === 'string' ? err.message : 'حدث خطأ أثناء إنشاء حساب الموظف.')
       setFormError(errorMsg)
     }
   }

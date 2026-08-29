@@ -18,7 +18,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.core.models import User
+from apps.core.models import User, Role
 from apps.core.pagination import StandardPagination
 from apps.core.views import CsrfProtectedAPIView
 

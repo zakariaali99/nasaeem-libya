@@ -1,4 +1,5 @@
 import {
+  AlertCircle,
   Archive,
   Check,
   CheckCircle2,
@@ -45,6 +46,7 @@ export default function AdminBackups() {
   const [pendingDelete, setPendingDelete] = useState<string | null>(null)
   const [pendingRestore, setPendingRestore] = useState<{ filename?: string; file?: File } | null>(null)
   const [restoreSuccessNotice, setRestoreSuccessNotice] = useState<string | null>(null)
+  const [restoreErrorNotice, setRestoreErrorNotice] = useState<string | null>(null)
   const [guideOpen, setGuideOpen] = useState(false)
   const [copiedCmd, setCopiedCmd] = useState<string | null>(null)
 
@@ -65,13 +67,16 @@ export default function AdminBackups() {
 
   const handleConfirmRestore = async () => {
     if (!pendingRestore) return
+    setRestoreErrorNotice(null)
+    setRestoreSuccessNotice(null)
     try {
       const res = await restoreBackup.mutateAsync(pendingRestore)
       setPendingRestore(null)
       setRestoreSuccessNotice(`تم استرجاع النظام بنجاح! (${res.restored_records_count} سجل مسترجع).`)
       refetch()
-    } catch (e) {
+    } catch (e: unknown) {
       console.error(e)
+      setRestoreErrorNotice((e as Error)?.message || 'فشل استرجاع النسخة الاحتياطية. يرجى التأكد من سلامة ملف الـ ZIP.')
     }
   }
 
@@ -112,6 +117,13 @@ export default function AdminBackups() {
         <div className="flex items-center gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-800 dark:text-emerald-300">
           <CheckCircle2 className="size-5 shrink-0" />
           <p className="text-xs font-bold">{restoreSuccessNotice}</p>
+        </div>
+      )}
+
+      {restoreErrorNotice && (
+        <div className="flex items-center gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-destructive">
+          <AlertCircle className="size-5 shrink-0" />
+          <p className="text-xs font-bold">{restoreErrorNotice}</p>
         </div>
       )}
 

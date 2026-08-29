@@ -72,9 +72,7 @@ export function useRestoreBackup() {
       if (file) {
         const formData = new FormData()
         formData.append('file', file)
-        return (await api.post<{ success: boolean; restored_records_count: number }>('/admin/backups/restore/', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        })).data
+        return (await api.post<{ success: boolean; restored_records_count: number }>('/admin/backups/restore/', formData)).data
       }
       return (await api.post<{ success: boolean; restored_records_count: number }>('/admin/backups/restore/', { filename })).data
     },

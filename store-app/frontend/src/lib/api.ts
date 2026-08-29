@@ -130,7 +130,10 @@ export async function request<T>(
 
   const requestHeaders = new Headers(headers)
   requestHeaders.set('Accept', 'application/json')
-  if (body !== undefined && !isFormData) {
+  if (isFormData) {
+    // Let browser generate multipart/form-data boundary automatically
+    requestHeaders.delete('Content-Type')
+  } else if (body !== undefined) {
     requestHeaders.set('Content-Type', 'application/json')
   }
   if (UNSAFE_METHODS.has(upperMethod)) {

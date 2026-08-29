@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import os
+import uuid
 from pathlib import Path
 
 from django.http import FileResponse, Http404
 from rest_framework import permissions, status
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -73,6 +75,7 @@ class AdminBackupDeleteView(APIView):
 
 class AdminBackupRestoreView(APIView):
     permission_classes = [IsAdminOrOwner]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def post(self, request):
         uploaded_file = request.FILES.get("file")
@@ -80,9 +83,9 @@ class AdminBackupRestoreView(APIView):
         temp_path = None
 
         if uploaded_file:
-            # Save uploaded zip temporarily
+            # Save uploaded zip with a clean, safe UUID name to avoid encoding or special character issues
             backups_dir = backup_service.get_backups_dir()
-            temp_path = backups_dir / f"restore_temp_{uploaded_file.name}"
+            temp_path = backups_dir / f"restore_temp_{uuid.uuid4().hex}.zip"
             with open(temp_path, "wb+") as destination:
                 for chunk in uploaded_file.chunks():
                     destination.write(chunk)
@@ -91,15 +94,18 @@ class AdminBackupRestoreView(APIView):
             safe_name = os.path.basename(filename)
             restore_target = backup_service.get_backups_dir() / safe_name
         else:
-            return Response({"error": "يرجى اختيار ملف نسخة احتياطية للاسترجاع."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": "يرجى اختيار ملف نسخة احتياطية للاسترجاع."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not restore_target.exists():
+            return Response({"message": "ملف النسخة الاحتياطية المحدد غير موجود."}, status=status.HTTP_404_NOT_FOUND)
 
         try:
             result = backup_service.restore_backup(restore_target)
             return Response(result)
         except Exception as e:
-            return Response({"error": f"فشل استرجاع النسخة الاحتياطية: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"message": f"فشل استرجاع النسخة الاحتياطية: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         finally:
-            if uploaded_file and temp_path.exists():
+            if temp_path and temp_path.exists():
                 try:
                     temp_path.unlink()
                 except Exception:

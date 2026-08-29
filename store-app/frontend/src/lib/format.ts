@@ -23,7 +23,7 @@ const moneyFormatter = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 2,
 })
 
-function toNumber(value: number | string | null | undefined): number {
+export function toNumber(value: number | string | null | undefined): number {
   if (value === null || value === undefined || value === '') return 0
   if (typeof value === 'number') return Number.isFinite(value) ? value : 0
   let str = String(value).trim()

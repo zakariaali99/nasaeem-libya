@@ -24,7 +24,7 @@ import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { ApiError } from '@/lib/api'
-import { formatPrice } from '@/lib/format'
+import { formatPrice, toNumber } from '@/lib/format'
 import { uploadImage, useCategories, useCollections } from '@/lib/queries/catalog'
 import { cn } from '@/lib/utils'
 import type { PerfumeNote, Product, ProductImage } from '@/types/api'
@@ -36,7 +36,7 @@ const schema = z
     price: z
       .string()
       .min(1, 'السعر مطلوب')
-      .refine((v) => Number(v) > 0, 'السعر يجب أن يكون أكبر من صفر'),
+      .refine((v) => toNumber(v) > 0, 'السعر يجب أن يكون أكبر من صفر'),
     compare_at_price: z.string().optional(),
     sku: z.string().max(50).optional(),
     barcode: z.string().max(50).optional(),
@@ -48,7 +48,7 @@ const schema = z
   .refine(
     (data) =>
       !data.compare_at_price ||
-      Number(data.compare_at_price) > Number(data.price),
+      toNumber(data.compare_at_price) > toNumber(data.price),
     {
       path: ['compare_at_price'],
       message: 'السعر قبل الخصم يجب أن يكون أعلى من السعر الحالي',
@@ -296,8 +296,24 @@ export function ProductForm({
     })
   })
 
-  const apiError =
-    serverError instanceof ApiError ? serverError.message : null
+  const FIELD_LABELS: Record<string, string> = {
+    name: 'اسم المنتج',
+    price: 'السعر',
+    compare_at_price: 'السعر قبل الخصم',
+    sku: 'رمز المنتج SKU',
+    barcode: 'الباركود',
+    images: 'الصور',
+    category_ids: 'التصنيفات',
+    collection_ids: 'المجموعات',
+  }
+
+  const apiError = serverError instanceof ApiError
+    ? serverError.errors && Object.keys(serverError.errors).length > 0
+      ? `${serverError.message}: ${Object.entries(serverError.errors)
+          .map(([f, msgs]) => `${FIELD_LABELS[f] || f} (${msgs.join(', ')})`)
+          .join(' | ')}`
+      : serverError.message
+    : null
 
   return (
     <form onSubmit={submitHandler} className="space-y-6 animate-fade-rise">
@@ -884,7 +900,7 @@ export function ProductForm({
               <input
                 ref={fileInput}
                 type="file"
-                accept="image/*"
+                accept="image/*,.heic,.heif,.avif,.webp,.jpg,.jpeg,.png"
                 multiple
                 className="sr-only"
                 onChange={(event) => handleFiles(event.target.files)}

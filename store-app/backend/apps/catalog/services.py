@@ -203,17 +203,54 @@ def store_image(uploaded_file, *, subdir="products"):
 
     Returns the `full` URL, which is what `ProductImage.url` stores.
     """
-    from PIL import Image, UnidentifiedImageError
+    import io
+    import logging
+    from PIL import Image, ImageFile, ImageOps, UnidentifiedImageError
+
+    logger = logging.getLogger(__name__)
 
     try:
-        image = Image.open(uploaded_file)
-        image.verify()
-        uploaded_file.seek(0)
-        image = Image.open(uploaded_file)
-    except (UnidentifiedImageError, OSError) as exc:
+        import pillow_heif
+        pillow_heif.register_heif_opener()
+    except Exception:
+        pass
+
+    try:
+        import pillow_avif  # noqa: F401
+    except Exception:
+        pass
+
+    ImageFile.LOAD_TRUNCATED_IMAGES = True
+
+    try:
+        if hasattr(uploaded_file, "read"):
+            uploaded_file.seek(0)
+            content = uploaded_file.read()
+        elif isinstance(uploaded_file, (bytes, bytearray)):
+            content = uploaded_file
+        else:
+            raise ValueError("الملف غير صالح")
+
+        if not content:
+            raise ValueError("الملف المرفوع فارغ")
+
+        image = Image.open(io.BytesIO(content))
+        image.load()
+        try:
+            image = ImageOps.exif_transpose(image)
+        except Exception:
+            pass
+    except Exception as exc:
+        logger.warning("store_image validation failed: %s (%s)", exc, type(exc))
         raise ValueError("الملف ليس صورة صالحة") from exc
 
-    if image.mode not in ("RGB", "RGBA"):
+    # Cleanly convert transparent formats onto a crisp white background
+    if image.mode in ("RGBA", "LA") or (image.mode == "P" and "transparency" in image.info):
+        bg = Image.new("RGB", image.size, (255, 255, 255))
+        rgba = image.convert("RGBA")
+        bg.paste(rgba, mask=rgba.split()[3])
+        image = bg
+    elif image.mode != "RGB":
         image = image.convert("RGB")
 
     directory = Path(settings.MEDIA_ROOT) / subdir
@@ -223,9 +260,7 @@ def store_image(uploaded_file, *, subdir="products"):
     for name, size in RENDITIONS.items():
         rendition = image.copy()
         rendition.thumbnail((size, size), Image.LANCZOS)
-        if rendition.mode == "RGBA":
-            rendition = rendition.convert("RGB")
-        rendition.save(directory / f"{stem}-{name}.webp", "WEBP", quality=82, method=4)
+        rendition.save(directory / f"{stem}-{name}.webp", "WEBP", quality=85, method=4)
 
     return f"{settings.MEDIA_URL}{subdir}/{stem}-full.webp"
 

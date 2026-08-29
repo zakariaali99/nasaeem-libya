@@ -103,7 +103,7 @@ export function ProductGallery({ images, productName }: ProductGalleryProps) {
         <div className="relative">
           <ul
             ref={trackRef}
-            className="flex w-full snap-x snap-mandatory overflow-x-auto overscroll-x-contain rounded-lg [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="flex w-full snap-x snap-mandatory overflow-x-auto overscroll-x-contain rounded-3xl bg-white dark:bg-card/40 border border-border/80 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             /* A listbox of images: arrow keys move it, and the label names it. */
             role="listbox"
             aria-label={`صور ${productName}`}
@@ -130,7 +130,7 @@ export function ProductGallery({ images, productName }: ProductGalleryProps) {
               return (
                 <li
                   key={image.id}
-                  className="w-full shrink-0 snap-center"
+                  className="w-full shrink-0 snap-center flex items-center justify-center p-4 sm:p-6"
                   role="option"
                   aria-selected={index === selected}
                   aria-label={`${image.alt_text || productName} — ${index + 1} من ${images.length}`}
@@ -147,7 +147,7 @@ export function ProductGallery({ images, productName }: ProductGalleryProps) {
                     loading={index === 0 ? 'eager' : 'lazy'}
                     fetchPriority={index === 0 ? 'high' : undefined}
                     decoding={index === 0 ? 'sync' : 'async'}
-                    className="aspect-square w-full bg-muted object-cover"
+                    className="aspect-square max-h-[460px] sm:max-h-[520px] w-full max-w-full object-contain"
                   />
                 </li>
               )
@@ -200,8 +200,8 @@ export function ProductGallery({ images, productName }: ProductGalleryProps) {
                 aria-label={`عرض الصورة ${index + 1}`}
                 aria-current={index === selected}
                 className={cn(
-                  'block size-16 shrink-0 overflow-hidden rounded-md border-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-                  index === selected ? 'border-primary' : 'border-border',
+                  'block size-16 shrink-0 overflow-hidden rounded-xl border-2 bg-white dark:bg-card/40 p-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                  index === selected ? 'border-primary shadow-xs' : 'border-border',
                 )}
               >
                 <img
@@ -210,7 +210,7 @@ export function ProductGallery({ images, productName }: ProductGalleryProps) {
                   width={64}
                   height={64}
                   loading="lazy"
-                  className="size-full object-cover"
+                  className="size-full object-contain"
                 />
               </button>
             </li>

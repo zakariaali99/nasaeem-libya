@@ -189,7 +189,7 @@ function CartLineItem({ line }: { line: CartLine }) {
             width={84}
             height={84}
             loading="lazy"
-            className="size-20 sm:size-24 rounded-xl bg-muted/40 object-cover border border-border"
+            className="size-20 sm:size-24 rounded-xl bg-white dark:bg-card/40 object-contain p-1.5 border border-border"
           />
         ) : (
           <span className="block size-20 sm:size-24 rounded-xl bg-muted border border-border" aria-hidden="true" />

@@ -56,13 +56,13 @@ export function ProductCard({ product, priority = false, sizes }: ProductCardPro
         viewTransition
         className="relative block focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
       >
-        <div className="relative overflow-hidden rounded-t-2xl bg-muted/30 aspect-square">
+        <div className="relative overflow-hidden rounded-t-2xl bg-white dark:bg-card/40 aspect-square flex items-center justify-center p-3 sm:p-4">
           <ProductImage
             image={product.images?.[0]}
             alt={product.images?.[0]?.alt_text || product.name}
             priority={priority}
             sizes={sizes}
-            className="size-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+            className="size-full max-h-full object-contain transition-transform duration-500 ease-out group-hover:scale-105"
           />
 
           {!product.in_stock && (

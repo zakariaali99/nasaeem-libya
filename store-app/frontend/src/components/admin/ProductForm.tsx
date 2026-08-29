@@ -1283,7 +1283,7 @@ export function ProductForm({
                       alt=""
                       width={160}
                       height={160}
-                      className="aspect-square w-full object-cover"
+                      className="aspect-square w-full object-contain p-2 bg-white dark:bg-card/40"
                     />
                     {index === 0 && (
                       <span className="absolute start-2 top-2 rounded-lg bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground shadow-xs">

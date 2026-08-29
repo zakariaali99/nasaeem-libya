@@ -59,7 +59,7 @@ export function ProductImage({
       loading={priority ? 'eager' : 'lazy'}
       fetchPriority={priority ? 'high' : undefined}
       decoding={priority ? 'sync' : 'async'}
-      className={cn('aspect-square w-full bg-muted object-cover', className)}
+      className={cn('aspect-square w-full object-contain', className)}
     />
   )
 }

@@ -96,7 +96,7 @@ export default function AdminProductsPage() {
               width={44}
               height={44}
               loading="lazy"
-              className="size-11 shrink-0 rounded-2xl object-cover border border-border bg-muted/30 shadow-2xs"
+              className="size-11 shrink-0 rounded-2xl object-contain p-1 border border-border bg-white dark:bg-card/40 shadow-2xs"
             />
           ) : (
             <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-muted/60 text-muted-foreground border border-border">

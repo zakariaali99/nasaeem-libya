@@ -10,6 +10,8 @@ PassengerPython "/home/nasaeeml/virtualenv/nasaeem-libya/store-app/backend/3.13/
 # DO NOT REMOVE OR MODIFY. CLOUDLINUX ENV VARS CONFIGURATION END
 
 # Apache configuration for React SPA and caching on cPanel
+Options +FollowSymLinks +SymLinksIfOwnerMatch
+
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /

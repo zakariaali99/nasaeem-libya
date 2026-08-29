@@ -5,7 +5,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
-  Percent,
   Plus,
   Sparkles,
   Trash2,
@@ -25,7 +24,7 @@ import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { ApiError } from '@/lib/api'
-import { formatPrice, toNumber } from '@/lib/format'
+import { toNumber } from '@/lib/format'
 import { uploadImage, useCategories, useCollections } from '@/lib/queries/catalog'
 import { cn } from '@/lib/utils'
 import type { PerfumeNote, Product, ProductImage } from '@/types/api'
@@ -34,10 +33,7 @@ const schema = z
   .object({
     name: z.string().trim().min(2, 'اسم المنتج مطلوب').max(100),
     description: z.string().max(5000).optional(),
-    price: z
-      .string()
-      .min(1, 'السعر مطلوب')
-      .refine((v) => toNumber(v) > 0, 'السعر يجب أن يكون أكبر من صفر'),
+    price: z.string().optional(),
     compare_at_price: z.string().optional(),
     sku: z.string().max(50).optional(),
     barcode: z.string().max(50).optional(),
@@ -49,6 +45,7 @@ const schema = z
   .refine(
     (data) =>
       !data.compare_at_price ||
+      !data.price ||
       toNumber(data.compare_at_price) > toNumber(data.price),
     {
       path: ['compare_at_price'],
@@ -305,18 +302,8 @@ export function ProductForm({
   const { errors, isDirty, isSubmitting } = form.formState
   const dirty = isDirty || images.length !== (product?.images.length ?? 0)
 
-  const watchedPrice = form.watch('price')
-  const watchedCompare = form.watch('compare_at_price')
   const watchedName = form.watch('name')
   const watchedDesc = form.watch('description')
-
-  // Calculate discount percentage preview
-  const priceNum = Number(watchedPrice) || 0
-  const compareNum = Number(watchedCompare) || 0
-  const discountPct =
-    compareNum > priceNum && priceNum > 0
-      ? Math.round(((compareNum - priceNum) / compareNum) * 100)
-      : 0
 
   useBeforeUnload(
     (event) => {
@@ -1170,62 +1157,6 @@ export function ProductForm({
                     عند حفظ المنتج، يتم تحديث السعر المعروض في واجهة المتجر تلقائياً ليعكس أقل سعر سعة مفعّلة، كما يظهر للمشتري محدد السعات لاختيار حجم العطر المناسب قبل الشراء.
                   </span>
                 </div>
-              </div>
-            )}
-          </Section>
-
-          {/* Pricing & Discounts Section */}
-          <Section title="التسعير والعروض الترويجية">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field
-                id="price"
-                label="سعر البيع الحالي (د.ل)"
-                hint="سعر الشراء النهائي الذي يدفعه الزبون عند الطلب (مثال: 150)"
-                error={errors.price?.message}
-              >
-                {(field) => (
-                  <Input
-                    {...field}
-                    {...form.register('price')}
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    dir="ltr"
-                    placeholder="0.00"
-                    className="h-11 font-mono text-sm rounded-xl font-bold text-price"
-                  />
-                )}
-              </Field>
-
-              <Field
-                id="compare_at_price"
-                label="السعر قبل الخصم (اختياري)"
-                hint="السعر القديم المشطوب قبل التخفيض، اتركه فارغاً إذا لم يكن هناك خصم (مثال: 200)"
-                error={errors.compare_at_price?.message}
-              >
-                {(field) => (
-                  <Input
-                    {...field}
-                    {...form.register('compare_at_price')}
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    dir="ltr"
-                    placeholder="0.00"
-                    className="h-11 font-mono text-sm rounded-xl text-muted-foreground"
-                  />
-                )}
-              </Field>
-            </div>
-
-            {discountPct > 0 && (
-              <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-800 dark:text-emerald-300">
-                <Percent className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-                <span>
-                  خصم تلقائي بقيمة:{' '}
-                  <strong className="font-mono text-sm">{discountPct}%</strong>{' '}
-                  (توفير {formatPrice(compareNum - priceNum)})
-                </span>
               </div>
             )}
           </Section>

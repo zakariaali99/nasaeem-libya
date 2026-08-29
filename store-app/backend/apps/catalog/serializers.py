@@ -260,6 +260,11 @@ class ProductWriteSerializer(serializers.ModelSerializer):
             if list_field in data and data[list_field] is None:
                 data[list_field] = []
 
+        if "sizes" in data and data["sizes"] and (not data.get("price") or str(data.get("price")).strip() in ("", "0", "0.00")):
+            valid_prices = [float(s["price"]) for s in data["sizes"] if s.get("price")]
+            if valid_prices:
+                data["price"] = str(min(valid_prices))
+
         return super().to_internal_value(data)
 
     def validate(self, attrs):

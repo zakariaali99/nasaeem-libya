@@ -994,12 +994,7 @@ export function ProductForm({
                 id="has_multiple_sizes"
                 checked={hasMultipleSizes}
                 onCheckedChange={(v) => {
-                  const enabled = Boolean(v)
-                  setHasMultipleSizes(enabled)
-                  if (enabled && sizes.length === 0) {
-                    addSize('50 مل')
-                    addSize('100 مل')
-                  }
+                  setHasMultipleSizes(Boolean(v))
                 }}
               />
             </div>

@@ -186,3 +186,68 @@ export async function uploadImage(file: File) {
   const response = await api.post<{ url: string; renditions: Record<string, string> }>('/images/', body)
   return response.data
 }
+
+export interface ProductSizeItem {
+  id?: string
+  size: string
+  price: string
+  compare_at_price?: string | null
+  stock: number
+  reserved_stock?: number
+  available_stock?: number
+  sku?: string
+  is_active?: boolean
+}
+
+export interface ProductSizesResponse {
+  data: ProductSizeItem[]
+  product_id: string
+  product_name: string
+  has_variants: boolean
+}
+
+export function useProductSizes(lookup: string | undefined) {
+  return useQuery({
+    queryKey: ['product-sizes', lookup],
+    queryFn: async () => {
+      if (!lookup) return null
+      const clean = safeDecodeLookup(lookup)
+      const res = await api.get<ProductSizesResponse>(`/products/${encodeURIComponent(clean)}/sizes/`)
+      return res.data
+    },
+    enabled: !!lookup,
+  })
+}
+
+export function useManageProductSizes() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      lookup,
+      ...data
+    }: {
+      lookup: string
+      action: 'add_size' | 'batch_adjust' | 'sync_sizes'
+      size?: string
+      price?: string
+      compare_at_price?: string | null
+      stock?: number
+      sku?: string
+      adjustments?: { variant_id: string; change: number; reason?: string; note?: string }[]
+      sizes?: ProductSizeItem[]
+    }) => {
+      const clean = safeDecodeLookup(lookup)
+      const res = await api.post<{ message: string; variant_id?: string }>(
+        `/products/${encodeURIComponent(clean)}/sizes/`,
+        data,
+      )
+      return res.data
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['product-sizes', variables.lookup] })
+      queryClient.invalidateQueries({ queryKey: ['product', variables.lookup] })
+      queryClient.invalidateQueries({ queryKey: ['products'] })
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
+    },
+  })
+}

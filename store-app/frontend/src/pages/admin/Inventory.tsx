@@ -2,6 +2,7 @@ import {
   AlertTriangle,
   ArrowDownRight,
   ArrowUpRight,
+  Boxes,
   CheckCircle2,
   ClipboardList,
   History,
@@ -26,7 +27,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import { Input } from '@/components/ui/input'
 import { ApiError } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
-import { useAdjustInventory, useInventory } from '@/lib/queries/catalog'
+import { useAdjustInventory, useInventory, useManageProductSizes, useProductSizes } from '@/lib/queries/catalog'
 import { usePageTitle } from '@/lib/usePageTitle'
 import { useUrlState } from '@/lib/useUrlState'
 import { cn } from '@/lib/utils'
@@ -61,6 +62,7 @@ export default function AdminInventoryPage() {
   const [auditTarget, setAuditTarget] = useState('')
   const [damageReason, setDamageReason] = useState('damaged_transit')
   const [note, setNote] = useState('')
+  const [sizesModalProduct, setSizesModalProduct] = useState<{ id: string; name: string } | null>(null)
 
   const openAdjust = (next: AdjustTarget, initialTab: AdjustTab = 'restock') => {
     setTarget(next)
@@ -252,30 +254,108 @@ export default function AdminInventoryPage() {
               </Button>
             </>
           ) : (
-            <div className="flex flex-col gap-1 w-full max-w-xs">
+            <div className="flex flex-col gap-1.5 w-full min-w-56 max-w-sm">
               {row.variants.map((v) => (
-                <div key={v.variant_id} className="flex items-center justify-between gap-2 text-xs bg-muted/40 p-1.5 rounded-lg border border-border/50">
-                  <span className="font-medium text-foreground truncate max-w-24">{v.label || v.sku}</span>
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-mono font-bold text-[11px] text-foreground">{formatNumber(v.available_stock)} متاح</span>
+                <div
+                  key={v.variant_id}
+                  className="flex items-center justify-between gap-2 text-xs bg-muted/40 hover:bg-muted/70 p-1.5 rounded-xl border border-border/60 transition-colors"
+                >
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="inline-flex items-center justify-center font-bold px-1.5 py-0.5 rounded-md bg-primary/10 text-primary text-[11px] shrink-0">
+                      {v.label || v.sku}
+                    </span>
+                    <span className="font-mono font-bold text-[11px] text-foreground truncate">
+                      {formatNumber(v.available_stock)} متاح
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    {/* Quick -1 for this size */}
                     <button
                       type="button"
-                      aria-label={`تعديل مخزون ${v.label}`}
+                      aria-label={`خصم 1 من ${v.label}`}
+                      title="إنقاص قطعة واحدة (-1)"
+                      disabled={adjust.isPending || v.stock <= 0}
+                      onClick={() =>
+                        adjust.mutate({
+                          product_id: row.product_id,
+                          variant_id: v.variant_id,
+                          change: -1,
+                          reason: 'manual',
+                          note: `إنقاص سريع (-1) لسعة ${v.label}`,
+                        })
+                      }
+                      className="flex size-6 items-center justify-center rounded-md border border-border bg-card text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all disabled:opacity-30"
+                    >
+                      <Minus className="size-3" />
+                    </button>
+
+                    {/* Quick +1 for this size */}
+                    <button
+                      type="button"
+                      aria-label={`إضافة 1 لـ ${v.label}`}
+                      title="إضافة قطعة واحدة (+1)"
+                      disabled={adjust.isPending}
+                      onClick={() =>
+                        adjust.mutate({
+                          product_id: row.product_id,
+                          variant_id: v.variant_id,
+                          change: 1,
+                          reason: 'restock',
+                          note: `إضافة سريعة (+1) لسعة ${v.label}`,
+                        })
+                      }
+                      className="flex size-6 items-center justify-center rounded-md border border-border bg-card text-muted-foreground hover:bg-emerald-500/10 hover:text-emerald-600 transition-all"
+                    >
+                      <Plus className="size-3" />
+                    </button>
+
+                    {/* Full Adjust for this size */}
+                    <button
+                      type="button"
+                      aria-label={`إدارة وتدقيق مخزون ${v.label}`}
+                      title="إدارة وتدقيق مخزون هذه السعة"
                       onClick={() =>
                         openAdjust({
                           productId: row.product_id,
                           variantId: v.variant_id,
-                          label: `${row.name} (${v.label || v.sku})`,
+                          label: `${row.name} — ${v.label || v.sku}`,
                           current: v.stock,
                         })
                       }
                       className="flex size-6 items-center justify-center rounded-md bg-card border border-border text-primary hover:bg-primary hover:text-primary-foreground transition-all"
                     >
-                      <Plus className="size-3" />
+                      <SlidersHorizontal className="size-3" />
                     </button>
                   </div>
                 </div>
               ))}
+
+              {/* Action buttons for multi-size perfume */}
+              <div className="flex items-center gap-1.5 pt-0.5">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSizesModalProduct({ id: row.product_id, name: row.name })}
+                  className="h-7 px-2 rounded-lg text-[11px] font-bold border-primary/40 bg-primary/5 text-primary hover:bg-primary hover:text-primary-foreground transition-all shadow-2xs gap-1 flex-1"
+                >
+                  <Boxes className="size-3" />
+                  <span>توريد وتعديل السعات</span>
+                </Button>
+
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 rounded-lg text-[11px] font-bold text-muted-foreground hover:text-foreground"
+                >
+                  <Link to={`/admin/products/${encodeURIComponent(row.product_id)}/variants`}>
+                    <Plus className="size-3 me-0.5" />
+                    سعة جديدة
+                  </Link>
+                </Button>
+              </div>
             </div>
           )}
         </div>
@@ -629,6 +709,307 @@ export default function AdminInventoryPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Dedicated Perfume Sizes Multi-Restock Modal */}
+      <ProductSizesRestockDialog
+        product={sizesModalProduct}
+        onClose={() => setSizesModalProduct(null)}
+      />
     </div>
+  )
+}
+
+function ProductSizesRestockDialog({
+  product,
+  onClose,
+}: {
+  product: { id: string; name: string } | null
+  onClose: () => void
+}) {
+  const sizesQuery = useProductSizes(product?.id)
+  const manageSizes = useManageProductSizes()
+
+  const [quantities, setQuantities] = useState<Record<string, number>>({})
+  const [newSizeName, setNewSizeName] = useState('')
+  const [newSizePrice, setNewSizePrice] = useState('')
+  const [newSizeStock, setNewSizeStock] = useState('10')
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+
+  if (!product) return null
+
+  const sizes = sizesQuery.data?.data ?? []
+
+  const handleApplyPresetToAll = (qty: number) => {
+    const next: Record<string, number> = {}
+    sizes.forEach((s) => {
+      if (s.id) next[s.id] = qty
+    })
+    setQuantities(next)
+  }
+
+  const handleSaveBatchAdjust = async () => {
+    setErrorMsg(null)
+    const adjustments = Object.entries(quantities)
+      .map(([variant_id, change]) => ({
+        variant_id,
+        change,
+        reason: change > 0 ? 'restock' : 'manual',
+        note: 'توريد دفعي من صفحة المخزون',
+      }))
+      .filter((a) => a.change !== 0)
+
+    if (adjustments.length === 0) {
+      onClose()
+      return
+    }
+
+    try {
+      await manageSizes.mutateAsync({
+        lookup: product.id,
+        action: 'batch_adjust',
+        adjustments,
+      })
+      onClose()
+    } catch (err: any) {
+      setErrorMsg(err?.response?.data?.message || err?.message || 'تعذّر حفظ التوريد')
+    }
+  }
+
+  const handleAddNewSize = async () => {
+    if (!newSizeName.trim()) {
+      setErrorMsg('اسم السعة مطلوب (مثال: 100 مل)')
+      return
+    }
+    setErrorMsg(null)
+    try {
+      await manageSizes.mutateAsync({
+        lookup: product.id,
+        action: 'add_size',
+        size: newSizeName.trim(),
+        price: newSizePrice.trim() || '0',
+        stock: Number(newSizeStock) || 0,
+      })
+      setNewSizeName('')
+      setNewSizePrice('')
+      setNewSizeStock('10')
+      setShowAddForm(false)
+    } catch (err: any) {
+      setErrorMsg(err?.response?.data?.message || err?.message || 'تعذّر إضافة السعة')
+    }
+  }
+
+  return (
+    <Dialog open={Boolean(product)} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-xl rounded-3xl p-6">
+        <DialogTitle className="text-base font-extrabold text-foreground flex items-center gap-2">
+          <Boxes className="size-5 text-primary" />
+          إدارة وتوريد سعات: {product.name}
+        </DialogTitle>
+        <DialogDescription className="text-xs text-muted-foreground">
+          يمكنك توريد شحنات جديدة لجميع سعات العطر دفعة واحدة، أو إضافة حجم وسعة جديدة مباشرة للمنتج.
+        </DialogDescription>
+
+        {errorMsg && <Alert tone="error">{errorMsg}</Alert>}
+
+        {sizesQuery.isLoading ? (
+          <div className="py-8 text-center text-xs text-muted-foreground">جارٍ تحميل السعات...</div>
+        ) : (
+          <div className="space-y-4 pt-2">
+            {/* Quick Bulk Presets */}
+            <div className="flex items-center justify-between p-3 rounded-2xl bg-muted/30 border border-border/80 text-xs">
+              <span className="font-bold text-foreground">توريد سريع لجميع السعات:</span>
+              <div className="flex gap-1.5">
+                {[5, 10, 20, 50].map((num) => (
+                  <button
+                    key={num}
+                    type="button"
+                    onClick={() => handleApplyPresetToAll(num)}
+                    className="px-2.5 py-1 rounded-xl bg-card border border-border text-xs font-bold text-foreground hover:border-primary hover:text-primary transition-all shadow-2xs"
+                  >
+                    +{num} للكل
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setQuantities({})}
+                  className="px-2 py-1 rounded-xl text-xs text-muted-foreground hover:text-foreground"
+                >
+                  تفريغ
+                </button>
+              </div>
+            </div>
+
+            {/* Sizes List with Restock Inputs */}
+            <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+              {sizes.length === 0 ? (
+                <div className="p-4 text-center text-xs text-muted-foreground">
+                  لا توجد سعات بعد لهذا العطر. أضف سعة جديدة أدناه.
+                </div>
+              ) : (
+                sizes.map((s) => {
+                  const currentQty = quantities[s.id || ''] || 0
+                  return (
+                    <div
+                      key={s.id || s.size}
+                      className="flex items-center justify-between gap-3 p-3 rounded-2xl border border-border bg-card shadow-2xs"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center justify-center font-bold px-2 py-0.5 rounded-lg bg-primary/10 text-primary text-xs">
+                            {s.size}
+                          </span>
+                          <span className="text-xs font-mono text-muted-foreground">{s.sku}</span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          الرصيد الحالي: <strong className="font-mono text-foreground">{s.stock}</strong> قطعة
+                          {currentQty !== 0 && (
+                            <span className="ms-2 font-bold text-primary">
+                              ← الجديد: <span className="font-mono">{s.stock + currentQty}</span>
+                            </span>
+                          )}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setQuantities((prev) => ({
+                              ...prev,
+                              [s.id || '']: (prev[s.id || ''] || 0) - 1,
+                            }))
+                          }
+                          className="size-7 rounded-lg border border-border bg-muted/40 text-muted-foreground flex items-center justify-center hover:bg-destructive/10 hover:text-destructive"
+                        >
+                          <Minus className="size-3" />
+                        </button>
+
+                        <Input
+                          type="number"
+                          value={currentQty === 0 ? '' : currentQty}
+                          onChange={(e) => {
+                            const val = Number(e.target.value) || 0
+                            setQuantities((prev) => ({ ...prev, [s.id || '']: val }))
+                          }}
+                          placeholder="+0"
+                          className="h-8 w-16 text-center font-mono font-bold text-xs rounded-lg"
+                        />
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setQuantities((prev) => ({
+                              ...prev,
+                              [s.id || '']: (prev[s.id || ''] || 0) + 1,
+                            }))
+                          }
+                          className="size-7 rounded-lg border border-border bg-muted/40 text-muted-foreground flex items-center justify-center hover:bg-emerald-500/10 hover:text-emerald-600"
+                        >
+                          <Plus className="size-3" />
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+
+            {/* Inline Add New Size Form */}
+            {showAddForm ? (
+              <div className="p-4 rounded-2xl border border-primary/30 bg-primary/5 space-y-3 animate-fade-rise">
+                <h4 className="text-xs font-bold text-primary flex items-center gap-1.5">
+                  <Plus className="size-3.5" />
+                  إضافة حجم وسعة جديدة للعطر (بالـ مل)
+                </h4>
+                <div className="grid grid-cols-3 gap-2">
+                  <Input
+                    value={newSizeName}
+                    onChange={(e) => setNewSizeName(e.target.value)}
+                    placeholder="السعة (مثال: 150 مل)"
+                    className="h-8 text-xs rounded-lg bg-card"
+                  />
+                  <Input
+                    type="number"
+                    step="0.01"
+                    dir="ltr"
+                    value={newSizePrice}
+                    onChange={(e) => setNewSizePrice(e.target.value)}
+                    placeholder="السعر (د.ل)"
+                    className="h-8 text-xs font-mono font-bold rounded-lg bg-card text-price"
+                  />
+                  <Input
+                    type="number"
+                    min="0"
+                    dir="ltr"
+                    value={newSizeStock}
+                    onChange={(e) => setNewSizeStock(e.target.value)}
+                    placeholder="المخزون الأولي"
+                    className="h-8 text-xs font-mono rounded-lg bg-card text-center"
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setShowAddForm(false)}
+                    className="h-7 text-xs px-2"
+                  >
+                    إلغاء
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    loading={manageSizes.isPending}
+                    onClick={handleAddNewSize}
+                    className="h-7 text-xs font-bold px-3 rounded-lg"
+                  >
+                    حفظ السعة
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowAddForm(true)}
+                className="w-full py-2 rounded-2xl border border-dashed border-border text-xs font-bold text-muted-foreground hover:border-primary hover:text-primary transition-all flex items-center justify-center gap-1.5"
+              >
+                <Plus className="size-3.5" />
+                <span>إضافة سعة وحجم جديد لهذا العطر</span>
+              </button>
+            )}
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-between pt-3 border-t border-border">
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                <Link to={`/admin/products/${encodeURIComponent(product.id)}/variants`}>
+                  انتقال لصفحة السعات الكاملة ←
+                </Link>
+              </Button>
+
+              <div className="flex gap-2">
+                <Button variant="ghost" size="sm" className="rounded-xl text-xs" onClick={onClose}>
+                  إغلاق
+                </Button>
+                <Button
+                  size="sm"
+                  loading={manageSizes.isPending}
+                  onClick={handleSaveBatchAdjust}
+                  className="rounded-xl text-xs font-bold px-5 shadow-sm"
+                >
+                  حفظ وتطبيق التوريد
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   )
 }

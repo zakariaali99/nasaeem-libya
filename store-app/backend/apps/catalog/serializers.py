@@ -227,6 +227,7 @@ class ProductWriteSerializer(serializers.ModelSerializer):
     )
     images = serializers.ListField(child=serializers.DictField(), required=False, allow_null=True, write_only=True)
     perfume_details = serializers.DictField(required=False, allow_null=True, write_only=True)
+    sizes = serializers.ListField(child=serializers.DictField(), required=False, allow_null=True, write_only=True)
 
     class Meta:
         model = Product
@@ -234,7 +235,7 @@ class ProductWriteSerializer(serializers.ModelSerializer):
             "id", "name", "slug", "description", "price", "compare_at_price",
             "sku", "barcode", "is_active", "has_variants", "track_quantity",
             "meta_title", "meta_description", "width", "length", "height", "weight",
-            "category_ids", "collection_ids", "images", "perfume_details",
+            "category_ids", "collection_ids", "images", "perfume_details", "sizes",
         ]
         extra_kwargs = {"slug": {"required": False}}
         # `stock` is deliberately absent: stock only ever moves through
@@ -255,7 +256,7 @@ class ProductWriteSerializer(serializers.ModelSerializer):
                 val = val.replace("،", ".").replace(",", ".")
                 data[field] = val if val else None
 
-        for list_field in ("category_ids", "collection_ids", "images"):
+        for list_field in ("category_ids", "collection_ids", "images", "sizes"):
             if list_field in data and data[list_field] is None:
                 data[list_field] = []
 
@@ -270,7 +271,7 @@ class ProductWriteSerializer(serializers.ModelSerializer):
             })
         return attrs
 
-    def _apply_relations(self, product, categories, collections, images, perfume_details=None):
+    def _apply_relations(self, product, categories, collections, images, perfume_details=None, sizes=None):
         if categories is not None:
             product.categories.set(categories)
         if collections is not None:
@@ -308,14 +309,110 @@ class ProductWriteSerializer(serializers.ModelSerializer):
                 defaults=defaults,
             )
 
+        if sizes is not None and isinstance(sizes, list):
+            from .models import VariantOption, VariantValue, ProductVariant, InventoryLog
+            size_option, _ = VariantOption.objects.get_or_create(name="الحجم")
+
+            existing_variants = {}
+            for v in product.variants.prefetch_related("values").all():
+                for val in v.values.all():
+                    existing_variants[val.value.strip()] = v
+
+            current_size_names = set()
+            for s in sizes:
+                if not isinstance(s, dict):
+                    continue
+                size_name = str(s.get("size") or s.get("name") or "").strip()
+                if not size_name:
+                    continue
+                current_size_names.add(size_name)
+
+                val_obj, _ = VariantValue.objects.get_or_create(option=size_option, value=size_name)
+
+                raw_price = s.get("price") or product.price
+                try:
+                    price_val = Decimal(str(raw_price))
+                except Exception:
+                    price_val = product.price
+
+                compare_val = None
+                if s.get("compare_at_price"):
+                    try:
+                        compare_val = Decimal(str(s["compare_at_price"]))
+                    except Exception:
+                        compare_val = None
+
+                stock_val = int(s.get("stock") or 0)
+                sku_val = str(s.get("sku") or f"{product.sku or 'NAS'}-{size_name}").strip()
+                is_active_val = bool(s.get("is_active", True))
+
+                if size_name in existing_variants:
+                    variant = existing_variants[size_name]
+                    variant.price = price_val
+                    variant.compare_at_price = compare_val
+                    variant.sku = sku_val
+                    variant.is_active = is_active_val
+                    if stock_val != variant.stock:
+                        delta = stock_val - variant.stock
+                        variant.stock = stock_val
+                        InventoryLog.objects.create(
+                            product=product,
+                            variant=variant,
+                            change=delta,
+                            reason=InventoryLog.Reason.MANUAL,
+                            note=f"تعديل مخزون السعة {size_name}",
+                        )
+                    variant.save()
+                else:
+                    variant = ProductVariant.objects.create(
+                        product=product,
+                        price=price_val,
+                        compare_at_price=compare_val,
+                        sku=sku_val,
+                        stock=stock_val,
+                        is_active=is_active_val,
+                    )
+                    variant.values.set([val_obj])
+                    if stock_val > 0:
+                        InventoryLog.objects.create(
+                            product=product,
+                            variant=variant,
+                            change=stock_val,
+                            reason=InventoryLog.Reason.MANUAL,
+                            note=f"المخزون الأولي للسعة {size_name}",
+                        )
+
+            # Deactivate or remove sizes not present anymore
+            for old_size_name, old_variant in existing_variants.items():
+                if old_size_name not in current_size_names:
+                    if old_variant.reserved_stock > 0:
+                        old_variant.is_active = False
+                        old_variant.save(update_fields=["is_active", "updated_at"])
+                    else:
+                        old_variant.delete()
+
+            from django.db.models import Sum
+            total_variants = ProductVariant.objects.filter(product=product)
+            if total_variants.exists():
+                product.has_variants = True
+                product.stock = total_variants.aggregate(s=Sum("stock"))["s"] or 0
+                active_variants = total_variants.filter(is_active=True, price__isnull=False)
+                if active_variants.exists():
+                    product.price = min(v.price for v in active_variants)
+                product.save(update_fields=["has_variants", "stock", "price", "updated_at"])
+            else:
+                product.has_variants = False
+                product.save(update_fields=["has_variants", "updated_at"])
+
     def create(self, validated_data):
         categories = validated_data.pop("category_ids", None)
         collections = validated_data.pop("collection_ids", None)
         images = validated_data.pop("images", None)
         perfume_details = validated_data.pop("perfume_details", None)
+        sizes = validated_data.pop("sizes", None)
         validated_data.setdefault("slug", unique_slug(Product, validated_data["name"]))
         product = Product.objects.create(**validated_data)
-        self._apply_relations(product, categories, collections, images, perfume_details)
+        self._apply_relations(product, categories, collections, images, perfume_details, sizes)
         return product
 
     def update(self, instance, validated_data):
@@ -323,8 +420,9 @@ class ProductWriteSerializer(serializers.ModelSerializer):
         collections = validated_data.pop("collection_ids", None)
         images = validated_data.pop("images", None)
         perfume_details = validated_data.pop("perfume_details", None)
+        sizes = validated_data.pop("sizes", None)
         product = super().update(instance, validated_data)
-        self._apply_relations(product, categories, collections, images, perfume_details)
+        self._apply_relations(product, categories, collections, images, perfume_details, sizes)
         return product
 
     def to_representation(self, instance):

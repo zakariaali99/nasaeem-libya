@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
+  Boxes,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -136,6 +137,86 @@ export function ProductForm({
   const [heartInput, setHeartInput] = useState('')
   const [baseInput, setBaseInput] = useState('')
 
+  // Perfume Sizes & Volumes States
+  const [hasMultipleSizes, setHasMultipleSizes] = useState<boolean>(() => {
+    return Boolean(product?.variants && product.variants.length > 0)
+  })
+  const [sizes, setSizes] = useState<
+    {
+      id?: string
+      size: string
+      price: string
+      compare_at_price: string
+      stock: number
+      sku: string
+      is_active: boolean
+    }[]
+  >(() => {
+    if (product?.variants && product.variants.length > 0) {
+      return product.variants.map((v) => ({
+        id: v.id,
+        size: v.values?.map((val) => val.value).join(' / ') || v.sku || 'حجم',
+        price: v.price || product.price || '',
+        compare_at_price: v.compare_at_price || '',
+        stock: v.stock ?? 0,
+        sku: v.sku || '',
+        is_active: v.is_active ?? true,
+      }))
+    }
+    return []
+  })
+  const [customSizeInput, setCustomSizeInput] = useState('')
+
+  const PRESET_SIZES = ['30 مل', '50 مل', '75 مل', '100 مل', '125 مل', '150 مل', '200 مل', '250 مل']
+
+  const addSize = (sizeName: string) => {
+    const trimmed = sizeName.trim()
+    if (!trimmed) return
+    if (sizes.some((s) => s.size === trimmed)) return
+    const currentPrice = form.getValues('price') || ''
+    const currentCompare = form.getValues('compare_at_price') || ''
+    const baseSku = form.getValues('sku') || 'NAS'
+    const cleanSizeSlug = trimmed.replace(/\s+/g, '')
+    setSizes((prev) => [
+      ...prev,
+      {
+        size: trimmed,
+        price: currentPrice,
+        compare_at_price: currentCompare,
+        stock: 10,
+        sku: `${baseSku}-${cleanSizeSlug}`,
+        is_active: true,
+      },
+    ])
+  }
+
+  const removeSize = (index: number) => {
+    setSizes((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const updateSizeField = (
+    index: number,
+    field: 'size' | 'price' | 'compare_at_price' | 'stock' | 'sku' | 'is_active',
+    value: any,
+  ) => {
+    setSizes((prev) => {
+      const copy = [...prev]
+      const currentItem = copy[index]
+      if (currentItem) {
+        copy[index] = {
+          size: field === 'size' ? String(value) : currentItem.size,
+          price: field === 'price' ? String(value) : currentItem.price,
+          compare_at_price: field === 'compare_at_price' ? String(value) : currentItem.compare_at_price,
+          stock: field === 'stock' ? Number(value) || 0 : currentItem.stock,
+          sku: field === 'sku' ? String(value) : currentItem.sku,
+          is_active: field === 'is_active' ? Boolean(value) : currentItem.is_active,
+          id: currentItem.id,
+        }
+      }
+      return copy
+    })
+  }
+
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -187,8 +268,39 @@ export function ProductForm({
         setSelectedSeasons(product.perfume_details.seasons ?? ['winter', 'autumn'])
         setSelectedOccasions(product.perfume_details.occasions ?? ['formal', 'evening'])
       }
+      if (product.variants && product.variants.length > 0) {
+        setHasMultipleSizes(true)
+        setSizes(
+          product.variants.map((v) => ({
+            id: v.id,
+            size: v.values?.map((val) => val.value).join(' / ') || v.sku || 'حجم',
+            price: v.price || product.price || '',
+            compare_at_price: v.compare_at_price || '',
+            stock: v.stock ?? 0,
+            sku: v.sku || '',
+            is_active: v.is_active ?? true,
+          }))
+        )
+      } else {
+        setHasMultipleSizes(false)
+        setSizes([])
+      }
     }
   }, [product, form])
+
+  // Auto sync lowest active size price to form price
+  useEffect(() => {
+    if (hasMultipleSizes && sizes.length > 0) {
+      const activeSizes = sizes.filter((s) => s.is_active)
+      const validPrices = (activeSizes.length > 0 ? activeSizes : sizes)
+        .map((s) => parseFloat(s.price) || 0)
+        .filter((p) => p > 0)
+      if (validPrices.length > 0) {
+        const minP = Math.min(...validPrices)
+        form.setValue('price', String(minP), { shouldValidate: true })
+      }
+    }
+  }, [sizes, hasMultipleSizes, form])
 
   const { errors, isDirty, isSubmitting } = form.formState
   const dirty = isDirty || images.length !== (product?.images.length ?? 0)
@@ -225,15 +337,21 @@ export function ProductForm({
   }, [dirty])
 
   const handleFiles = async (files: FileList | null) => {
-    if (!files || files.length === 0) return
+    if (!files?.length) return
     setUploading(true)
     setUploadError(null)
     try {
-      const uploaded: Pick<ProductImage, 'url' | 'alt_text'>[] = []
-      for (const file of Array.from(files)) {
-        const result = await uploadImage(file)
-        uploaded.push({ url: result.url, alt_text: '' })
+      const remainingSlots = 10 - images.length
+      if (remainingSlots <= 0) {
+        throw new Error('الحد الأقصى لصور المنتج هو 10 صور')
       }
+      const filesToUpload = Array.from(files).slice(0, remainingSlots)
+      const uploaded = await Promise.all(
+        filesToUpload.map(async (f) => {
+          const res = await uploadImage(f)
+          return { url: res.url, alt_text: form.getValues('name') || 'عطر' }
+        }),
+      )
       setImages((current) => [...current, ...uploaded])
     } catch (err) {
       setUploadError(
@@ -266,10 +384,35 @@ export function ProductForm({
     const cleanedPrice = cleanNum(values.price)
     const cleanedCompare = cleanNum(values.compare_at_price) || null
 
+    let effectivePrice = cleanedPrice
+    let effectiveCompare = cleanedCompare
+
+    if (hasMultipleSizes && sizes.length > 0) {
+      const activeSizes = sizes.filter((s) => s.is_active)
+      const validPrices = (activeSizes.length > 0 ? activeSizes : sizes)
+        .map((s) => parseFloat(cleanNum(s.price)) || 0)
+        .filter((p) => p > 0)
+
+      if (validPrices.length > 0) {
+        effectivePrice = String(Math.min(...validPrices))
+      }
+    }
+
     await onSubmit({
       ...values,
-      price: cleanedPrice,
-      compare_at_price: cleanedCompare,
+      price: effectivePrice,
+      compare_at_price: effectiveCompare,
+      has_variants: hasMultipleSizes && sizes.length > 0,
+      sizes: hasMultipleSizes && sizes.length > 0
+        ? sizes.map((s) => ({
+            size: s.size,
+            price: cleanNum(s.price) || effectivePrice,
+            compare_at_price: cleanNum(s.compare_at_price) || null,
+            stock: Number(s.stock) || 0,
+            sku: s.sku,
+            is_active: s.is_active,
+          }))
+        : null,
       category_ids: categoryIds,
       collection_ids: collectionIds,
       images: images.map((img, order) => ({
@@ -830,6 +973,207 @@ export function ProductForm({
                       })}
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
+          </Section>
+
+          {/* Perfume Sizes & Volumes Section */}
+          <Section title="سعات وأحجام العطر والأسعار (السعات بالـ مل)">
+            <div className="flex items-center justify-between p-3.5 rounded-2xl border border-border/80 bg-muted/20">
+              <div className="space-y-0.5">
+                <span className="font-bold text-sm text-foreground flex items-center gap-2">
+                  <Boxes className="size-4 text-primary" />
+                  تفعيل أحجام وسعات متعددة للعطر (خيارات البيع بالـ مل)
+                </span>
+                <p className="text-xs text-muted-foreground">
+                  أضف سعات العطر المتوفرة (مثل: 50 مل، 100 مل، 200 مل) مع تحديد سعر ومخزون كل سعة بشكل مستقل.
+                </p>
+              </div>
+              <Checkbox
+                id="has_multiple_sizes"
+                checked={hasMultipleSizes}
+                onCheckedChange={(v) => {
+                  const enabled = Boolean(v)
+                  setHasMultipleSizes(enabled)
+                  if (enabled && sizes.length === 0) {
+                    addSize('50 مل')
+                    addSize('100 مل')
+                  }
+                }}
+              />
+            </div>
+
+            {hasMultipleSizes && (
+              <div className="space-y-4 pt-2 animate-fade-rise">
+                {/* Preset Quick Chips */}
+                <div className="space-y-2 rounded-2xl border border-border/80 bg-card/60 p-4">
+                  <span className="text-xs font-bold text-foreground block">
+                    اختيار سريع لسعات العطور الشائعة (انقر للإضافة الفورية):
+                  </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {PRESET_SIZES.map((preset) => {
+                      const exists = sizes.some((s) => s.size === preset)
+                      return (
+                        <button
+                          key={preset}
+                          type="button"
+                          disabled={exists}
+                          onClick={() => addSize(preset)}
+                          className={cn(
+                            'rounded-xl border px-3 py-1.5 text-xs font-bold transition-all',
+                            exists
+                              ? 'border-primary/40 bg-primary/10 text-primary opacity-60 cursor-default'
+                              : 'border-border bg-background hover:border-primary hover:text-primary shadow-2xs'
+                          )}
+                        >
+                          {exists ? `✓ ${preset}` : `+ ${preset}`}
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  {/* Custom Size Input */}
+                  <div className="flex items-center gap-2 pt-2 border-t border-border/60">
+                    <Input
+                      value={customSizeInput}
+                      onChange={(e) => setCustomSizeInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          if (customSizeInput.trim()) {
+                            addSize(customSizeInput.trim())
+                            setCustomSizeInput('')
+                          }
+                        }
+                      }}
+                      placeholder="أو اكتب سعة مخصصة (مثال: 70 مل، ربع تولة، عينة 10 مل)..."
+                      className="h-9 text-xs rounded-xl flex-1"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => {
+                        if (customSizeInput.trim()) {
+                          addSize(customSizeInput.trim())
+                          setCustomSizeInput('')
+                        }
+                      }}
+                      className="h-9 px-4 rounded-xl text-xs font-bold shrink-0 shadow-2xs"
+                    >
+                      <Plus className="size-3.5 me-1" />
+                      إضافة السعة
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Sizes Table */}
+                {sizes.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
+                    لم تقم بإضافة أي سعات بعد. انقر على أحد أزرار السعات أعلاه للبدء.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-2xl border border-border bg-card shadow-2xs">
+                    <table className="w-full text-start text-xs">
+                      <thead className="border-b border-border bg-muted/40 text-muted-foreground font-bold">
+                        <tr>
+                          <th className="p-3 text-start">السعة / الحجم</th>
+                          <th className="p-3 text-start">السعر الحالي (د.ل) *</th>
+                          <th className="p-3 text-start">السعر قبل الخصم (اختياري)</th>
+                          <th className="p-3 text-start">المخزون (قطعة)</th>
+                          <th className="p-3 text-start">رمز SKU</th>
+                          <th className="p-3 text-center">الحالة</th>
+                          <th className="p-3 text-end">إزالة</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/60">
+                        {sizes.map((item, idx) => (
+                          <tr key={idx} className="hover:bg-muted/20 transition-colors">
+                            <td className="p-3 font-bold text-foreground">
+                              <Input
+                                value={item.size}
+                                onChange={(e) => updateSizeField(idx, 'size', e.target.value)}
+                                className="h-8 text-xs font-bold w-24 rounded-lg"
+                              />
+                            </td>
+                            <td className="p-3">
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                dir="ltr"
+                                value={item.price}
+                                onChange={(e) => updateSizeField(idx, 'price', e.target.value)}
+                                placeholder="0.00"
+                                className="h-8 text-xs font-mono font-bold w-28 text-price rounded-lg"
+                              />
+                            </td>
+                            <td className="p-3">
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                dir="ltr"
+                                value={item.compare_at_price || ''}
+                                onChange={(e) => updateSizeField(idx, 'compare_at_price', e.target.value)}
+                                placeholder="0.00"
+                                className="h-8 text-xs font-mono text-muted-foreground w-28 rounded-lg"
+                              />
+                            </td>
+                            <td className="p-3">
+                              <Input
+                                type="number"
+                                min="0"
+                                dir="ltr"
+                                value={item.stock}
+                                onChange={(e) => updateSizeField(idx, 'stock', Number(e.target.value) || 0)}
+                                className="h-8 text-xs font-mono font-bold w-20 rounded-lg text-center"
+                              />
+                            </td>
+                            <td className="p-3">
+                              <Input
+                                dir="ltr"
+                                value={item.sku}
+                                onChange={(e) => updateSizeField(idx, 'sku', e.target.value)}
+                                placeholder="SKU-..."
+                                className="h-8 text-xs font-mono w-28 rounded-lg"
+                              />
+                            </td>
+                            <td className="p-3 text-center">
+                              <button
+                                type="button"
+                                onClick={() => updateSizeField(idx, 'is_active', !item.is_active)}
+                                className={cn(
+                                  'px-2 py-0.5 rounded-md text-[11px] font-bold border transition-colors',
+                                  item.is_active
+                                    ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30'
+                                    : 'bg-muted text-muted-foreground border-border'
+                                )}
+                              >
+                                {item.is_active ? 'مفعل' : 'معطل'}
+                              </button>
+                            </td>
+                            <td className="p-3 text-end">
+                              <button
+                                type="button"
+                                onClick={() => removeSize(idx)}
+                                className="p-1 text-muted-foreground hover:text-destructive transition-colors"
+                                title="إزالة هذا الحجم"
+                              >
+                                <Trash2 className="size-4" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs text-primary font-medium flex items-center gap-2">
+                  <Sparkles className="size-4 shrink-0" />
+                  <span>
+                    عند حفظ المنتج، يتم تحديث السعر المعروض في واجهة المتجر تلقائياً ليعكس أقل سعر سعة مفعّلة، كما يظهر للمشتري محدد السعات لاختيار حجم العطر المناسب قبل الشراء.
+                  </span>
                 </div>
               </div>
             )}

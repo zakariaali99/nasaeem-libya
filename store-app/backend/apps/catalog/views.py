@@ -647,6 +647,10 @@ class InventoryAdjustView(APIView):
                 product=product, variant=variant, change=data["change"],
                 reason=data["reason"], note=data.get("note", ""), user=request.user,
             )
+            if variant and product.has_variants:
+                from django.db.models import Sum
+                product.stock = ProductVariant.objects.filter(product=product).aggregate(s=Sum("stock"))["s"] or 0
+                product.save(update_fields=["stock", "updated_at"])
         except services.StockError as exc:
             return Response({"message": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -905,4 +909,123 @@ class AdminReviewsView(APIView):
             return Response({"message": "التقييم غير موجود"}, status=status.HTTP_404_NOT_FOUND)
         review.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ProductSizesManageView(APIView):
+    """Direct administration of perfume sizes, prices, and stock for a product."""
+
+    permission_classes = [IsAdminRole]
+
+    def get(self, request, lookup):
+        product = ProductDetailView().get_object(lookup, admin=True)
+        if product is None:
+            return Response({"message": "المنتج غير موجود"}, status=status.HTTP_404_NOT_FOUND)
+
+        variants = product.variants.prefetch_related("values").all()
+        data = [
+            {
+                "id": str(v.id),
+                "size": " / ".join(val.value for val in v.values.all()) or v.sku,
+                "price": str(v.price) if v.price else str(product.price),
+                "compare_at_price": str(v.compare_at_price) if v.compare_at_price else None,
+                "stock": v.stock,
+                "reserved_stock": v.reserved_stock,
+                "available_stock": v.available_stock,
+                "sku": v.sku,
+                "is_active": v.is_active,
+            }
+            for v in variants
+        ]
+        return Response({
+            "data": data,
+            "product_id": str(product.id),
+            "product_name": product.name,
+            "has_variants": product.has_variants,
+        })
+
+    def post(self, request, lookup):
+        product = ProductDetailView().get_object(lookup, admin=True)
+        if product is None:
+            return Response({"message": "المنتج غير موجود"}, status=status.HTTP_404_NOT_FOUND)
+
+        action = request.data.get("action", "sync_sizes")
+
+        if action == "add_size":
+            size_name = str(request.data.get("size", "")).strip()
+            if not size_name:
+                return Response({"message": "اسم الحجم / السعة مطلوب (مثال: 100 مل)"}, status=status.HTTP_400_BAD_REQUEST)
+
+            size_option, _ = VariantOption.objects.get_or_create(name="الحجم")
+            val_obj, _ = VariantValue.objects.get_or_create(option=size_option, value=size_name)
+
+            raw_price = request.data.get("price") or product.price
+            price_val = Decimal(str(raw_price))
+            compare_val = Decimal(str(request.data["compare_at_price"])) if request.data.get("compare_at_price") else None
+            stock_val = int(request.data.get("stock") or 0)
+            sku_val = str(request.data.get("sku") or f"{product.sku or 'NAS'}-{size_name}").strip()
+
+            variant = ProductVariant.objects.create(
+                product=product,
+                price=price_val,
+                compare_at_price=compare_val,
+                stock=stock_val,
+                sku=sku_val,
+                is_active=True,
+            )
+            variant.values.set([val_obj])
+
+            if stock_val > 0:
+                InventoryLog.objects.create(
+                    product=product,
+                    variant=variant,
+                    change=stock_val,
+                    reason=InventoryLog.Reason.RESTOCK,
+                    note=f"إضافة حجم جديد وتوريد أولي: {size_name}",
+                    user=request.user,
+                )
+
+            from django.db.models import Sum
+            product.has_variants = True
+            total_stock = ProductVariant.objects.filter(product=product).aggregate(s=Sum("stock"))["s"] or 0
+            product.stock = total_stock
+            active_vars = ProductVariant.objects.filter(product=product, is_active=True, price__isnull=False)
+            if active_vars.exists():
+                product.price = min(v.price for v in active_vars)
+            product.save(update_fields=["has_variants", "stock", "price", "updated_at"])
+
+            return Response({
+                "message": f"تمت إضافة سعة {size_name} بنجاح",
+                "variant_id": str(variant.id),
+            }, status=status.HTTP_201_CREATED)
+
+        elif action == "batch_adjust":
+            adjustments = request.data.get("adjustments", [])
+            for adj in adjustments:
+                var_id = adj.get("variant_id")
+                change = int(adj.get("change") or 0)
+                if not var_id or change == 0:
+                    continue
+                v = ProductVariant.objects.filter(pk=var_id, product=product).first()
+                if v:
+                    services.adjust_stock(
+                        product=product,
+                        variant=v,
+                        change=change,
+                        reason=adj.get("reason", InventoryLog.Reason.RESTOCK),
+                        note=adj.get("note", "توريد دفعي لأحجام العطر"),
+                        user=request.user,
+                    )
+            from django.db.models import Sum
+            product.stock = ProductVariant.objects.filter(product=product).aggregate(s=Sum("stock"))["s"] or 0
+            product.save(update_fields=["stock", "updated_at"])
+            return Response({"message": "تم تحديث وتوريد المخزون لجميع السعات بنجاح"})
+
+        elif action == "sync_sizes":
+            sizes_list = request.data.get("sizes", [])
+            serializer = ProductWriteSerializer(product, data={"sizes": sizes_list}, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response({"message": "تم حفظ وتحديث سعات العطر بنجاح"})
+
+        return Response({"message": "إجراء غير معروف"}, status=status.HTTP_400_BAD_REQUEST)
 

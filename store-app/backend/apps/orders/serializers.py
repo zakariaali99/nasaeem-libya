@@ -339,9 +339,15 @@ class DashboardStatsSerializer(serializers.Serializer):
         ) or Decimal("0.00")
 
         # Build dynamic time series for the requested date window (Single Query Aggregation)
+        # Exclude cancelled orders completely from revenue and order trends
         from django.db.models.functions import TruncDate
         daily_stats = (
-            Order.objects.filter(created_at__date__gte=parsed_start, created_at__date__lte=parsed_end)
+            Order.objects.exclude(status=OrderStatus.CANCELLED)
+            .filter(
+                status__in=[OrderStatus.PROCESSING, OrderStatus.COMPLETED],
+                created_at__date__gte=parsed_start,
+                created_at__date__lte=parsed_end,
+            )
             .annotate(day=TruncDate("created_at"))
             .values("day")
             .annotate(day_rev=Sum("total"), day_orders=Count("id"))
@@ -372,7 +378,7 @@ class DashboardStatsSerializer(serializers.Serializer):
             "processing_orders": by_status.get(OrderStatus.PROCESSING, 0),
             "completed_orders": by_status.get(OrderStatus.COMPLETED, 0),
             "cancelled_orders": by_status.get(OrderStatus.CANCELLED, 0),
-            "today_orders": Order.objects.filter(created_at__date=today).count(),
+            "today_orders": Order.objects.exclude(status=OrderStatus.CANCELLED).filter(created_at__date=today).count(),
             "month_revenue": str(
                 (Order.objects.filter(
                     status__in=[OrderStatus.PROCESSING, OrderStatus.COMPLETED],

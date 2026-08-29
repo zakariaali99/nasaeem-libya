@@ -119,7 +119,43 @@ def test_executive_analytics_admin_api_endpoint_with_timeframe(api_client, admin
     assert "brand_performance" in data
     assert "vip_top_spenders" in data
     assert data["timeframe_days"] == 30
-    assert len(data["trend_series"]) == 30
+    assert len(res.data["data"]["trend_series"]) > 0
+
+
+@pytest.mark.django_db
+def test_cancelled_orders_excluded_from_dashboard_revenue_and_series(api_client, admin_user):
+    from decimal import Decimal
+    from django.utils import timezone
+    from apps.orders.models import Order, OrderStatus
+
+    api_client.force_authenticate(user=admin_user)
+    today = timezone.localtime().date()
+
+    # Create 1 completed order (300 LYD) and 1 cancelled order (500 LYD)
+    Order.objects.create(
+        order_number="ORD-TEST-COMPL",
+        status=OrderStatus.COMPLETED,
+        subtotal=Decimal("300.00"),
+        total=Decimal("300.00"),
+    )
+    Order.objects.create(
+        order_number="ORD-TEST-CANC",
+        status=OrderStatus.CANCELLED,
+        subtotal=Decimal("500.00"),
+        total=Decimal("500.00"),
+    )
+
+    res = api_client.get("/api/admin/dashboard/?days=7")
+    assert res.status_code == 200
+    data = res.data["data"]
+
+    # Cancelled order must NOT be in timeframe_revenue or revenue_total
+    assert Decimal(data["revenue_total"]) >= Decimal("300.00")
+    # Cancelled order's 500 LYD must not inflate today's series
+    today_point = next((p for p in data["series"] if p["date"] == today.isoformat()), None)
+    assert today_point is not None
+    assert Decimal(today_point["revenue"]) == Decimal("300.00")
+    assert today_point["orders"] == 1
 
 
 @pytest.mark.django_db

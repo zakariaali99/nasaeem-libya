@@ -28,15 +28,15 @@ const OCCASION_TRANSLATIONS: Record<string, string> = {
 }
 
 export function SensoryPerformanceRadar({ details }: SensoryPerformanceRadarProps) {
-  const longevityScore = details?.longevity_score ?? 5
-  const longevityHours = details?.longevity_hours || '14 إلى 18 ساعة'
-  const sillageScore = details?.sillage_score ?? 4
-  const seasons = details?.seasons?.length ? details.seasons : ['winter', 'autumn', 'spring']
-  const occasions = details?.occasions?.length
-    ? details.occasions
-    : ['formal', 'evening', 'special_dates']
-  const concentration = details?.concentration || 'Eau de Parfum'
-  const origin = details?.origin_country || 'فرنسا'
+  if (!details) return null
+
+  const longevityScore = details.longevity_score ?? 4
+  const longevityHours = details.longevity_hours || ''
+  const sillageScore = details.sillage_score ?? 4
+  const seasons = details.seasons || []
+  const occasions = details.occasions || []
+  const concentration = details.concentration || ''
+  const origin = details.origin_country || ''
 
   return (
     <div className="rounded-3xl border border-border bg-card p-6 shadow-2xs space-y-6">

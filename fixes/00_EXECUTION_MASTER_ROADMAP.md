@@ -20,24 +20,24 @@
 الهدف: تجهيز الـ APIs ونماذج البيانات قبل لمس الواجهات لضمان عدم حدوث أي انقطاع.
 
 ### 1.1 بيانات وهرم العطور الحقيقية (Real Perfume Attributes)
-- [ ] **الملف**: `store-app/backend/apps/catalog/serializers.py`
+- [x] **الملف**: `store-app/backend/apps/catalog/serializers.py`
   - إضافة دعم كامل لـ `perfume_details` داخل `ProductWriteSerializer` لحفظ وإنشاء سجلات `PerfumeAttribute` ذرياً (الجنس: رجالي/نسائي/محايد، العائلة العطرية، التركيز، بلد المنشأ، نوتات القمة والقلب والقاعدة، الثبات والفوحان، الفصول والمناسبات).
   - **حذف الـ Fallback الوهمي**: تعديل دالة `get_perfume_details` في `ProductDetailSerializer` لتعيد `null` إذا لم يقم المدير بإدخال تفاصيل عطرية، بدلاً من اختلاق نوتات عود وبرغموت وهمية.
   - **حذف الحزمة التلقائية الوهمية**: تعديل `get_bundles` لتعيد فقط الحزم الفعلية الموجودة في قاعدة البيانات دون اختلاق حزم غير موجودة.
 
 ### 1.2 الشراء بدون تسجيل مسبق وإنشاء الحساب التلقائي (Frictionless Guest Checkout)
-- [ ] **الملف**: `store-app/backend/apps/orders/views.py` & `services.py`
+- [x] **الملف**: `store-app/backend/apps/orders/views.py` & `services.py`
   - تعديل `CartCheckoutView` بالسماح بالطلب دون اشتراط تسجيل الدخول المسبق (`AllowAny`).
   - استقبال اسم العميل ورقم هاتفه من بيانات الطلب.
   - التحقق من رقم الهاتف: إذا كان مسجلاً يُربط به الطلب، وإن كان جديداً يتم إنشاء حساب تلقائي بكلمة مرور `000000` وتسجيل دخوله في جلسة المتصفح فوراً لمتابعة الطلب.
 
 ### 1.3 إدارة وتغيير كلمات مرور العملاء للمدير (Admin User Password Control)
-- [ ] **الملف**: `store-app/backend/apps/accounts/views.py` & `serializers.py`
+- [x] **الملف**: `store-app/backend/apps/accounts/views.py` & `serializers.py`
   - تحديث `AdminUserDetailView` و `AdminUserUpdateSerializer` لإتاحة تعيين كلمة مرور جديدة للمستخدم من قبل الإدارة.
   - إضافة دعم لإعادة تعيين كلمة المرور إلى الأصفار الافتراضية (`000000`).
 
 ### 1.4 محرك رسائل الواتساب الآلية (WhatsApp Messaging Engine)
-- [ ] **الملف**: `store-app/backend/apps/orders/notifications.py`
+- [x] **الملف**: `store-app/backend/apps/orders/notifications.py`
   - تجهيز دالة `format_bank_transfer_whatsapp_message(order)`: تتضمن بيانات الحساب المصرفي للمتجر، رقم الآيبان (IBAN)، والفاتورة الكاملة بتفاصيل المنتجات والإجمالي.
   - تجهيز دالة `format_new_account_welcome_whatsapp_message(user)`: تتضمن اسم العميل، رقم الهاتف، كلمة المرور المؤقتة `000000`، نصيحة الأمان بضرورة تغييرها، ورابط المتجر.
 
@@ -48,7 +48,7 @@
 الهدف: تمكين المدير وموظفي المتجر من التحكم الكامل في البيانات الحقيقية والطلبات.
 
 ### 2.1 شاشة إدخال وتعديل المنتجات والعطور (Product & Fragrance Form)
-- [ ] **الملف**: `store-app/frontend/src/components/admin/ProductForm.tsx`
+- [x] **الملف**: `store-app/frontend/src/components/admin/ProductForm.tsx`
   - إضافة بطاقة مخصصة بعنوان **«بيانات وهرم العطر الحسي»**:
     - اختيار الفئة المستهدفة: أزرار واضحة `رجالي` | `نسائي` | `للجنسين`.
     - العائلة العطرية (شرقي، خشبي، زهري، حمضي...)، التركيز، وبلد المنشأ.
@@ -58,7 +58,7 @@
   - ربط هذه الحقول بطلب الحفظ والتعديل للباك إند.
 
 ### 2.2 إعادة هيكلة مسار حالات الطلب للمدير (Unified Order Lifecycle)
-- [ ] **الملف**: `store-app/frontend/src/pages/admin/AdminOrderDetail.tsx` & `AdminOrders.tsx`
+- [x] **الملف**: `store-app/frontend/src/pages/admin/AdminOrderDetail.tsx` & `AdminOrders.tsx`
   - إزالة الأزرار المتفرقة المتضاربة.
   - وضع زر عملي رئيسي واحد للإجراء التالي:
     - من `جديد` ⬅️ الزر: **«تأكيد الطلب وبدء التجهيز»**.
@@ -67,14 +67,14 @@
     - أزرار جانبية واضحة للإلغاء أو تسجيل الرفض.
 
 ### 2.3 إدارة حسابات وكلمات مرور العملاء (Customer Account Management)
-- [ ] **الملف**: `store-app/frontend/src/pages/admin/AdminUserDetail.tsx`
+- [x] **الملف**: `store-app/frontend/src/pages/admin/AdminUserDetail.tsx`
   - إضافة بطاقة «أمان الحساب وكلمة المرور»:
     - زر لفتح نافذة **«تغيير كلمة مرور العميل»**.
     - زر سريع **«إعادة تعيين إلى 000000»** مع رسالة تأكيد.
     - زر لإرسال بيانات الدخول المحدثة للعميل عبر واتساب.
 
 ### 2.4 تنظيف القائمة الجانبية للوحة التحكم (Admin Navigation Cleanup)
-- [ ] **الملف**: `store-app/frontend/src/components/layout/AdminLayout.tsx`
+- [x] **الملف**: `store-app/frontend/src/components/layout/AdminLayout.tsx`
   - إخفاء روابط "شركات التوصيل"، "مطابقة كشوفات COD"، و"بوابات الدفع" من القائمة الجانبية ومودال البحث السريع.
 
 ---
@@ -84,9 +84,9 @@
 الهدف: تبسيط تجربة الشراء للمشتري الليبي وإزالة أي نصوص أو شارات مضللة.
 
 ### 3.1 تجربة الشراء السلسة والدفع (Frictionless Checkout)
-- [ ] **الملف**: `store-app/frontend/src/pages/storefront/Cart.tsx`
+- [x] **الملف**: `store-app/frontend/src/pages/storefront/Cart.tsx`
   - إزالة التحويل الإلزامي لصفحة تسجيل الدخول (`navigate('/login')`) عند الضغط على متابعة الشراء، ونقل العميل مباشرة لصفحة إنهاء الطلب.
-- [ ] **الملف**: `store-app/frontend/src/pages/storefront/Checkout.tsx`
+- [x] **الملف**: `store-app/frontend/src/pages/storefront/Checkout.tsx`
   - إظهار حقلي (الاسم الكامل + رقم الهاتف) في حال لم يكن العميل مسجلاً الدخول مسبقاً.
   - **تنظيف قائمة المدن والمناطق**: إزالة أي مبالغ أو أسعار ملحقة بالأسماء داخل الـ `<select>` وعرض أسماء المدن نقية فقط.
   - **قصر خيارات الدفع على وسيلتين فقط**:
@@ -95,18 +95,22 @@
   - إزالة جميع حقول بوابات الدفع الإلكتروني وبطاقات تداول وسداد ومسارات إعادة التوجيه.
 
 ### 3.2 العرض المشروط وتنظيف صفحة المنتج (Product Page Truth & Cleanup)
-- [ ] **الملف**: `store-app/frontend/src/pages/storefront/ProductDetail.tsx`
+- [x] **الملف**: `store-app/frontend/src/pages/storefront/ProductDetail.tsx`
   - **حذف عداد المشاهدين العشوائي (`LiveSocialProof.tsx`)** وشارات الشحن ونقص المخزون الوهمية.
   - جعل قسم الهرم العطري (`FragrancePyramid`) ومؤشرات الثبات (`SensoryPerformanceRadar`) مشروطة: تظهر **فقط** إذا كان العطر يحتوي على تفاصيل حقيقية في قاعدة البيانات.
-- [ ] **الملف**: `store-app/frontend/src/components/storefront/FragrancePyramid.tsx` & `SensoryPerformanceRadar.tsx`
+- [x] **الملف**: `store-app/frontend/src/components/storefront/FragrancePyramid.tsx` & `SensoryPerformanceRadar.tsx`
   - إزالة النصوص الافتراضية الثابتة (البرغموت والعود) من واجهة الفرونت إند.
 
 ### 3.3 تطهير التذييل وشارات الثقة (Footer & Badges Cleanup)
-- [ ] **الملف**: `store-app/frontend/src/components/layout/Footer.tsx`
+- [x] **الملف**: `store-app/frontend/src/components/layout/Footer.tsx`
   - حذف شارات سداد ومعاملات وتداول من قسم طرق الدفع.
   - قصر طرق الدفع على الدفع عند الاستلام كاش والتحويل المصرفي.
-- [ ] **الملف**: `store-app/frontend/src/components/storefront/ProductTrustBadges.tsx`
+- [x] **الملف**: `store-app/frontend/src/components/storefront/ProductTrustBadges.tsx`
   - تعديل شارة الدفع إلى «الدفع عند الاستلام كاش — معاينة العطر قبل الدفع».
+- [x] **الملف**: `store-app/frontend/src/pages/auth/Login.tsx` & `Register.tsx`
+  - إضافة زر إظهار/إخفاء كلمة المرور (Eye Toggle) لتسهيل الرؤية وتجربة الدخول.
+- [x] **الملف**: `store-app/frontend/src/pages/storefront/Account.tsx`
+  - إضافة قسم إدارة وتغيير كلمة المرور الشخصية للعميل.
 
 ---
 

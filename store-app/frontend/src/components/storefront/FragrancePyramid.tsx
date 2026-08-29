@@ -28,18 +28,15 @@ function getNoteIcon(name: string, iconType?: string) {
 }
 
 export function FragrancePyramid({ details }: FragrancePyramidProps) {
-  const topNotes = details?.top_notes || [
-    { name: 'البرغموت الإيطالي', desc: 'افتتاحية منعشة وحيوية' },
-    { name: 'الفلفل الوردي', desc: 'لمسة توابل أنيقة' },
-  ]
-  const heartNotes = details?.heart_notes || [
-    { name: 'العود الكمبودي المعتق', desc: 'قلب دافئ وفاخر' },
-    { name: 'الورد الجوري الدمشقي', desc: 'أناقة مخملية ساحرة' },
-  ]
-  const baseNotes = details?.base_notes || [
-    { name: 'المسك الأبيض الفاخر', desc: 'أثر دائم وناعم' },
-    { name: 'العنبر الملكي', desc: 'عمق وثبات استثنائي' },
-  ]
+  if (!details) return null
+
+  const topNotes = details.top_notes || []
+  const heartNotes = details.heart_notes || []
+  const baseNotes = details.base_notes || []
+
+  if (!topNotes.length && !heartNotes.length && !baseNotes.length) {
+    return null
+  }
 
   const [activeNote, setActiveNote] = React.useState<PerfumeNote | null>(null)
 

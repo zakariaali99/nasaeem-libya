@@ -225,8 +225,8 @@ class ProductWriteSerializer(serializers.ModelSerializer):
     collection_ids = serializers.PrimaryKeyRelatedField(
         queryset=Collection.objects.all(), many=True, required=False, write_only=True,
     )
-    images = serializers.ListField(child=serializers.DictField(), required=False, write_only=True)
-    perfume_details = serializers.DictField(required=False, write_only=True)
+    images = serializers.ListField(child=serializers.DictField(), required=False, allow_null=True, write_only=True)
+    perfume_details = serializers.DictField(required=False, allow_null=True, write_only=True)
 
     class Meta:
         model = Product
@@ -254,6 +254,11 @@ class ProductWriteSerializer(serializers.ModelSerializer):
                 # Normalize Arabic comma and European comma to dot
                 val = val.replace("،", ".").replace(",", ".")
                 data[field] = val if val else None
+
+        for list_field in ("category_ids", "collection_ids", "images"):
+            if list_field in data and data[list_field] is None:
+                data[list_field] = []
+
         return super().to_internal_value(data)
 
     def validate(self, attrs):
@@ -282,7 +287,7 @@ class ProductWriteSerializer(serializers.ModelSerializer):
                 for index, item in enumerate(images)
                 if item.get("url")
             ])
-        if perfume_details is not None:
+        if isinstance(perfume_details, dict) and perfume_details:
             from .models import PerfumeAttribute
             defaults = {
                 "fragrance_family": perfume_details.get("fragrance_family", "شرقي فاخر"),

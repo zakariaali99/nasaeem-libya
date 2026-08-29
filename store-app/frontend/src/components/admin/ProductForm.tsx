@@ -93,7 +93,7 @@ export function ProductForm({
 
   // Perfume Details & Olfactory Pyramid States
   const [hasPerfumeDetails, setHasPerfumeDetails] = useState<boolean>(
-    Boolean(product?.perfume_details)
+    product ? Boolean(product?.perfume_details) : true
   )
   const [perfumeGender, setPerfumeGender] = useState<'MEN' | 'WOMEN' | 'UNISEX'>(
     product?.perfume_details?.gender ?? 'UNISEX'

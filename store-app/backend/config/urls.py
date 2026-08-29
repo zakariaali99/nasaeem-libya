@@ -27,17 +27,25 @@ urlpatterns = [
 
 from django.views.static import serve
 
+_DIST_DIR = settings.BASE_DIR / "dist"
+
 urlpatterns += [
     re_path(r"^media/(?P<path>.*)$", serve, {"document_root": settings.MEDIA_ROOT}),
+    re_path(r"^assets/(?P<path>.*)$", serve, {"document_root": _DIST_DIR / "assets"}),
+    re_path(r"^fonts/(?P<path>.*)$", serve, {"document_root": _DIST_DIR / "fonts"}),
+    re_path(r"^brand/(?P<path>.*)$", serve, {"document_root": _DIST_DIR / "brand"}),
+    re_path(r"^brands/(?P<path>.*)$", serve, {"document_root": _DIST_DIR / "brands"}),
+    re_path(r"^providers/(?P<path>.*)$", serve, {"document_root": _DIST_DIR / "providers"}),
+    re_path(r"^favicon\.svg$", serve, {"document_root": _DIST_DIR, "path": "favicon.svg"}),
+    re_path(r"^sw\.js$", serve, {"document_root": _DIST_DIR, "path": "sw.js"}),
+    re_path(r"^manifest\.webmanifest$", serve, {"document_root": _DIST_DIR, "path": "manifest.webmanifest"}),
 ]
 
 # SPA shell — LAST. Serves every non-API, non-admin, non-asset path with the
-# built index.html, injecting per-product SEO. nginx serves real files (assets,
-# fonts, media) directly and only falls through to here for HTML navigations,
-# but the negative lookahead keeps Django honest when it is hit directly.
+# built index.html, injecting per-product SEO.
 urlpatterns += [
     re_path(
-        r"^(?!api/|django-admin/|django-static/|media/)(?P<path>.*)$",
+        r"^(?!api/|django-admin/|django-static/|media/|assets/|fonts/|brand/|brands/|providers/|favicon\.svg|sw\.js|manifest\.webmanifest)(?P<path>.*)$",
         spa.render_shell,
         name="spa-shell",
     ),

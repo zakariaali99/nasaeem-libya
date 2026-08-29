@@ -1,6 +1,10 @@
 import {
   Archive,
+  Check,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Copy,
   Database,
   Download,
   FileArchive,
@@ -10,6 +14,7 @@ import {
   RefreshCw,
   RotateCcw,
   ShoppingBag,
+  Terminal,
   Trash2,
   Upload,
 } from 'lucide-react'
@@ -40,6 +45,14 @@ export default function AdminBackups() {
   const [pendingDelete, setPendingDelete] = useState<string | null>(null)
   const [pendingRestore, setPendingRestore] = useState<{ filename?: string; file?: File } | null>(null)
   const [restoreSuccessNotice, setRestoreSuccessNotice] = useState<string | null>(null)
+  const [guideOpen, setGuideOpen] = useState(false)
+  const [copiedCmd, setCopiedCmd] = useState<string | null>(null)
+
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text)
+    setCopiedCmd(id)
+    setTimeout(() => setCopiedCmd(null), 2500)
+  }
 
   const handleCreate = async () => {
     try {
@@ -158,7 +171,7 @@ export default function AdminBackups() {
       </div>
 
       {/* Upload External Backup Section */}
-      <div className="rounded-3xl border border-dashed border-border/80 bg-muted/20 p-6 sm:p-7 shadow-xs">
+      <div className="rounded-3xl border border-dashed border-border/80 bg-muted/20 p-6 sm:p-7 shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
             <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary shrink-0">
@@ -174,7 +187,7 @@ export default function AdminBackups() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <input
               type="file"
               id="restore-upload"
@@ -200,6 +213,115 @@ export default function AdminBackups() {
             </Button>
           </div>
         </div>
+
+        {pendingRestore?.file && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary/30 bg-primary/5 p-3.5">
+            <div className="flex items-center gap-2 text-xs font-bold text-foreground">
+              <FileArchive className="size-4 text-primary" />
+              <span>الملف المحدد:</span>
+              <span className="font-mono text-primary">{pendingRestore.file.name}</span>
+              <span className="text-[11px] text-muted-foreground font-mono">
+                ({(pendingRestore.file.size / (1024 * 1024)).toFixed(2)} MB)
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 rounded-xl text-xs font-bold"
+                onClick={() => setPendingRestore(null)}
+              >
+                إلغاء
+              </Button>
+              <Button
+                size="sm"
+                className="h-8 rounded-xl font-bold text-xs gap-1.5 shadow-xs"
+                onClick={handleConfirmRestore}
+                loading={restoreBackup.isPending}
+              >
+                <RotateCcw className="size-3.5" />
+                <span>بدء الاسترجاع الفوري الآن</span>
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Disaster Recovery Cheatsheet Guide (Collapsible) */}
+      <div className="rounded-3xl border border-border bg-card shadow-xs overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setGuideOpen(!guideOpen)}
+          className="flex w-full items-center justify-between p-5 text-start hover:bg-muted/20 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex size-9 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+              <Terminal className="size-4" />
+            </div>
+            <div>
+              <h3 className="font-bold text-sm text-foreground">
+                دليل الاسترجاع في حال انهيار أو نقل السيرفر بالكامل (Disaster Recovery Guide)
+              </h3>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                خطوات وأوامر سريعة لاسترجاع النظام في استضافة جديدة نظيفة بدون فتح المتصفح
+              </p>
+            </div>
+          </div>
+          <span className="flex size-7 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+            {guideOpen ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+          </span>
+        </button>
+
+        {guideOpen && (
+          <div className="border-t border-border/80 p-5 sm:p-6 bg-muted/10 space-y-4 text-xs">
+            <div className="space-y-2">
+              <h4 className="font-bold text-foreground flex items-center gap-1.5">
+                <span>1. الاسترجاع عبر سطر الأوامر (CLI) — الأسرع والأضمن:</span>
+              </h4>
+              <p className="text-muted-foreground leading-relaxed">
+                في حال قمت بنقل المشروع لسيرفر جديد أو تم حذف كل شيء، ارفع ملف النسخة الاحتياطية (.zip) إلى السيرفر ثم شغّل الأمر التالي:
+              </p>
+              <div className="relative flex items-center justify-between rounded-xl bg-slate-900 px-4 py-3 font-mono text-emerald-400 text-xs shadow-inner">
+                <span dir="ltr">python manage.py restore_system_backup /path/to/backup.zip</span>
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard('python manage.py restore_system_backup /path/to/backup.zip', 'restore')}
+                  className="flex size-7 items-center justify-center rounded-lg bg-slate-800 text-slate-300 hover:text-white transition-colors"
+                  title="نسخ الأمر"
+                >
+                  {copiedCmd === 'restore' ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <h4 className="font-bold text-foreground flex items-center gap-1.5">
+                <span>2. الجدولة التلقائية للنسخ الاحتياطي (Cron Job):</span>
+              </h4>
+              <p className="text-muted-foreground leading-relaxed">
+                لأخذ نسخة احتياطية تلقائية يومياً في منتصف الليل عبر لوحة الاستضافة (cPanel Cron Jobs):
+              </p>
+              <div className="relative flex items-center justify-between rounded-xl bg-slate-900 px-4 py-3 font-mono text-emerald-400 text-xs shadow-inner">
+                <span dir="ltr">0 0 * * * cd /path/to/backend && python manage.py create_system_backup</span>
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard('0 0 * * * cd /path/to/backend && python manage.py create_system_backup', 'cron')}
+                  className="flex size-7 items-center justify-center rounded-lg bg-slate-800 text-slate-300 hover:text-white transition-colors"
+                  title="نسخ الأمر"
+                >
+                  {copiedCmd === 'cron' ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-1.5 pt-1 text-[11px] text-muted-foreground border-t border-border/60">
+              <span className="font-bold text-foreground">💡 ملاحظة هامة:</span>
+              <p>
+                كلا الأمرين يتعاملان مباشرة مع مجلد الوسائط <code className="text-primary font-mono">media/</code> وقاعدة البيانات ذرياً (Atomic)، دون مواجهة قيود أحجام الرفع في المتصفحات.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Backups Table */}

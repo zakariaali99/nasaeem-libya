@@ -152,6 +152,44 @@ export function ProductForm({
     },
   })
 
+  // Sync form and component states when the product prop changes
+  useEffect(() => {
+    if (product) {
+      form.reset({
+        name: product.name ?? '',
+        description: product.description ?? '',
+        price: product.price ?? '',
+        compare_at_price: product.compare_at_price ?? '',
+        sku: product.sku ?? '',
+        barcode: product.barcode ?? '',
+        meta_title: product.meta_title ?? '',
+        meta_description: product.meta_description ?? '',
+        is_active: product.is_active ?? true,
+        track_quantity: product.track_quantity ?? true,
+      })
+      setImages(
+        product.images?.map((img) => ({ url: img.url, alt_text: img.alt_text })) ?? [],
+      )
+      setCategoryIds(product.categories?.map((c) => c.id) ?? [])
+      setCollectionIds(product.collections?.map((c) => c.id) ?? [])
+      if (product.perfume_details) {
+        setHasPerfumeDetails(true)
+        setPerfumeFamily(product.perfume_details.fragrance_family ?? 'شرقي خشبي فاخر')
+        setPerfumeGender(product.perfume_details.gender ?? 'UNISEX')
+        setPerfumeConcentration(product.perfume_details.concentration ?? 'Eau de Parfum')
+        setPerfumeOrigin(product.perfume_details.origin_country ?? 'فرنسا')
+        setTopNotes(product.perfume_details.top_notes ?? [])
+        setHeartNotes(product.perfume_details.heart_notes ?? [])
+        setBaseNotes(product.perfume_details.base_notes ?? [])
+        setLongevityScore(product.perfume_details.longevity_score ?? 4)
+        setLongevityHours(product.perfume_details.longevity_hours ?? '12 إلى 18 ساعة')
+        setSillageScore(product.perfume_details.sillage_score ?? 4)
+        setSelectedSeasons(product.perfume_details.seasons ?? ['winter', 'autumn'])
+        setSelectedOccasions(product.perfume_details.occasions ?? ['formal', 'evening'])
+      }
+    }
+  }, [product, form])
+
   const { errors, isDirty, isSubmitting } = form.formState
   const dirty = isDirty || images.length !== (product?.images.length ?? 0)
 
@@ -218,8 +256,20 @@ export function ProductForm({
   }
 
   const submitHandler = form.handleSubmit(async (values) => {
+    const cleanNum = (v: string | undefined | null) => {
+      if (!v) return ''
+      let s = String(v).trim()
+      s = s.replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+      return s.replace(/،/g, '.').replace(/,/g, '.')
+    }
+
+    const cleanedPrice = cleanNum(values.price)
+    const cleanedCompare = cleanNum(values.compare_at_price) || null
+
     await onSubmit({
       ...values,
+      price: cleanedPrice,
+      compare_at_price: cleanedCompare,
       category_ids: categoryIds,
       collection_ids: collectionIds,
       images: images.map((img, order) => ({
@@ -775,6 +825,7 @@ export function ProductForm({
               <Field
                 id="price"
                 label="سعر البيع الحالي (د.ل)"
+                hint="سعر الشراء النهائي الذي يدفعه الزبون عند الطلب (مثال: 150)"
                 error={errors.price?.message}
               >
                 {(field) => (
@@ -794,6 +845,7 @@ export function ProductForm({
               <Field
                 id="compare_at_price"
                 label="السعر قبل الخصم (اختياري)"
+                hint="السعر القديم المشطوب قبل التخفيض، اتركه فارغاً إذا لم يكن هناك خصم (مثال: 200)"
                 error={errors.compare_at_price?.message}
               >
                 {(field) => (

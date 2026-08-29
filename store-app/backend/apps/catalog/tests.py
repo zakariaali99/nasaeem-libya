@@ -713,3 +713,46 @@ class TestWishlist:
         assert res2.json()["data"]["is_wishlisted"] is False
         assert res2.json()["data"]["count"] == 0
 
+
+class TestProductCreationAndLookupRobustness:
+    def test_price_sanitization_and_arabic_digits(self, admin_api):
+        data = {
+            "name": "عطر التوت البري",
+            "price": "١٨٠,٧٥",
+            "compare_at_price": "٢٢٠،٠٠",
+            "is_active": True,
+        }
+        res = admin_api.post("/api/products/", data, format="json")
+        assert res.status_code == 201
+        created = res.json()["data"]
+        assert created["price"] == "180.75"
+        assert created["compare_at_price"] == "220.00"
+
+    def test_lookup_resilience_unicode_and_encoded(self, api, admin_api):
+        data = {
+            "name": "عطر ياسمين دمشقي",
+            "price": "140.00",
+            "is_active": True,
+        }
+        res = admin_api.post("/api/products/", data, format="json")
+        assert res.status_code == 201
+        slug = res.json()["data"]["slug"]
+
+        import urllib.parse
+        # Raw Unicode slug
+        res_raw = api.get(f"/api/products/{slug}/")
+        assert res_raw.status_code == 200
+        assert res_raw.json()["data"]["name"] == "عطر ياسمين دمشقي"
+
+        # Encoded slug
+        encoded = urllib.parse.quote(slug)
+        res_enc = api.get(f"/api/products/{encoded}/")
+        assert res_enc.status_code == 200
+        assert res_enc.json()["data"]["name"] == "عطر ياسمين دمشقي"
+
+        # Double encoded slug
+        double_enc = urllib.parse.quote(encoded)
+        res_dbl = api.get(f"/api/products/{double_enc}/")
+        assert res_dbl.status_code == 200
+        assert res_dbl.json()["data"]["name"] == "عطر ياسمين دمشقي"
+

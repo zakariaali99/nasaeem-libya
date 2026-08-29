@@ -61,6 +61,7 @@ export default function AdminProductEditPage() {
         }
       />
       <ProductForm
+        key={product.id}
         product={product}
         submitLabel="حفظ التغييرات"
         pending={update.isPending}

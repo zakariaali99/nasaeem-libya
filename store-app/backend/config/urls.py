@@ -25,8 +25,11 @@ urlpatterns = [
     path("sitemap.xml", spa.sitemap_xml, name="sitemap"),
 ]
 
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+from django.views.static import serve
+
+urlpatterns += [
+    re_path(r"^media/(?P<path>.*)$", serve, {"document_root": settings.MEDIA_ROOT}),
+]
 
 # SPA shell — LAST. Serves every non-API, non-admin, non-asset path with the
 # built index.html, injecting per-product SEO. nginx serves real files (assets,

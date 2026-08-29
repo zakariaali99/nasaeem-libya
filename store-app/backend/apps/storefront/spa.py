@@ -23,9 +23,10 @@ import re
 from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 
 from django.conf import settings
+from django.db.models import Q
 from django.http import Http404, HttpResponse
 from django.utils.html import escape
 from django.views.decorators.cache import cache_control
@@ -237,8 +238,19 @@ def render_shell(request, path: str = ""):
 
     match = re.match(r"^products/(?P<slug>[^/]+)/?$", path)
     if match:
+        raw_slug = match.group("slug")
+        slug = raw_slug
+        try:
+            while "%" in slug:
+                unquoted = unquote(slug)
+                if unquoted == slug:
+                    break
+                slug = unquoted
+        except Exception:
+            slug = raw_slug
+
         product = (
-            Product.objects.filter(slug=match.group("slug"), is_active=True)
+            Product.objects.filter(Q(slug=slug) | Q(slug=raw_slug), is_active=True)
             .prefetch_related("images", "variants")
             .first()
         )

@@ -179,33 +179,60 @@ class ProductDetailView(APIView):
 
     def get_object(self, lookup, *, admin=False):
         """Resolves by slug OR uuid, per `03-api-contract.md`."""
+        import urllib.parse
+        import uuid as _uuid
+
         queryset = product_queryset()
         if not admin:
             queryset = queryset.filter(is_active=True)
-        product = queryset.filter(slug=lookup).first()
-        if product is None:
-            import uuid as _uuid
 
-            try:
-                product = queryset.filter(id=_uuid.UUID(str(lookup))).first()
-            except (ValueError, AttributeError):
-                product = None
+        lookup_str = str(lookup).strip() if lookup is not None else ""
+        decoded = lookup_str
+        try:
+            while "%" in decoded:
+                nxt = urllib.parse.unquote(decoded)
+                if nxt == decoded:
+                    break
+                decoded = nxt
+        except Exception:
+            decoded = lookup_str
+
+        # 1. Match by decoded slug
+        product = queryset.filter(slug=decoded).first() if decoded else None
+
+        # 2. Match by raw lookup if different
+        if product is None and lookup_str and lookup_str != decoded:
+            product = queryset.filter(slug=lookup_str).first()
+
+        # 3. Match by UUID
+        if product is None and lookup_str:
+            for candidate in (decoded, lookup_str):
+                try:
+                    product = queryset.filter(id=_uuid.UUID(candidate)).first()
+                    if product:
+                        break
+                except (ValueError, AttributeError):
+                    pass
+
         return product
 
     def get(self, request, lookup):
         admin = bool(request.user.is_authenticated and getattr(request.user, "is_admin_role", False))
-        cache_key = f"store:product:{lookup}"
+        product = self.get_object(lookup, admin=admin)
+        if product is None:
+            return Response({"message": "المنتج غير موجود"}, status=status.HTTP_404_NOT_FOUND)
+
+        cache_key = f"store:product:{product.slug}"
         if not admin:
             cached_data = cache.get(cache_key)
             if cached_data is not None:
                 return Response({"data": cached_data})
 
-        product = self.get_object(lookup, admin=admin)
-        if product is None:
-            return Response({"message": "المنتج غير موجود"}, status=status.HTTP_404_NOT_FOUND)
         serialized_data = ProductDetailSerializer(product, context={"request": request}).data
         if not admin:
             cache.set(cache_key, serialized_data, 21600)
+            if str(lookup) != str(product.slug):
+                cache.set(f"store:product:{lookup}", serialized_data, 21600)
         return Response({"data": serialized_data})
 
     def patch(self, request, lookup):
@@ -220,6 +247,7 @@ class ProductDetailView(APIView):
         cache.delete(f"store:product:{lookup}")
         if product.slug:
             cache.delete(f"store:product:{product.slug}")
+        cache.delete(f"store:product:{product.id}")
         return Response({"data": serializer.data, "message": "تم تحديث المنتج"})
 
     def delete(self, request, lookup):

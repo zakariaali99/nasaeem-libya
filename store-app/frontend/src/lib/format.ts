@@ -25,7 +25,11 @@ const moneyFormatter = new Intl.NumberFormat('en-US', {
 
 function toNumber(value: number | string | null | undefined): number {
   if (value === null || value === undefined || value === '') return 0
-  const parsed = typeof value === 'number' ? value : Number(value)
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0
+  let str = String(value).trim()
+  str = str.replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+  str = str.replace(/،/g, '.').replace(/,/g, '.')
+  const parsed = Number(str)
   return Number.isFinite(parsed) ? parsed : 0
 }
 

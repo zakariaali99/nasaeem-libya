@@ -37,11 +37,27 @@ export function useProducts(params: Params, options: { enabled?: boolean } = {})
   })
 }
 
+export function safeDecodeLookup(val: string | undefined | null): string {
+  if (!val) return ''
+  let res = String(val).trim()
+  try {
+    while (res.includes('%')) {
+      const next = decodeURIComponent(res)
+      if (next === res) break
+      res = next
+    }
+  } catch {
+    // fallback if malformed percent sequence
+  }
+  return res
+}
+
 export function useProduct(lookup: string | undefined) {
+  const clean = safeDecodeLookup(lookup)
   return useQuery({
-    queryKey: catalogKeys.product(lookup ?? ''),
-    queryFn: async () => (await api.get<Product>(`/products/${encodeURIComponent(lookup!)}/`)).data,
-    enabled: Boolean(lookup),
+    queryKey: catalogKeys.product(clean),
+    queryFn: async () => (await api.get<Product>(`/products/${encodeURIComponent(clean)}/`)).data,
+    enabled: Boolean(clean),
   })
 }
 
@@ -108,34 +124,46 @@ export const useCreateProduct = () =>
   useCatalogMutation((input: Record<string, unknown>) => api.post<Product>('/products/', input))
 
 export const useUpdateProduct = () =>
-  useCatalogMutation(({ lookup, ...input }: { lookup: string } & Record<string, unknown>) =>
-    api.patch<Product>(`/products/${encodeURIComponent(lookup)}/`, input),
-  )
+  useCatalogMutation(({ lookup, ...input }: { lookup: string } & Record<string, unknown>) => {
+    const clean = safeDecodeLookup(lookup)
+    return api.patch<Product>(`/products/${encodeURIComponent(clean)}/`, input)
+  })
 
 export const useDeleteProduct = () =>
-  useCatalogMutation((lookup: string) => api.delete(`/products/${encodeURIComponent(lookup)}/`))
+  useCatalogMutation((lookup: string) => {
+    const clean = safeDecodeLookup(lookup)
+    return api.delete(`/products/${encodeURIComponent(clean)}/`)
+  })
 
 export const useCreateCategory = () =>
   useCatalogMutation((input: Record<string, unknown>) => api.post<Category>('/categories/', input))
 
 export const useUpdateCategory = () =>
-  useCatalogMutation(({ lookup, ...input }: { lookup: string } & Record<string, unknown>) =>
-    api.patch<Category>(`/categories/${encodeURIComponent(lookup)}/`, input),
-  )
+  useCatalogMutation(({ lookup, ...input }: { lookup: string } & Record<string, unknown>) => {
+    const clean = safeDecodeLookup(lookup)
+    return api.patch<Category>(`/categories/${encodeURIComponent(clean)}/`, input)
+  })
 
 export const useDeleteCategory = () =>
-  useCatalogMutation((lookup: string) => api.delete(`/categories/${encodeURIComponent(lookup)}/`))
+  useCatalogMutation((lookup: string) => {
+    const clean = safeDecodeLookup(lookup)
+    return api.delete(`/categories/${encodeURIComponent(clean)}/`)
+  })
 
 export const useCreateCollection = () =>
   useCatalogMutation((input: Record<string, unknown>) => api.post<Collection>('/collections/', input))
 
 export const useUpdateCollection = () =>
-  useCatalogMutation(({ lookup, ...input }: { lookup: string } & Record<string, unknown>) =>
-    api.patch<Collection>(`/collections/${encodeURIComponent(lookup)}/`, input),
-  )
+  useCatalogMutation(({ lookup, ...input }: { lookup: string } & Record<string, unknown>) => {
+    const clean = safeDecodeLookup(lookup)
+    return api.patch<Collection>(`/collections/${encodeURIComponent(clean)}/`, input)
+  })
 
 export const useDeleteCollection = () =>
-  useCatalogMutation((lookup: string) => api.delete(`/collections/${encodeURIComponent(lookup)}/`))
+  useCatalogMutation((lookup: string) => {
+    const clean = safeDecodeLookup(lookup)
+    return api.delete(`/collections/${encodeURIComponent(clean)}/`)
+  })
 
 export const useAdjustInventory = () =>
   useCatalogMutation((input: {
@@ -147,9 +175,10 @@ export const useAdjustInventory = () =>
   }) => api.post('/admin/inventory/adjust/', input))
 
 export const useGenerateVariantMatrix = () =>
-  useCatalogMutation(({ lookup, ...input }: { lookup: string; value_groups: string[][]; defaults?: Record<string, unknown> }) =>
-    api.post(`/products/${encodeURIComponent(lookup)}/variants/matrix/`, input),
-  )
+  useCatalogMutation(({ lookup, ...input }: { lookup: string; value_groups: string[][]; defaults?: Record<string, unknown> }) => {
+    const clean = safeDecodeLookup(lookup)
+    return api.post(`/products/${encodeURIComponent(clean)}/variants/matrix/`, input)
+  })
 
 export async function uploadImage(file: File) {
   const body = new FormData()

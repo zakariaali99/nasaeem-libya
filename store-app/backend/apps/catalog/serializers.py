@@ -240,6 +240,22 @@ class ProductWriteSerializer(serializers.ModelSerializer):
         # `stock` is deliberately absent: stock only ever moves through
         # services.adjust_stock(), which writes an InventoryLog row.
 
+    def to_internal_value(self, data):
+        if hasattr(data, "copy"):
+            data = data.copy()
+        elif isinstance(data, dict):
+            data = dict(data)
+        for field in ("price", "compare_at_price"):
+            if field in data and data[field] is not None:
+                val = str(data[field]).strip()
+                # Normalize Eastern Arabic digits: ٠١٢٣٤٥٦٧٨٩ -> 0123456789
+                for i, d in enumerate("٠١٢٣٤٥٦٧٨٩"):
+                    val = val.replace(d, str(i))
+                # Normalize Arabic comma and European comma to dot
+                val = val.replace("،", ".").replace(",", ".")
+                data[field] = val if val else None
+        return super().to_internal_value(data)
+
     def validate(self, attrs):
         price = attrs.get("price", getattr(self.instance, "price", None))
         compare_at = attrs.get("compare_at_price", getattr(self.instance, "compare_at_price", None))

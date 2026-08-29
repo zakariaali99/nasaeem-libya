@@ -14,6 +14,7 @@ export default function AdminProductNewPage() {
     <>
       <PageHeader title="منتج جديد" description="املأ التفاصيل ثم احفظ ليظهر المنتج في المتجر." />
       <ProductForm
+        key="product-new"
         submitLabel="حفظ المنتج"
         pending={create.isPending}
         serverError={create.error}

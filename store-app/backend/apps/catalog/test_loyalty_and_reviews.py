@@ -55,7 +55,7 @@ def test_product_review_submission_and_loyalty_bonus(api_client, customer_user, 
     initial_points = customer_user.loyalty_points
 
     response = api_client.post(
-        f"/api/products/{sample_product.slug}/reviews/",
+        f"/api/products/{sample_product.id}/reviews/",
         {
             "rating": 5,
             "title": "عطر رائع جداً وثباته ممتاز",
@@ -83,7 +83,7 @@ def test_product_review_submission_and_loyalty_bonus(api_client, customer_user, 
     assert rev.is_verified_buyer is False
 
     # Get Reviews list
-    get_res = api_client.get(f"/api/products/{sample_product.slug}/reviews/")
+    get_res = api_client.get(f"/api/products/{sample_product.id}/reviews/")
     assert get_res.status_code == 200
     assert get_res.data["data"]["total_reviews"] == 1
     assert get_res.data["data"]["average_rating"] == 5.0

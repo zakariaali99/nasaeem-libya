@@ -171,58 +171,36 @@ class ProductListView(APIView):
         )
 
 
+def _unquote_slug(slug_str: str) -> str:
+    import urllib.parse
+    decoded = str(slug_str).strip() if slug_str is not None else ""
+    while "%" in decoded:
+        nxt = urllib.parse.unquote(decoded)
+        if nxt == decoded:
+            break
+        decoded = nxt
+    return decoded
+
+
 class ProductDetailView(APIView):
     permission_classes = [AllowAny]
 
     def get_permissions(self):
         return [AllowAny()] if self.request.method == "GET" else [IsAdminRole()]
 
-    def get_object(self, lookup, *, admin=False):
-        """Resolves by slug OR uuid, per `03-api-contract.md`."""
-        import urllib.parse
-        import uuid as _uuid
-
+    def get_object(self, pk, *, admin=False):
         queryset = product_queryset()
         if not admin:
             queryset = queryset.filter(is_active=True)
+        return queryset.filter(pk=pk).first()
 
-        lookup_str = str(lookup).strip() if lookup is not None else ""
-        decoded = lookup_str
-        try:
-            while "%" in decoded:
-                nxt = urllib.parse.unquote(decoded)
-                if nxt == decoded:
-                    break
-                decoded = nxt
-        except Exception:
-            decoded = lookup_str
-
-        # 1. Match by decoded slug
-        product = queryset.filter(slug=decoded).first() if decoded else None
-
-        # 2. Match by raw lookup if different
-        if product is None and lookup_str and lookup_str != decoded:
-            product = queryset.filter(slug=lookup_str).first()
-
-        # 3. Match by UUID
-        if product is None and lookup_str:
-            for candidate in (decoded, lookup_str):
-                try:
-                    product = queryset.filter(id=_uuid.UUID(candidate)).first()
-                    if product:
-                        break
-                except (ValueError, AttributeError):
-                    pass
-
-        return product
-
-    def get(self, request, lookup):
+    def get(self, request, pk):
         admin = bool(request.user.is_authenticated and getattr(request.user, "is_admin_role", False))
-        product = self.get_object(lookup, admin=admin)
+        product = self.get_object(pk, admin=admin)
         if product is None:
             return Response({"message": "المنتج غير موجود"}, status=status.HTTP_404_NOT_FOUND)
 
-        cache_key = f"store:product:{product.slug}"
+        cache_key = f"store:product:{product.id}"
         if not admin:
             cached_data = cache.get(cache_key)
             if cached_data is not None:
@@ -231,12 +209,10 @@ class ProductDetailView(APIView):
         serialized_data = ProductDetailSerializer(product, context={"request": request}).data
         if not admin:
             cache.set(cache_key, serialized_data, 21600)
-            if str(lookup) != str(product.slug):
-                cache.set(f"store:product:{lookup}", serialized_data, 21600)
         return Response({"data": serialized_data})
 
-    def patch(self, request, lookup):
-        product = self.get_object(lookup, admin=True)
+    def patch(self, request, pk):
+        product = self.get_object(pk, admin=True)
         if product is None:
             return Response({"message": "المنتج غير موجود"}, status=status.HTTP_404_NOT_FOUND)
         serializer = ProductWriteSerializer(
@@ -244,14 +220,13 @@ class ProductDetailView(APIView):
         )
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        cache.delete(f"store:product:{lookup}")
+        cache.delete(f"store:product:{product.id}")
         if product.slug:
             cache.delete(f"store:product:{product.slug}")
-        cache.delete(f"store:product:{product.id}")
         return Response({"data": serializer.data, "message": "تم تحديث المنتج"})
 
-    def delete(self, request, lookup):
-        product = self.get_object(lookup, admin=True)
+    def delete(self, request, pk):
+        product = self.get_object(pk, admin=True)
         if product is None:
             return Response({"message": "المنتج غير موجود"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -259,7 +234,7 @@ class ProductDetailView(APIView):
         product_name = product.name
 
         # Invalidate related product and storefront caches
-        cache.delete(f"store:product:{lookup}")
+        cache.delete(f"store:product:{product.id}")
         if product_slug:
             cache.delete(f"store:product:{product_slug}")
         cache.delete("store:categories:tree")
@@ -284,6 +259,37 @@ class ProductDetailView(APIView):
             {"deleted": True, "message": f"تم حذف المنتج «{product_name}» نهائياً من المتجر"},
             status=status.HTTP_200_OK,
         )
+
+
+class ProductBySlugView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, slug):
+        decoded_slug = _unquote_slug(slug)
+        admin = bool(request.user.is_authenticated and getattr(request.user, "is_admin_role", False))
+        queryset = product_queryset()
+        if not admin:
+            queryset = queryset.filter(is_active=True)
+
+        product = queryset.filter(slug=decoded_slug).first()
+        if product is None and decoded_slug != slug:
+            product = queryset.filter(slug=slug).first()
+
+        if product is None:
+            return Response({"message": "المنتج غير موجود"}, status=status.HTTP_404_NOT_FOUND)
+
+        cache_key = f"store:product:{product.slug}"
+        if not admin:
+            cached_data = cache.get(cache_key)
+            if cached_data is not None:
+                return Response({"data": cached_data})
+
+        serialized_data = ProductDetailSerializer(product, context={"request": request}).data
+        if not admin:
+            cache.set(cache_key, serialized_data, 21600)
+            if str(slug) != str(product.slug):
+                cache.set(f"store:product:{slug}", serialized_data, 21600)
+        return Response({"data": serialized_data})
 
 
 class CategoryListView(APIView):
@@ -327,25 +333,17 @@ class CategoryDetailView(APIView):
     def get_permissions(self):
         return [AllowAny()] if self.request.method == "GET" else [IsAdminRole()]
 
-    def get_object(self, lookup):
-        category = Category.objects.filter(slug=lookup).first()
-        if category is None:
-            import uuid as _uuid
+    def get_object(self, pk):
+        return Category.objects.filter(pk=pk).first()
 
-            try:
-                category = Category.objects.filter(id=_uuid.UUID(str(lookup))).first()
-            except (ValueError, AttributeError):
-                category = None
-        return category
-
-    def get(self, request, lookup):
-        category = self.get_object(lookup)
+    def get(self, request, pk):
+        category = self.get_object(pk)
         if category is None:
             return Response({"message": "التصنيف غير موجود"}, status=status.HTTP_404_NOT_FOUND)
         return Response({"data": CategorySerializer(category, context={"request": request}).data})
 
-    def patch(self, request, lookup):
-        category = self.get_object(lookup)
+    def patch(self, request, pk):
+        category = self.get_object(pk)
         if category is None:
             return Response({"message": "التصنيف غير موجود"}, status=status.HTTP_404_NOT_FOUND)
         serializer = CategorySerializer(category, data=request.data, partial=True,
@@ -355,8 +353,8 @@ class CategoryDetailView(APIView):
         cache.delete("store:categories:tree")
         return Response({"data": serializer.data, "message": "تم تحديث التصنيف"})
 
-    def delete(self, request, lookup):
-        category = self.get_object(lookup)
+    def delete(self, request, pk):
+        category = self.get_object(pk)
         if category is None:
             return Response({"message": "التصنيف غير موجود"}, status=status.HTTP_404_NOT_FOUND)
         if category.is_system:
@@ -366,11 +364,25 @@ class CategoryDetailView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+class CategoryBySlugView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, slug):
+        decoded_slug = _unquote_slug(slug)
+        category = Category.objects.filter(slug=decoded_slug).first()
+        if category is None and decoded_slug != slug:
+            category = Category.objects.filter(slug=slug).first()
+
+        if category is None:
+            return Response({"message": "التصنيف غير موجود"}, status=status.HTTP_404_NOT_FOUND)
+        return Response({"data": CategorySerializer(category, context={"request": request}).data})
+
+
 class CategoryProductsView(APIView):
     permission_classes = [AllowAny]
 
-    def get(self, request, lookup):
-        category = CategoryDetailView().get_object(lookup)
+    def get(self, request, pk):
+        category = CategoryDetailView().get_object(pk)
         if category is None:
             return Response({"message": "التصنيف غير موجود"}, status=status.HTTP_404_NOT_FOUND)
         queryset = filter_products(
@@ -407,25 +419,17 @@ class CollectionDetailView(APIView):
     def get_permissions(self):
         return [AllowAny()] if self.request.method == "GET" else [IsAdminRole()]
 
-    def get_object(self, lookup):
-        collection = Collection.objects.filter(slug=lookup).first()
-        if collection is None:
-            import uuid as _uuid
+    def get_object(self, pk):
+        return Collection.objects.filter(pk=pk).first()
 
-            try:
-                collection = Collection.objects.filter(id=_uuid.UUID(str(lookup))).first()
-            except (ValueError, AttributeError):
-                collection = None
-        return collection
-
-    def get(self, request, lookup):
-        collection = self.get_object(lookup)
+    def get(self, request, pk):
+        collection = self.get_object(pk)
         if collection is None:
             return Response({"message": "المجموعة غير موجودة"}, status=status.HTTP_404_NOT_FOUND)
         return Response({"data": CollectionSerializer(collection, context={"request": request}).data})
 
-    def patch(self, request, lookup):
-        collection = self.get_object(lookup)
+    def patch(self, request, pk):
+        collection = self.get_object(pk)
         if collection is None:
             return Response({"message": "المجموعة غير موجودة"}, status=status.HTTP_404_NOT_FOUND)
         serializer = CollectionSerializer(collection, data=request.data, partial=True,
@@ -434,19 +438,33 @@ class CollectionDetailView(APIView):
         serializer.save()
         return Response({"data": serializer.data, "message": "تم تحديث المجموعة"})
 
-    def delete(self, request, lookup):
-        collection = self.get_object(lookup)
+    def delete(self, request, pk):
+        collection = self.get_object(pk)
         if collection is None:
             return Response({"message": "المجموعة غير موجودة"}, status=status.HTTP_404_NOT_FOUND)
         collection.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+class CollectionBySlugView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, slug):
+        decoded_slug = _unquote_slug(slug)
+        collection = Collection.objects.filter(slug=decoded_slug).first()
+        if collection is None and decoded_slug != slug:
+            collection = Collection.objects.filter(slug=slug).first()
+
+        if collection is None:
+            return Response({"message": "المجموعة غير موجودة"}, status=status.HTTP_404_NOT_FOUND)
+        return Response({"data": CollectionSerializer(collection, context={"request": request}).data})
+
+
 class CollectionProductsView(APIView):
     permission_classes = [AllowAny]
 
-    def get(self, request, lookup):
-        collection = CollectionDetailView().get_object(lookup)
+    def get(self, request, pk):
+        collection = CollectionDetailView().get_object(pk)
         if collection is None:
             return Response({"message": "المجموعة غير موجودة"}, status=status.HTTP_404_NOT_FOUND)
         queryset = filter_products(
@@ -556,8 +574,8 @@ class VariantMatrixView(APIView):
 
     permission_classes = [IsAdminRole]
 
-    def post(self, request, lookup):
-        product = ProductDetailView().get_object(lookup, admin=True)
+    def post(self, request, pk):
+        product = ProductDetailView().get_object(pk, admin=True)
         if product is None:
             return Response({"message": "المنتج غير موجود"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -796,8 +814,8 @@ class ProductReviewsView(APIView):
     def get_permissions(self):
         return [AllowAny()] if self.request.method == "GET" else [IsAuthenticated()]
 
-    def get(self, request, slug):
-        product = Product.objects.filter(slug=slug).first()
+    def get(self, request, pk):
+        product = Product.objects.filter(pk=pk).first()
         if product is None:
             return Response({"message": "المنتج غير موجود"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -826,11 +844,11 @@ class ProductReviewsView(APIView):
             }
         })
 
-    def post(self, request, slug):
+    def post(self, request, pk):
         from apps.core.models import LoyaltyTransaction
         from apps.orders.models import OrderItem, OrderStatus
 
-        product = Product.objects.filter(slug=slug).first()
+        product = Product.objects.filter(pk=pk).first()
         if product is None:
             return Response({"message": "المنتج غير موجود"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -916,8 +934,8 @@ class ProductSizesManageView(APIView):
 
     permission_classes = [IsAdminRole]
 
-    def get(self, request, lookup):
-        product = ProductDetailView().get_object(lookup, admin=True)
+    def get(self, request, pk):
+        product = ProductDetailView().get_object(pk, admin=True)
         if product is None:
             return Response({"message": "المنتج غير موجود"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -943,8 +961,8 @@ class ProductSizesManageView(APIView):
             "has_variants": product.has_variants,
         })
 
-    def post(self, request, lookup):
-        product = ProductDetailView().get_object(lookup, admin=True)
+    def post(self, request, pk):
+        product = ProductDetailView().get_object(pk, admin=True)
         if product is None:
             return Response({"message": "المنتج غير موجود"}, status=status.HTTP_404_NOT_FOUND)
 

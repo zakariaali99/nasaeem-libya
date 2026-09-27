@@ -3,18 +3,18 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import type { ProductReviewsResponse, ProductReview } from '@/types/api'
 
-export function useProductReviews(slug: string) {
+export function useProductReviews(productId: string | undefined) {
   return useQuery({
-    queryKey: ['product-reviews', slug],
+    queryKey: ['product-reviews', productId],
     queryFn: async () => {
-      const res = await api.get<ProductReviewsResponse>(`/catalog/products/${slug}/reviews/`)
+      const res = await api.get<ProductReviewsResponse>(`/products/${productId}/reviews/`)
       return res.data
     },
-    enabled: Boolean(slug),
+    enabled: Boolean(productId),
   })
 }
 
-export function useCreateProductReview(slug: string) {
+export function useCreateProductReview(productId: string | undefined) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (payload: {
@@ -24,13 +24,13 @@ export function useCreateProductReview(slug: string) {
       photo_url?: string
     }) => {
       const res = await api.post<ProductReview>(
-        `/catalog/products/${slug}/reviews/`,
+        `/products/${productId}/reviews/`,
         payload,
       )
       return res
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['product-reviews', slug] })
+      queryClient.invalidateQueries({ queryKey: ['product-reviews', productId] })
       queryClient.invalidateQueries({ queryKey: ['loyalty-summary'] })
     },
   })

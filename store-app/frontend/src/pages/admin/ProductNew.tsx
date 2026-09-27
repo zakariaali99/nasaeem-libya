@@ -20,8 +20,8 @@ export default function AdminProductNewPage() {
         serverError={create.error}
         onSubmit={async (values) => {
           const response = await create.mutateAsync(values)
-          const slug = (response as { data: { slug: string } }).data.slug
-          navigate(`/admin/products/${encodeURIComponent(slug)}`, { replace: true })
+          const created = (response as { data: { id: string } }).data
+          navigate(`/admin/products/${created.id}`, { replace: true })
         }}
       />
     </>

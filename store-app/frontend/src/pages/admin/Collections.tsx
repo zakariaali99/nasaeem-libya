@@ -137,7 +137,7 @@ export default function AdminCollectionsPage() {
               loading={create.isPending || update.isPending}
               disabled={form.name.trim().length < 2}
               onClick={async () => {
-                if (editing) await update.mutateAsync({ lookup: editing.slug, ...form })
+                if (editing) await update.mutateAsync({ id: editing.id, ...form })
                 else await create.mutateAsync(form)
                 setEditing(null)
                 setCreating(false)
@@ -158,7 +158,7 @@ export default function AdminCollectionsPage() {
         loading={remove.isPending}
         onConfirm={async () => {
           if (!pendingDelete) return
-          await remove.mutateAsync(pendingDelete.slug)
+          await remove.mutateAsync(pendingDelete.id)
           setPendingDelete(null)
         }}
       />

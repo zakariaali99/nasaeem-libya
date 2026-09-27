@@ -116,7 +116,7 @@ class AdminUnifiedSearchView(APIView):
                 "compare_at_price": str(p.compare_at_price) if p.compare_at_price else None,
                 "image_url": p.images.first().url if p.images.exists() else None,
                 "stock": p.stock,
-                "url": f"/admin/products/{p.slug}",
+                "url": f"/admin/products/{p.id}",
             }
             for p in products_qs
         ]

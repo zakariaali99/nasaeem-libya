@@ -10,8 +10,8 @@ import { useProduct, useUpdateProduct } from '@/lib/queries/catalog'
 import { usePageTitle } from '@/lib/usePageTitle'
 
 export default function AdminProductEditPage() {
-  const { productSlugOrId } = useParams()
-  const query = useProduct(productSlugOrId)
+  const { productId } = useParams()
+  const query = useProduct(productId)
   const update = useUpdateProduct()
   usePageTitle(query.data ? `${query.data.name} — لوحة التحكم` : 'تعديل منتج — لوحة التحكم')
 
@@ -46,7 +46,7 @@ export default function AdminProductEditPage() {
         actions={
           <>
             <Button asChild variant="outline">
-              <Link to={`/admin/products/${encodeURIComponent(product.slug)}/variants`}>
+              <Link to={`/admin/products/${product.id}/variants`}>
                 <Layers aria-hidden="true" />
                 الخيارات ({product.variants?.length ?? 0})
               </Link>
@@ -67,7 +67,7 @@ export default function AdminProductEditPage() {
         pending={update.isPending}
         serverError={update.error}
         onSubmit={async (values) => {
-          await update.mutateAsync({ lookup: product.slug, ...values })
+          await update.mutateAsync({ id: product.id, ...values })
         }}
       />
     </>

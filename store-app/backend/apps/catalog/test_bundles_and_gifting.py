@@ -118,7 +118,7 @@ def test_product_detail_api_bundles_payload():
     )
     bundle.included_products.add(addon)
 
-    res = client.get(f"/api/products/{main_p.slug}/")
+    res = client.get(f"/api/products/{main_p.id}/")
     assert res.status_code == 200
     data = res.json()["data"]
     assert "bundles" in data

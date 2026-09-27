@@ -17,9 +17,9 @@ import { cn } from '@/lib/utils'
 const PRESET_SIZES = ['30 مل', '50 مل', '75 مل', '100 مل', '125 مل', '150 مل', '200 مل', '250 مل']
 
 export default function AdminProductVariantsPage() {
-  const { productSlugOrId } = useParams()
-  const product = useProduct(productSlugOrId)
-  const productSizes = useProductSizes(product.data?.slug || productSlugOrId)
+  const { productId } = useParams()
+  const product = useProduct(productId)
+  const productSizes = useProductSizes(productId)
   const manageSizes = useManageProductSizes()
 
   usePageTitle(`سعات وأحجام ${product.data?.name || 'العطر'} — لوحة التحكم`)
@@ -47,7 +47,7 @@ export default function AdminProductVariantsPage() {
   }
 
   const sizesList = productSizes.data?.data ?? []
-  const prodSlug = product.data.slug
+  const prodId = product.data.id
 
   const handleAddSize = async (sizeName?: string) => {
     const sizeToAdd = (sizeName || newSize).trim()
@@ -64,7 +64,7 @@ export default function AdminProductVariantsPage() {
 
     try {
       await manageSizes.mutateAsync({
-        lookup: prodSlug,
+        id: prodId,
         action: 'add_size',
         size: sizeToAdd,
         price: effectivePrice,
@@ -90,7 +90,7 @@ export default function AdminProductVariantsPage() {
     const updated = sizesList.filter((s) => s.size !== sizeName)
     try {
       await manageSizes.mutateAsync({
-        lookup: prodSlug,
+        id: prodId,
         action: 'sync_sizes',
         sizes: updated,
       })
@@ -106,7 +106,7 @@ export default function AdminProductVariantsPage() {
     )
     try {
       await manageSizes.mutateAsync({
-        lookup: prodSlug,
+        id: prodId,
         action: 'sync_sizes',
         sizes: updated,
       })
@@ -130,7 +130,7 @@ export default function AdminProductVariantsPage() {
 
     try {
       await manageSizes.mutateAsync({
-        lookup: prodSlug,
+        id: prodId,
         action: 'sync_sizes',
         sizes: updated,
       })
@@ -149,7 +149,7 @@ export default function AdminProductVariantsPage() {
         actions={
           <div className="flex items-center gap-2">
             <Button asChild variant="outline" className="rounded-xl font-bold">
-              <Link to={`/admin/products/${encodeURIComponent(product.data.slug)}`}>
+              <Link to={`/admin/products/${product.data.id}`}>
                 العودة لبيانات العطر
               </Link>
             </Button>

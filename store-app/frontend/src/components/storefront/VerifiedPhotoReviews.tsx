@@ -7,14 +7,15 @@ import { useMe } from '@/lib/queries/auth'
 import { cn } from '@/lib/utils'
 
 interface VerifiedPhotoReviewsProps {
-  productSlug: string
+  productId: string
   productName: string
+  productSlug?: string
 }
 
-export function VerifiedPhotoReviews({ productSlug, productName }: VerifiedPhotoReviewsProps) {
-  const { data: reviewsData, isLoading } = useProductReviews(productSlug)
+export function VerifiedPhotoReviews({ productId, productName, productSlug }: VerifiedPhotoReviewsProps) {
+  const { data: reviewsData, isLoading } = useProductReviews(productId)
   const { data: user } = useMe()
-  const createReview = useCreateProductReview(productSlug)
+  const createReview = useCreateProductReview(productId)
 
   const [modalOpen, setModalOpen] = useState(false)
   const [rating, setRating] = useState(5)

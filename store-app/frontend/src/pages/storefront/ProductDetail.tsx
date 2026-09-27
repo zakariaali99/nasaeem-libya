@@ -28,7 +28,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { ApiError } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { useAddToCart } from '@/lib/queries/cart'
-import { useProduct, useProducts } from '@/lib/queries/catalog'
+import { useProductBySlug, useProducts } from '@/lib/queries/catalog'
 import { useStorefrontLayout } from '@/lib/queries/storefront'
 import { useToggleWishlist, useWishlistIds } from '@/lib/queries/wishlist'
 import { rememberViewed } from '@/lib/recentlyViewed'
@@ -37,7 +37,7 @@ import type { Product, ProductVariant } from '@/types/api'
 
 export default function ProductDetailPage() {
   const { productSlug = '' } = useParams()
-  const { data: product, isPending, isError, error, refetch } = useProduct(productSlug)
+  const { data: product, isPending, isError, error, refetch } = useProductBySlug(productSlug)
   const [selection, setSelection] = useState<VariantSelection>({})
 
   useEffect(() => {
@@ -296,7 +296,7 @@ function ProductView({
 
       {/* Verified Customer Photo Reviews */}
       <section className="mt-10">
-        <VerifiedPhotoReviews productSlug={product.slug} productName={product.name} />
+        <VerifiedPhotoReviews productId={product.id} productName={product.name} productSlug={product.slug} />
       </section>
 
       <Specs product={product} variant={variant} />

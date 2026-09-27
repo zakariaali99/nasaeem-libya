@@ -13,9 +13,12 @@ import type {
 
 export const catalogKeys = {
   products: (params: Record<string, unknown>) => ['products', params] as const,
-  product: (lookup: string) => ['product', lookup] as const,
+  product: (id: string) => ['product', id] as const,
+  productBySlug: (slug: string) => ['product-by-slug', slug] as const,
   categories: () => ['categories'] as const,
+  categoryBySlug: (slug: string) => ['category-by-slug', slug] as const,
   collections: () => ['collections'] as const,
+  collectionBySlug: (slug: string) => ['collection-by-slug', slug] as const,
   options: () => ['options'] as const,
   inventory: (params: Record<string, unknown>) => ['inventory', params] as const,
   inventoryLogs: (params: Record<string, unknown>) => ['inventory-logs', params] as const,
@@ -37,27 +40,19 @@ export function useProducts(params: Params, options: { enabled?: boolean } = {})
   })
 }
 
-export function safeDecodeLookup(val: string | undefined | null): string {
-  if (!val) return ''
-  let res = String(val).trim()
-  try {
-    while (res.includes('%')) {
-      const next = decodeURIComponent(res)
-      if (next === res) break
-      res = next
-    }
-  } catch {
-    // fallback if malformed percent sequence
-  }
-  return res
+export function useProduct(id: string | undefined) {
+  return useQuery({
+    queryKey: catalogKeys.product(id ?? ''),
+    queryFn: async () => (await api.get<Product>(`/products/${id}/`)).data,
+    enabled: Boolean(id),
+  })
 }
 
-export function useProduct(lookup: string | undefined) {
-  const clean = safeDecodeLookup(lookup)
+export function useProductBySlug(slug: string | undefined) {
   return useQuery({
-    queryKey: catalogKeys.product(clean),
-    queryFn: async () => (await api.get<Product>(`/products/${encodeURIComponent(clean)}/`)).data,
-    enabled: Boolean(clean),
+    queryKey: catalogKeys.productBySlug(slug ?? ''),
+    queryFn: async () => (await api.get<Product>(`/products/by-slug/${encodeURIComponent(slug!)}/`)).data,
+    enabled: Boolean(slug),
   })
 }
 
@@ -69,11 +64,27 @@ export function useCategories() {
   })
 }
 
+export function useCategoryBySlug(slug: string | undefined) {
+  return useQuery({
+    queryKey: catalogKeys.categoryBySlug(slug ?? ''),
+    queryFn: async () => (await api.get<Category>(`/categories/by-slug/${encodeURIComponent(slug!)}/`)).data,
+    enabled: Boolean(slug),
+  })
+}
+
 export function useCollections() {
   return useQuery({
     queryKey: catalogKeys.collections(),
     queryFn: async () => (await api.get<Collection[]>('/collections/')).data,
     staleTime: 5 * 60_000,
+  })
+}
+
+export function useCollectionBySlug(slug: string | undefined) {
+  return useQuery({
+    queryKey: catalogKeys.collectionBySlug(slug ?? ''),
+    queryFn: async () => (await api.get<Collection>(`/collections/by-slug/${encodeURIComponent(slug!)}/`)).data,
+    enabled: Boolean(slug),
   })
 }
 
@@ -113,7 +124,7 @@ function useCatalogMutation<TInput, TResult>(fn: (input: TInput) => Promise<TRes
   return useMutation({
     mutationFn: fn,
     onSuccess: () => {
-      for (const key of ['products', 'product', 'categories', 'collections', 'inventory', 'inventory-logs']) {
+      for (const key of ['products', 'product', 'product-by-slug', 'categories', 'category-by-slug', 'collections', 'collection-by-slug', 'inventory', 'inventory-logs']) {
         queryClient.invalidateQueries({ queryKey: [key] })
       }
     },
@@ -124,45 +135,39 @@ export const useCreateProduct = () =>
   useCatalogMutation((input: Record<string, unknown>) => api.post<Product>('/products/', input))
 
 export const useUpdateProduct = () =>
-  useCatalogMutation(({ lookup, ...input }: { lookup: string } & Record<string, unknown>) => {
-    const clean = safeDecodeLookup(lookup)
-    return api.patch<Product>(`/products/${encodeURIComponent(clean)}/`, input)
+  useCatalogMutation(({ id, ...input }: { id: string } & Record<string, unknown>) => {
+    return api.patch<Product>(`/products/${id}/`, input)
   })
 
 export const useDeleteProduct = () =>
-  useCatalogMutation((lookup: string) => {
-    const clean = safeDecodeLookup(lookup)
-    return api.delete(`/products/${encodeURIComponent(clean)}/`)
+  useCatalogMutation((id: string) => {
+    return api.delete(`/products/${id}/`)
   })
 
 export const useCreateCategory = () =>
   useCatalogMutation((input: Record<string, unknown>) => api.post<Category>('/categories/', input))
 
 export const useUpdateCategory = () =>
-  useCatalogMutation(({ lookup, ...input }: { lookup: string } & Record<string, unknown>) => {
-    const clean = safeDecodeLookup(lookup)
-    return api.patch<Category>(`/categories/${encodeURIComponent(clean)}/`, input)
+  useCatalogMutation(({ id, ...input }: { id: string } & Record<string, unknown>) => {
+    return api.patch<Category>(`/categories/${id}/`, input)
   })
 
 export const useDeleteCategory = () =>
-  useCatalogMutation((lookup: string) => {
-    const clean = safeDecodeLookup(lookup)
-    return api.delete(`/categories/${encodeURIComponent(clean)}/`)
+  useCatalogMutation((id: string) => {
+    return api.delete(`/categories/${id}/`)
   })
 
 export const useCreateCollection = () =>
   useCatalogMutation((input: Record<string, unknown>) => api.post<Collection>('/collections/', input))
 
 export const useUpdateCollection = () =>
-  useCatalogMutation(({ lookup, ...input }: { lookup: string } & Record<string, unknown>) => {
-    const clean = safeDecodeLookup(lookup)
-    return api.patch<Collection>(`/collections/${encodeURIComponent(clean)}/`, input)
+  useCatalogMutation(({ id, ...input }: { id: string } & Record<string, unknown>) => {
+    return api.patch<Collection>(`/collections/${id}/`, input)
   })
 
 export const useDeleteCollection = () =>
-  useCatalogMutation((lookup: string) => {
-    const clean = safeDecodeLookup(lookup)
-    return api.delete(`/collections/${encodeURIComponent(clean)}/`)
+  useCatalogMutation((id: string) => {
+    return api.delete(`/collections/${id}/`)
   })
 
 export const useAdjustInventory = () =>
@@ -175,9 +180,8 @@ export const useAdjustInventory = () =>
   }) => api.post('/admin/inventory/adjust/', input))
 
 export const useGenerateVariantMatrix = () =>
-  useCatalogMutation(({ lookup, ...input }: { lookup: string; value_groups: string[][]; defaults?: Record<string, unknown> }) => {
-    const clean = safeDecodeLookup(lookup)
-    return api.post(`/products/${encodeURIComponent(clean)}/variants/matrix/`, input)
+  useCatalogMutation(({ id, ...input }: { id: string; value_groups: string[][]; defaults?: Record<string, unknown> }) => {
+    return api.post(`/products/${id}/variants/matrix/`, input)
   })
 
 export async function uploadImage(file: File) {
@@ -206,16 +210,15 @@ export interface ProductSizesResponse {
   has_variants: boolean
 }
 
-export function useProductSizes(lookup: string | undefined) {
+export function useProductSizes(id: string | undefined) {
   return useQuery({
-    queryKey: ['product-sizes', lookup],
+    queryKey: ['product-sizes', id],
     queryFn: async () => {
-      if (!lookup) return null
-      const clean = safeDecodeLookup(lookup)
-      const res = await api.get<ProductSizesResponse>(`/products/${encodeURIComponent(clean)}/sizes/`)
+      if (!id) return null
+      const res = await api.get<ProductSizesResponse>(`/products/${id}/sizes/`)
       return res.data
     },
-    enabled: !!lookup,
+    enabled: !!id,
   })
 }
 
@@ -223,10 +226,10 @@ export function useManageProductSizes() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async ({
-      lookup,
+      id,
       ...data
     }: {
-      lookup: string
+      id: string
       action: 'add_size' | 'batch_adjust' | 'sync_sizes'
       size?: string
       price?: string
@@ -236,16 +239,15 @@ export function useManageProductSizes() {
       adjustments?: { variant_id: string; change: number; reason?: string; note?: string }[]
       sizes?: ProductSizeItem[]
     }) => {
-      const clean = safeDecodeLookup(lookup)
       const res = await api.post<{ message: string; variant_id?: string }>(
-        `/products/${encodeURIComponent(clean)}/sizes/`,
+        `/products/${id}/sizes/`,
         data,
       )
       return res.data
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['product-sizes', variables.lookup] })
-      queryClient.invalidateQueries({ queryKey: ['product', variables.lookup] })
+      queryClient.invalidateQueries({ queryKey: ['product-sizes', variables.id] })
+      queryClient.invalidateQueries({ queryKey: ['product', variables.id] })
       queryClient.invalidateQueries({ queryKey: ['products'] })
       queryClient.invalidateQueries({ queryKey: ['inventory'] })
     },

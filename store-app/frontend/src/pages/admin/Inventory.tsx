@@ -766,7 +766,7 @@ function ProductSizesRestockDialog({
 
     try {
       await manageSizes.mutateAsync({
-        lookup: product.id,
+        id: product.id,
         action: 'batch_adjust',
         adjustments,
       })
@@ -784,7 +784,7 @@ function ProductSizesRestockDialog({
     setErrorMsg(null)
     try {
       await manageSizes.mutateAsync({
-        lookup: product.id,
+        id: product.id,
         action: 'add_size',
         size: newSizeName.trim(),
         price: newSizePrice.trim() || '0',

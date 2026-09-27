@@ -264,7 +264,7 @@ export default function AdminProductsPage() {
             </Button>
           ) : null
         }
-        onRowClick={(row) => navigate(`/admin/products/${encodeURIComponent(row.slug)}`)}
+        onRowClick={(row) => navigate(`/admin/products/${row.id}`)}
         emptyTitle="لا توجد منتجات مطابقة"
         emptyDescription="جرّب تعديل عبارة البحث أو اختيار حالة تصفية أخرى."
         emptyAction={
@@ -278,7 +278,7 @@ export default function AdminProductsPage() {
         rowActions={(row) => (
           <div className="flex justify-end gap-1">
             <Button asChild variant="ghost" size="icon" className="size-8 rounded-lg" aria-label={`تعديل ${row.name}`}>
-              <Link to={`/admin/products/${encodeURIComponent(row.slug)}`}>
+              <Link to={`/admin/products/${row.id}`}>
                 <Pencil className="size-3.5" aria-hidden="true" />
               </Link>
             </Button>
@@ -304,7 +304,7 @@ export default function AdminProductsPage() {
         loading={remove.isPending}
         onConfirm={async () => {
           if (!pendingDelete) return
-          await remove.mutateAsync(pendingDelete.slug)
+          await remove.mutateAsync(pendingDelete.id)
           setPendingDelete(null)
           query.refetch()
         }}

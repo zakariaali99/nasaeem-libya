@@ -53,7 +53,7 @@ def test_sizes_manage_endpoint_get_and_post(admin_client):
 
     # 1. Add size via sizes endpoint
     res = admin_client.post(
-        f"/api/products/{product.slug}/sizes/",
+        f"/api/products/{product.id}/sizes/",
         {
             "action": "add_size",
             "size": "90 مل",
@@ -67,7 +67,7 @@ def test_sizes_manage_endpoint_get_and_post(admin_client):
     assert res.status_code == 201
 
     # 2. Get sizes
-    res_get = admin_client.get(f"/api/products/{product.slug}/sizes/")
+    res_get = admin_client.get(f"/api/products/{product.id}/sizes/")
     assert res_get.status_code == 200
     assert len(res_get.data["data"]) == 1
     variant_id = res_get.data["data"][0]["id"]
@@ -76,7 +76,7 @@ def test_sizes_manage_endpoint_get_and_post(admin_client):
 
     # 3. Batch adjust stock
     res_adj = admin_client.post(
-        f"/api/products/{product.slug}/sizes/",
+        f"/api/products/{product.id}/sizes/",
         {
             "action": "batch_adjust",
             "adjustments": [

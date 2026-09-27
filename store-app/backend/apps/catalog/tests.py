@@ -250,24 +250,26 @@ class TestProductList:
 
 
 class TestProductDetail:
-    def test_resolves_by_slug_and_by_uuid(self, api, product):
-        by_slug = api.get(reverse("product-detail", args=[product.slug]))
-        by_uuid = api.get(reverse("product-detail", args=[str(product.id)]))
-        assert by_slug.status_code == by_uuid.status_code == 200
-        assert by_slug.json()["data"]["id"] == by_uuid.json()["data"]["id"]
+    def test_resolves_by_uuid(self, api, product):
+        response = api.get(reverse("product-detail", args=[product.id]))
+        assert response.status_code == 200
+        assert response.json()["data"]["id"] == str(product.id)
 
-    def test_an_arabic_slug_resolves(self, api, product):
-        assert api.get(reverse("product-detail", args=["عود-ملكي"])).status_code == 200
+    def test_resolves_by_slug_endpoint(self, api, product):
+        response = api.get(reverse("product-by-slug", args=[product.slug]))
+        assert response.status_code == 200
+        assert response.json()["data"]["name"] == product.name
 
     def test_a_missing_product_is_404_with_an_arabic_message(self, api):
-        response = api.get(reverse("product-detail", args=["nope"]))
+        import uuid
+        response = api.get(reverse("product-detail", args=[uuid.uuid4()]))
         assert response.status_code == 404
         assert "غير موجود" in response.json()["message"]
 
     def test_the_discount_badge_agrees_with_the_prices(self, api, product):
         """price 450, compare_at 560 → 20%. The badge is derived from the two
         numbers beside it, so it cannot disagree with them."""
-        item = api.get(reverse("product-detail", args=[product.slug])).json()["data"]
+        item = api.get(reverse("product-detail", args=[product.id])).json()["data"]
         assert item["price"] == "450.00"
         assert item["compare_at_price"] == "560.00"
         assert item["discount_percent"] == 20
@@ -275,7 +277,7 @@ class TestProductDetail:
     def test_no_badge_when_there_is_no_saving(self, api, product):
         product.compare_at_price = None
         product.save()
-        item = api.get(reverse("product-detail", args=[product.slug])).json()["data"]
+        item = api.get(reverse("product-detail", args=[product.id])).json()["data"]
         assert item["discount_percent"] is None
 
 
@@ -291,7 +293,7 @@ class TestProductWrites:
         created = response.json()["data"]
         assert created["slug"] == "عطر-تجريبي"
 
-        public = api.get(reverse("product-detail", args=[created["slug"]]))
+        public = api.get(reverse("product-detail", args=[created["id"]]))
         assert public.status_code == 200
         assert public.json()["data"]["categories"][0]["id"] == str(category.id)
         assert public.json()["data"]["images"][0]["alt_text"] == "عطر"
@@ -308,7 +310,7 @@ class TestProductWrites:
     def test_stock_cannot_be_set_through_the_product_endpoint(self, admin_api, product):
         """Stock only moves through adjust_stock(), which writes an InventoryLog."""
         admin_api.patch(
-            reverse("product-detail", args=[product.slug]), {"stock": 9999}, format="json"
+            reverse("product-detail", args=[product.id]), {"stock": 9999}, format="json"
         )
         product.refresh_from_db()
         assert product.stock == 10
@@ -323,7 +325,7 @@ class TestProductWrites:
             order=order, product=product, quantity=1, unit_price=Decimal("450.00"),
             total_price=Decimal("450.00"), product_name=product.name,
         )
-        response = admin_api.delete(reverse("product-detail", args=[product.slug]))
+        response = admin_api.delete(reverse("product-detail", args=[product.id]))
         assert response.status_code == 200
         assert not Product.objects.filter(id=product.id).exists()
         item.refresh_from_db()
@@ -412,7 +414,7 @@ class TestVariantMatrix:
         colours = [VariantValue.objects.create(option=colour, value=v) for v in ("ذهبي", "فضي")]
 
         response = admin_api.post(
-            reverse("variant-matrix", args=[product.slug]),
+            reverse("variant-matrix", args=[product.id]),
             {"value_groups": [[str(v.id) for v in sizes], [str(v.id) for v in colours]],
              "defaults": {"stock": 4}},
             format="json",
@@ -429,8 +431,8 @@ class TestVariantMatrix:
         values = [VariantValue.objects.create(option=size, value=v) for v in ("50 مل", "100 مل")]
         payload = {"value_groups": [[str(v.id) for v in values]]}
 
-        first = admin_api.post(reverse("variant-matrix", args=[product.slug]), payload, format="json")
-        second = admin_api.post(reverse("variant-matrix", args=[product.slug]), payload, format="json")
+        first = admin_api.post(reverse("variant-matrix", args=[product.id]), payload, format="json")
+        second = admin_api.post(reverse("variant-matrix", args=[product.id]), payload, format="json")
         assert len(first.json()["data"]) == 2
         assert len(second.json()["data"]) == 0
 
@@ -504,12 +506,12 @@ class TestAdminPermissionSweep:
 
     def test_a_customer_cannot_write_products(self, customer_api, product):
         assert customer_api.post(reverse("product-list"), {"name": "x", "price": "1"}, format="json").status_code == 403
-        assert customer_api.patch(reverse("product-detail", args=[product.slug]), {"name": "y"}, format="json").status_code == 403
-        assert customer_api.delete(reverse("product-detail", args=[product.slug])).status_code == 403
+        assert customer_api.patch(reverse("product-detail", args=[product.id]), {"name": "y"}, format="json").status_code == 403
+        assert customer_api.delete(reverse("product-detail", args=[product.id])).status_code == 403
 
     def test_a_customer_cannot_write_categories(self, customer_api, category):
         assert customer_api.post(reverse("category-list"), {"name": "x"}, format="json").status_code == 403
-        assert customer_api.patch(reverse("category-detail", args=[category.slug]), {"name": "y"}, format="json").status_code == 403
+        assert customer_api.patch(reverse("category-detail", args=[category.id]), {"name": "y"}, format="json").status_code == 403
 
 
 class TestSearch:
@@ -737,22 +739,61 @@ class TestProductCreationAndLookupRobustness:
         res = admin_api.post("/api/products/", data, format="json")
         assert res.status_code == 201
         slug = res.json()["data"]["slug"]
+        prod_id = res.json()["data"]["id"]
 
         import urllib.parse
-        # Raw Unicode slug
-        res_raw = api.get(f"/api/products/{slug}/")
+        # Raw Unicode slug via by-slug
+        res_raw = api.get(f"/api/products/by-slug/{slug}/")
         assert res_raw.status_code == 200
         assert res_raw.json()["data"]["name"] == "عطر ياسمين دمشقي"
 
-        # Encoded slug
+        # Encoded slug via by-slug
         encoded = urllib.parse.quote(slug)
-        res_enc = api.get(f"/api/products/{encoded}/")
+        res_enc = api.get(f"/api/products/by-slug/{encoded}/")
         assert res_enc.status_code == 200
         assert res_enc.json()["data"]["name"] == "عطر ياسمين دمشقي"
 
-        # Double encoded slug
+        # Double encoded slug via by-slug
         double_enc = urllib.parse.quote(encoded)
-        res_dbl = api.get(f"/api/products/{double_enc}/")
+        res_dbl = api.get(f"/api/products/by-slug/{double_enc}/")
         assert res_dbl.status_code == 200
         assert res_dbl.json()["data"]["name"] == "عطر ياسمين دمشقي"
 
+        # PATCH on by-slug endpoint returns 405 Method Not Allowed
+        assert api.patch(f"/api/products/by-slug/{slug}/", {"name": "تعديل"}).status_code == 405
+
+        # Direct UUID works on main detail endpoint
+        res_uuid = api.get(f"/api/products/{prod_id}/")
+        assert res_uuid.status_code == 200
+        assert res_uuid.json()["data"]["name"] == "عطر ياسمين دمشقي"
+
+
+def test_category_edit_and_delete_accept_uuid_only(admin_api, category):
+    # 1. PATCH & DELETE with UUID succeed
+    response = admin_api.patch(f"/api/categories/{category.id}/", {"name": "عطور شرقية معدلة"}, format="json")
+    assert response.status_code == 200
+    assert response.json()["data"]["name"] == "عطور شرقية معدلة"
+
+    # 2. PATCH with slug returns 404 (route does not match uuid)
+    response_slug = admin_api.patch(f"/api/categories/{category.slug}/", {"name": "محاولة تعديل بالاسم"}, format="json")
+    assert response_slug.status_code == 404
+
+    # 3. DELETE with UUID succeeds
+    del_res = admin_api.delete(f"/api/categories/{category.id}/")
+    assert del_res.status_code == 204
+    assert not Category.objects.filter(pk=category.pk).exists()
+
+
+@pytest.mark.parametrize("times_encoded", [0, 1, 2])
+def test_category_and_collection_by_slug_endpoint(api, category, times_encoded):
+    import urllib.parse
+    lookup = category.slug
+    for _ in range(times_encoded):
+        lookup = urllib.parse.quote(lookup)
+
+    response = api.get(f"/api/categories/by-slug/{lookup}/")
+    assert response.status_code == 200
+    assert response.json()["data"]["id"] == str(category.id)
+
+    # PATCH on by-slug returns 405
+    assert api.patch(f"/api/categories/by-slug/{lookup}/", {}).status_code == 405

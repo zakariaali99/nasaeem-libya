@@ -63,7 +63,7 @@ def test_product_detail_caching_and_invalidation(api_client, admin_user, sample_
     cache.clear()
 
     # 1. Fetch product as guest (populates cache)
-    res = api_client.get(f"/api/products/{sample_product.slug}/")
+    res = api_client.get(f"/api/products/by-slug/{sample_product.slug}/")
     assert res.status_code == 200
     cache_key = f"store:product:{sample_product.slug}"
     assert cache.get(cache_key) is not None
@@ -71,7 +71,7 @@ def test_product_detail_caching_and_invalidation(api_client, admin_user, sample_
     # 2. Admin patches product (invalidates cache)
     api_client.force_authenticate(user=admin_user)
     patch_res = api_client.patch(
-        f"/api/products/{sample_product.slug}/",
+        f"/api/products/{sample_product.id}/",
         {"price": "195.00"},
         format="json",
     )

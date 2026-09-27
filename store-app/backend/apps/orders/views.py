@@ -17,6 +17,7 @@ from rest_framework.views import APIView
 from apps.accounts.permissions import IsAdminRole
 from apps.catalog.models import Product, ProductVariant
 from apps.core.pagination import StandardPagination
+from apps.core.store_settings import get_store_settings
 from apps.core.views import CsrfProtectedAPIView
 
 from . import services
@@ -351,9 +352,11 @@ class CheckoutConfirmView(CsrfProtectedAPIView):
         import urllib.parse
         dispatch_realtime_order_alert(order)
 
-        # Build recipient phone in international format
-        recipient_phone = (order.user.phone_number if order.user else customer_phone) or ""
-        clean_recipient = re.sub(r"[^\d]", "", recipient_phone)
+        # Build recipient phone in international format (Store customer service WhatsApp)
+        from apps.core.store_settings import get_store_settings
+        store_settings = get_store_settings()
+        store_whatsapp = store_settings.whatsapp or (order.user.phone_number if order.user else customer_phone) or ""
+        clean_recipient = re.sub(r"[^\d]", "", store_whatsapp)
         if clean_recipient.startswith("0"):
             clean_recipient = "218" + clean_recipient[1:]
         elif clean_recipient and not clean_recipient.startswith("218"):
@@ -1051,11 +1054,12 @@ class AdminAbandonedCartsView(APIView):
                 clean_phone = "218" + clean_phone
 
             first_item_name = items_list[0]["product_name"] if items_list else "العطور"
+            cart_url = f"{get_store_settings().site_url.rstrip('/')}/cart"
             msg = (
                 f"مرحباً {name} ✨\n"
                 f"لاحظنا في نسائم ليبيا أنك تركت {first_item_name} في سلتك.\n"
                 f"عطورك في انتظارك مع توصيل سريع لمدينتك! استخدم كود الخصم الحصري (NASAEEM5) للحصول على خصم إضافي 5% والشحن المجاني.\n"
-                f"أكمل طلبك الآن: https://nasaeem.ly/cart"
+                f"أكمل طلبك الآن: {cart_url}"
             )
             encoded_msg = urllib.parse.quote(msg)
             wa_link = f"https://wa.me/{clean_phone}?text={encoded_msg}" if clean_phone else ""
@@ -1130,11 +1134,12 @@ class AdminSendAbandonedCartWhatsAppView(APIView):
 
         first_item = cart.items.first()
         item_title = first_item.product.name if first_item else "عطورك المختارة"
+        cart_url = f"{get_store_settings().site_url.rstrip('/')}/cart"
         msg = (
             f"مرحباً {name} ✨\n"
             f"لاحظنا في نسائم ليبيا أنك تركت {item_title} في سلتك.\n"
             f"عطورك في انتظارك مع توصيل سريع لمدينتك! استخدم كود الخصم الحصري (NASAEEM5) للحصول على خصم إضافي 5% والشحن المجاني.\n"
-            f"أكمل طلبك الآن: https://nasaeem.ly/cart"
+            f"أكمل طلبك الآن: {cart_url}"
         )
         wa_link = f"https://wa.me/{clean_phone}?text={urllib.parse.quote(msg)}" if clean_phone else ""
 

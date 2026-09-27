@@ -1,4 +1,4 @@
-import { Building2, CheckCircle2, MessageSquare } from 'lucide-react'
+import { Building2, Check, CheckCircle2, Copy, MessageSquare } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 
@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatPrice } from '@/lib/format'
 import { useOrder } from '@/lib/queries/delivery'
+import { useStoreSettings } from '@/lib/queries/storeSettings'
 import { usePageTitle } from '@/lib/usePageTitle'
 
 export default function CheckoutCompletePage() {
@@ -14,7 +15,15 @@ export default function CheckoutCompletePage() {
   const [params] = useSearchParams()
   const reference = params.get('order') ?? ''
   const { data: order, isPending } = useOrder(reference || undefined)
+  const { data: storeSettings } = useStoreSettings()
   const [whatsappLink, setWhatsappLink] = useState<string | null>(null)
+  const [copiedField, setCopiedField] = useState<string | null>(null)
+
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text)
+    setCopiedField(id)
+    setTimeout(() => setCopiedField(null), 2000)
+  }
 
   useEffect(() => {
     const link = sessionStorage.getItem('last_whatsapp_link')
@@ -62,31 +71,73 @@ export default function CheckoutCompletePage() {
         </div>
       )}
 
-      {/* Bank Transfer Details Card */}
+      {/* Bank Transfer Details Cards */}
       {order?.payment_method === 'bank_transfer' && (
-        <div className="rounded-2xl border border-primary/20 bg-card p-5 space-y-3">
+        <div className="space-y-4">
           <div className="flex items-center gap-2 text-primary font-bold text-sm border-b border-border pb-2">
             <Building2 className="size-4" />
-            <span>بيانات الحساب المصرفي للتحويل</span>
+            <span>بيانات الحسابات المصرفية للتحويل المباشر</span>
           </div>
-          <div className="grid gap-2 text-xs">
-            <div className="flex justify-between border-b border-border/40 pb-1.5">
-              <span className="text-muted-foreground">اسم المصرف:</span>
-              <span className="font-bold text-foreground">المصرف التجاري الوطني / مصرف الجمهورية</span>
+
+          {(storeSettings?.bank_accounts || []).length === 0 ? (
+            <div className="rounded-2xl border border-primary/20 bg-card p-5 text-xs text-muted-foreground">
+              سيتواصل معك فريقنا لتزويدك ببيانات التحويل المصرفي.
             </div>
-            <div className="flex justify-between border-b border-border/40 pb-1.5">
-              <span className="text-muted-foreground">اسم المستفيد:</span>
-              <span className="font-bold text-foreground">شركة نسائم ليبيا للعطور</span>
-            </div>
-            <div className="flex justify-between border-b border-border/40 pb-1.5">
-              <span className="text-muted-foreground">رقم الحساب:</span>
-              <span className="font-mono font-bold text-primary text-sm">0123456789</span>
-            </div>
-            <div className="flex justify-between pt-0.5">
-              <span className="text-muted-foreground">رقم الآيبان (IBAN):</span>
-              <span className="font-mono font-bold text-primary text-xs" dir="ltr">LY88 0001 0123 4567 8901 2345</span>
-            </div>
-          </div>
+          ) : (
+            (storeSettings?.bank_accounts || []).map((acc) => (
+              <div key={acc.id} className="rounded-2xl border border-primary/20 bg-card p-5 space-y-3 shadow-2xs">
+                <div className="flex items-center justify-between border-b border-border/60 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-foreground text-sm">{acc.bank_name}</span>
+                    {acc.branch && <span className="text-xs text-muted-foreground font-medium">({acc.branch})</span>}
+                  </div>
+                </div>
+                <div className="grid gap-2 text-xs">
+                  <div className="flex justify-between border-b border-border/40 pb-1.5">
+                    <span className="text-muted-foreground">اسم المستفيد:</span>
+                    <span className="font-bold text-foreground">{acc.account_holder}</span>
+                  </div>
+                  <div className="flex items-center justify-between border-b border-border/40 pb-1.5">
+                    <span className="text-muted-foreground">رقم الحساب:</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold text-primary text-sm">{acc.account_number}</span>
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(acc.account_number, `acc-${acc.id}`)}
+                        className="text-muted-foreground hover:text-primary p-1 rounded-md transition-colors"
+                        title="نسخ رقم الحساب"
+                      >
+                        {copiedField === `acc-${acc.id}` ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+                  {acc.iban && (
+                    <div className="flex items-center justify-between pt-0.5">
+                      <span className="text-muted-foreground">رقم الآيبان (IBAN):</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-primary text-xs" dir="ltr">{acc.iban}</span>
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(acc.iban!, `iban-${acc.id}`)}
+                          className="text-muted-foreground hover:text-primary p-1 rounded-md transition-colors"
+                          title="نسخ رقم الآيبان"
+                        >
+                          {copiedField === `iban-${acc.id}` ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+
+          {storeSettings?.bank_transfer_note && (
+            <p className="rounded-xl bg-muted/40 p-3 text-xs text-muted-foreground leading-relaxed">
+              💡 <span className="font-bold text-foreground">ملاحظة:</span> {storeSettings.bank_transfer_note}
+            </p>
+          )}
+
           <p className="text-[11px] text-muted-foreground pt-1">
             💬 تم إرسال هذه البيانات بالإضافة إلى الفاتورة التفصيلية إلى هاتفك عبر واتساب تلقائياً.
           </p>

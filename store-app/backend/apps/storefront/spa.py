@@ -258,4 +258,14 @@ def render_shell(request, path: str = ""):
             title, description, extra = _product_head(request, product)
             html = _apply_head(html, title=title, description=description, extra=extra)
 
+    from apps.core.store_settings import get_public_store_settings
+    try:
+        settings_data = get_public_store_settings()
+        settings_json = json.dumps(settings_data, ensure_ascii=False).replace("</", "<\\/")
+        injected_script = f"<script>window.__STORE_SETTINGS__ = {settings_json};</script>"
+        if "</head>" in html:
+            html = html.replace("</head>", f"  {injected_script}\n</head>", 1)
+    except Exception:
+        pass
+
     return HttpResponse(html, content_type="text/html; charset=utf-8")

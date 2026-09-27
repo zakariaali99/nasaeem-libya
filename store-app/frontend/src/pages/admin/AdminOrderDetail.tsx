@@ -521,7 +521,7 @@ export default function AdminOrderDetail() {
               <div>
                 <span className="text-muted-foreground block mb-0.5">المدينة والمنطقة:</span>
                 <p className="font-bold text-foreground text-sm">
-                  {order.shipping_city || order.shipping_region || 'مصراتة — ليبيا'}
+                  {order.shipping_city || order.shipping_region || '—'}
                 </p>
               </div>
 

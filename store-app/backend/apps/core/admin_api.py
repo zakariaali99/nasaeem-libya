@@ -179,10 +179,12 @@ class AdminUnifiedSearchView(APIView):
             {"title": "العملاء والمستخدمين", "url": "/admin/users", "category": "العملاء", "icon": "Users"},
             {"title": "كوبونات الخصم", "url": "/admin/discounts", "category": "التسويق", "icon": "Percent"},
             {"title": "إضافة كوبون جديد", "url": "/admin/discounts/new", "category": "التسويق", "icon": "Plus"},
+            {"title": "إعدادات المتجر والحسابات المصرفية", "url": "/admin/settings", "category": "الإعدادات", "icon": "Settings"},
             {"title": "طرق الدفع الإلكتروني", "url": "/admin/payment-methods", "category": "الإعدادات", "icon": "CreditCard"},
             {"title": "شركات التوصيل والشحن", "url": "/admin/delivery-methods", "category": "الإعدادات", "icon": "Truck"},
             {"title": "المدن والمناطق", "url": "/admin/cities", "category": "الإعدادات", "icon": "MapPin"},
             {"title": "تخصيص الواجهة والصفحة الرئيسية", "url": "/admin/customization", "category": "التصميم", "icon": "Palette"},
+            {"title": "النسخ الاحتياطي للنظام", "url": "/admin/backup", "category": "الإعدادات", "icon": "Archive"},
         ]
         q_lower = query.lower()
         pages = [p for p in all_pages if q_lower in p["title"].lower() or q_lower in p["category"].lower()][:6]

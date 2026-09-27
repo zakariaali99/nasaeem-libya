@@ -53,7 +53,7 @@ class TestFrictionlessCheckoutAndWhatsApp:
         assert "نسائم ليبيا" in msg_bank
         assert "#202608BNK0001" in msg_bank
         assert "0123456789" in msg_bank
-        assert "LY88 0001 0123 4567 8901 2345" in msg_bank
+        assert "LY88000100000000012345678" in msg_bank
         assert "265" in msg_bank
 
         msg_cod = format_cod_order_whatsapp_message(order)

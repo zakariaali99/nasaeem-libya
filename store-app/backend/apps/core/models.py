@@ -253,3 +253,87 @@ class UserAddress(models.Model):
 
     def __str__(self):
         return f"{self.user.phone_number} — {self.region.name}"
+
+
+class StoreSettings(models.Model):
+    """Singleton: exactly one row (pk=1). Read through get_store_settings()."""
+
+    # Identity
+    store_name = models.CharField("اسم المتجر", max_length=120, default="نسائم ليبيا")
+    legal_name = models.CharField("الاسم القانوني", max_length=200, blank=True)
+    legal_name_en = models.CharField("الاسم القانوني (إنجليزي)", max_length=200, blank=True)
+    cr_number = models.CharField("رقم السجل التجاري", max_length=50, blank=True)
+    address = models.CharField("العنوان", max_length=200, blank=True)
+    site_url = models.URLField("رابط الموقع", default="https://nasaeem.ly")
+    # Contact
+    phone = models.CharField("هاتف خدمة العملاء", max_length=20, blank=True)       # 09XXXXXXXX
+    whatsapp = models.CharField("رقم واتساب", max_length=20, blank=True)          # 09XXXXXXXX
+    email = models.EmailField("البريد الإلكتروني", blank=True)
+    # Extra transfer note
+    bank_transfer_note = models.TextField("ملاحظة التحويل المصرفي", blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "إعدادات المتجر"
+        verbose_name_plural = "إعدادات المتجر"
+
+    def clean(self):
+        from apps.accounts.phone import normalise_phone
+        from django.core.exceptions import ValidationError
+        if self.phone:
+            norm = normalise_phone(self.phone)
+            if not norm:
+                raise ValidationError({"phone": "رقم الهاتف غير صحيح، مثال: 0912345678"})
+            self.phone = norm
+        if self.whatsapp:
+            norm = normalise_phone(self.whatsapp)
+            if not norm:
+                raise ValidationError({"whatsapp": "رقم الواتساب غير صحيح، مثال: 0912345678"})
+            self.whatsapp = norm
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.store_name
+
+
+class BankAccount(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    bank_name = models.CharField("اسم المصرف", max_length=120)
+    branch = models.CharField("الفرع", max_length=120, blank=True)
+    account_holder = models.CharField("اسم المستفيد", max_length=200)
+    account_number = models.CharField("رقم الحساب", max_length=40)
+    iban = models.CharField("الآيبان", max_length=34, blank=True)
+    is_active = models.BooleanField("مفعّل", default=True)
+    sort_order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "حساب مصرفي"
+        verbose_name_plural = "الحسابات المصرفية"
+        ordering = ["sort_order", "bank_name"]
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        import re
+        if self.account_number:
+            cleaned_acc = re.sub(r"\s+", "", str(self.account_number))
+            if not cleaned_acc.isdigit():
+                raise ValidationError({"account_number": "رقم الحساب يجب أن يحتوي على أرقام فقط"})
+            self.account_number = cleaned_acc
+        if self.iban:
+            cleaned_iban = re.sub(r"\s+", "", str(self.iban)).upper()
+            if not (cleaned_iban.startswith("LY") and len(cleaned_iban) == 25 and cleaned_iban.isalnum()):
+                raise ValidationError({"iban": "الآيبان يجب أن يبدأ بـ LY ويتكون من 25 خانة"})
+            self.iban = cleaned_iban
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.bank_name} — {self.account_number}"

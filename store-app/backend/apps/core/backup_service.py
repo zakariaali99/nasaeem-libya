@@ -98,6 +98,8 @@ def create_full_backup() -> dict:
 
     # Ordered list of models to dump
     model_labels = [
+        "core.StoreSettings",
+        "core.BankAccount",
         "core.User",
         "core.UserAddress",
         "core.LoyaltyTransaction",

@@ -62,14 +62,31 @@ def format_bank_transfer_whatsapp_message(order, store_url: str = "") -> str:
     )
     if order.discount_total and order.discount_total > 0:
         msg += f"🎁 الخصم: -{order.discount_total} د.ل\n"
+    from apps.core.models import BankAccount
+    from apps.core.store_settings import get_store_settings
+
+    settings = get_store_settings()
+    active_accounts = list(BankAccount.objects.filter(is_active=True).order_by("sort_order", "bank_name"))
+
+    if active_accounts:
+        bank_details_list = []
+        for acc in active_accounts:
+            branch_str = f" ({acc.branch})" if acc.branch else ""
+            acc_text = f"• *المصرف:* {acc.bank_name}{branch_str}\n• *اسم المستفيد:* {acc.account_holder}\n• *رقم الحساب المصرفي (Account):* `{acc.account_number}`"
+            if acc.iban:
+                acc_text += f"\n• *رقم الآيبان الدولي (IBAN):* `{acc.iban}`"
+            bank_details_list.append(acc_text)
+        bank_block = "🏛️ *بيانات الحساب المصرفي للتحويل:*\n" + "\n\n".join(bank_details_list)
+    else:
+        bank_block = "🏛️ *بيانات التحويل المصرفي:*\n• سيتواصل معك فريقنا لتزويدك ببيانات التحويل."
+
+    note_text = f"\n\n📝 *ملاحظة:* {settings.bank_transfer_note}" if settings.bank_transfer_note else ""
+
     msg += (
         f"🚚 رسوم التوصيل ({city_name}): {order.shipping_total} د.ل\n"
         f"💰 *المبلغ الإجمالي المطلوب تحويله: {order.total} د.ل*\n\n"
-        f"🏛️ *بيانات الحساب المصرفي للتحويل:*\n"
-        f"• *المصرف:* مصرف الجمهورية / المصرف التجاري الوطني\n"
-        f"• *اسم المستفيد:* شركة نسائم ليبيا للعطور\n"
-        f"• *رقم الحساب المصرفي (Account):* `0123456789`\n"
-        f"• *رقم الآيبان الدولي (IBAN):* `LY88 0001 0123 4567 8901 2345`\n\n"
+        f"{bank_block}"
+        f"{note_text}\n\n"
         f"📸 *خطوة التأكيد:* يرجى الرد على هذه الرسالة بصورة إشعار التحويل المصرفي ليتم تأكيد طلبك والبدء في شحنه فوراً 🚚.\n"
         f"📍 وجهة التوصيل: {city_name} — {address}"
     )
@@ -77,9 +94,12 @@ def format_bank_transfer_whatsapp_message(order, store_url: str = "") -> str:
 
 
 def format_new_account_welcome_whatsapp_message(
-    user_name: str, phone_number: str, temp_password: str = "000000", store_url: str = "https://nasaim.ly"
+    user_name: str, phone_number: str, temp_password: str = "000000", store_url: str = None
 ) -> str:
     """Format account creation welcome notice with security password advice."""
+    from apps.core.store_settings import get_store_settings
+    if not store_url:
+        store_url = get_store_settings().site_url
     return (
         f"🌟 *أهلاً بك {user_name} في عائلة نسائم ليبيا للعطور الفاخرة!*\n\n"
         f"تم إنشاء حساب خاص بك في متجرنا لتتمكن من متابعة حالة طلباتك، وعناوين التوصيل، ونقاط ولائك بسهولة:\n\n"

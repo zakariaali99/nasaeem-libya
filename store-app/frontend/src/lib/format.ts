@@ -96,3 +96,33 @@ export function discountPercent(
   if (was <= 0 || current <= 0 || current >= was) return null
   return Math.round(((was - current) / was) * 100)
 }
+
+/** Normalises and displays Libyan phone formatted as `+218 91 234 5678` or `091 234 5678`. */
+export function formatLibyanPhone(phone: string | null | undefined, international = true): string {
+  if (!phone) return ''
+  let digits = String(phone).replace(/[^\d+]/g, '')
+  if (digits.startsWith('+218')) digits = digits.slice(4)
+  else if (digits.startsWith('00218')) digits = digits.slice(5)
+  else if (digits.startsWith('218')) digits = digits.slice(3)
+  else if (digits.startsWith('0')) digits = digits.slice(1)
+
+  if (digits.length === 9) {
+    const prefix = digits.slice(0, 2)
+    const part1 = digits.slice(2, 5)
+    const part2 = digits.slice(5)
+    return international ? `+218 ${prefix} ${part1} ${part2}` : `0${prefix} ${part1} ${part2}`
+  }
+  return phone
+}
+
+/** Builds a clean `https://wa.me/218XXXXXXXXX?text=...` URL. */
+export function whatsappUrl(phone: string | null | undefined, text?: string): string {
+  if (!phone) return '#'
+  let digits = String(phone).replace(/[^\d]/g, '')
+  if (digits.startsWith('0')) digits = '218' + digits.slice(1)
+  else if (!digits.startsWith('218') && digits.length === 9) digits = '218' + digits
+
+  const url = `https://wa.me/${digits}`
+  return text ? `${url}?text=${encodeURIComponent(text)}` : url
+}
+

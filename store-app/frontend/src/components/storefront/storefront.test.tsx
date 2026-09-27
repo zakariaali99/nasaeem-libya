@@ -10,7 +10,7 @@ import {
   matchVariant,
   optionGroups,
 } from '@/components/storefront/VariantSelector'
-import { discountPercent, formatPrice } from '@/lib/format'
+import { discountPercent, formatLibyanPhone, formatPrice, whatsappUrl } from '@/lib/format'
 import type { ProductVariant } from '@/types/api'
 
 describe('money formatting', () => {
@@ -149,5 +149,22 @@ describe('variant availability', () => {
     expect(
       matchVariant(variants, { size: 'size:100 مل', color: 'color:ذهبي' }, groups)?.id,
     ).toBe('c')
+  })
+})
+
+describe('Libyan phone and WhatsApp url formatting', () => {
+  it('formats Libyan phone numbers correctly', () => {
+    expect(formatLibyanPhone('0912345678')).toBe('+218 91 234 5678')
+    expect(formatLibyanPhone('0912345678', false)).toBe('091 234 5678')
+    expect(formatLibyanPhone('+218912345678')).toBe('+218 91 234 5678')
+    expect(formatLibyanPhone('218912345678')).toBe('+218 91 234 5678')
+    expect(formatLibyanPhone('')).toBe('')
+    expect(formatLibyanPhone(null)).toBe('')
+  })
+
+  it('builds clean WhatsApp urls', () => {
+    expect(whatsappUrl('0915555555')).toBe('https://wa.me/218915555555')
+    expect(whatsappUrl('0915555555', 'مرحباً')).toBe('https://wa.me/218915555555?text=%D9%85%D8%B1%D8%AD%D8%A8%D8%A7%D9%8B')
+    expect(whatsappUrl(null)).toBe('#')
   })
 })

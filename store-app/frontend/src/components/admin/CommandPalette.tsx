@@ -1,4 +1,5 @@
 import {
+  Archive,
   Boxes,
   CreditCard,
   FolderTree,
@@ -11,6 +12,7 @@ import {
   Percent,
   Plus,
   Search,
+  Settings,
   ShoppingCart,
   Tag,
   Truck,
@@ -80,6 +82,8 @@ const ICON_MAP: Record<string, React.ElementType> = {
   Truck,
   MapPin,
   Palette,
+  Settings,
+  Archive,
 }
 
 export function CommandPalette({

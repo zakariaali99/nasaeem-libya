@@ -7,6 +7,9 @@ import {
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
+import { useStoreSettings } from '@/lib/queries/storeSettings'
+import { formatLibyanPhone } from '@/lib/format'
+
 const STORE_LINKS = [
   { to: '/products', label: 'كل العطور والمنتجات' },
   { to: '/wishlist', label: 'قائمة المفضلة' },
@@ -41,6 +44,12 @@ const TRUST_BADGES = [
 
 export function Footer() {
   const currentYear = new Date().getFullYear()
+  const { data: settings } = useStoreSettings()
+
+  const storeName = settings?.store_name || 'نسائم ليبيا'
+  const storeAddress = settings?.address || ''
+  const phone = settings?.phone || ''
+  const legalName = settings?.legal_name || 'نسائم ليبيا'
 
   return (
     <footer className="mt-16 border-t border-border bg-card/60 backdrop-blur-sm">
@@ -72,20 +81,26 @@ export function Footer() {
             <div className="flex size-9 items-center justify-center rounded-xl bg-primary/10 border border-primary/20">
               <img src="/brand/logo.svg" alt="" width={24} height={24} className="size-6" />
             </div>
-            <span className="font-display text-xl font-bold tracking-wide text-foreground">نسائم ليبيا</span>
+            <span className="font-display text-xl font-bold tracking-wide text-foreground">{storeName}</span>
           </div>
           <p className="text-xs sm:text-sm leading-relaxed text-muted-foreground">
-            نسائم ليبيا لاستيراد وتوزيع العطور الفاخرة والزيوت العطرية — مصراتة، ليبيا. نوفر أرقى تشكيلات العطور بالجملة والقطاعي مع خدمة توصيل احترافية لكافة المدن.
+            {storeName} لاستيراد وتوزيع العطور الفاخرة والزيوت العطرية. نوفر أرقى تشكيلات العطور بالجملة والقطاعي مع خدمة توصيل احترافية لكافة المدن.
           </p>
           <div className="space-y-1.5 pt-2 text-xs text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <MapPin className="size-4 text-primary shrink-0" />
-              <span>مصراتة — ليبيا</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Phone className="size-4 text-primary shrink-0" />
-              <span dir="ltr">+218 91 000 0000</span>
-            </div>
+            {storeAddress && (
+              <div className="flex items-center gap-2">
+                <MapPin className="size-4 text-primary shrink-0" />
+                <span>{storeAddress}</span>
+              </div>
+            )}
+            {phone && (
+              <div className="flex items-center gap-2">
+                <Phone className="size-4 text-primary shrink-0" />
+                <a href={`tel:${phone}`} dir="ltr" className="hover:text-primary transition-colors">
+                  {formatLibyanPhone(phone)}
+                </a>
+              </div>
+            )}
           </div>
         </div>
 
@@ -129,7 +144,7 @@ export function Footer() {
       {/* Payment Badges & Copyright */}
       <div className="border-t border-border/80 bg-muted/30 px-4 py-6">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 sm:flex-row text-center sm:text-start text-xs text-muted-foreground">
-          <p className="leading-relaxed">© {currentYear} شركة نسائم ليبيا لاستيراد العطور. جميع الحقوق محفوظة.</p>
+          <p className="leading-relaxed">© {currentYear} {legalName}. جميع الحقوق محفوظة.</p>
           <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3">
             <span className="text-[11px] font-semibold text-foreground shrink-0">طرق الدفع المعتمدة:</span>
             <div className="flex flex-wrap items-center justify-center gap-1.5">

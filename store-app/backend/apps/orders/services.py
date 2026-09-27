@@ -1118,6 +1118,13 @@ def build_order_invoice_data(order: Order) -> dict:
 
     tafqeet_text = tafqeet_libyan_dinars(order.total)
 
+    from apps.core.store_settings import get_store_settings
+
+    store_cfg = get_store_settings()
+    company_name = store_cfg.legal_name or store_cfg.store_name
+    company_name_en = store_cfg.legal_name_en or store_cfg.store_name
+    site_domain = store_cfg.site_url.replace("https://", "").replace("http://", "").rstrip("/")
+
     return {
         "invoice_number": invoice_number,
         "order_id": str(order.id),
@@ -1125,12 +1132,12 @@ def build_order_invoice_data(order: Order) -> dict:
         "issue_date": order.created_at.strftime("%Y/%m/%d"),
         "issue_time": order.created_at.strftime("%I:%M %p"),
         "company": {
-            "name": "شركة نسائم ليبيا لتجارة العطور الفاخرة ش.م.م",
-            "name_en": "NASAEEM LIBYA LUXURY PERFUMES CO.",
-            "cr_number": "2024/09812",
-            "city": "طرابلس، ليبيا",
-            "phone": "0910000000",
-            "website": "nasaeem.ly",
+            "name": company_name,
+            "name_en": company_name_en,
+            "cr_number": store_cfg.cr_number,
+            "city": store_cfg.address,
+            "phone": store_cfg.phone,
+            "website": site_domain,
         },
         "customer": {
             "name": order.user.name if order.user else "عميل نسائم",
@@ -1151,7 +1158,7 @@ def build_order_invoice_data(order: Order) -> dict:
             "payment_method": order.payment_method,
             "payment_status": order.payment.status if hasattr(order, "payment") and order.payment else "pending",
         },
-        "verification_url": f"https://nasaeem.ly/track?order={order.order_number}",
+        "verification_url": f"{store_cfg.site_url.rstrip('/')}/track?order={order.order_number}",
         "terms": "نسائم ليبيا تضمن أصالة كافة العطور بنسبة 100%. يحق للعميل الاستبدال أو الاسترجاع خلال 7 أيام من تاريخ الاستلام شريطة بقاء الغلاف الأصلي مغلقاً وبحالته المصنعية.",
     }
 

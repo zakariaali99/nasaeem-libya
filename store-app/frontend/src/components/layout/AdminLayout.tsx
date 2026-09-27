@@ -16,6 +16,7 @@ import {
   Percent,
   Plus,
   Search,
+  Settings,
   ShoppingBag,
   Store,
   Tags,
@@ -47,6 +48,7 @@ interface NavGroup {
     badgeKey?: 'pending_orders' | 'low_stock'
     badgeTone?: 'warning' | 'danger'
     end?: boolean
+    roles?: string[]
   }[]
 }
 
@@ -81,9 +83,10 @@ const NAV_GROUPS: NavGroup[] = [
   {
     title: 'التخصيص وإدارة النظام',
     items: [
+      { to: '/admin/settings', label: 'إعدادات المتجر', icon: Settings, roles: ['admin', 'owner'] },
       { to: '/admin/customization', label: 'محرر الواجهة والقوالب', icon: Blocks },
-      { to: '/admin/staff', label: 'فريق العمل والموظفون', icon: UserCog },
-      { to: '/admin/backup', label: 'النسخ الاحتياطي للنظام', icon: Archive },
+      { to: '/admin/staff', label: 'فريق العمل والموظفون', icon: UserCog, roles: ['admin', 'owner'] },
+      { to: '/admin/backup', label: 'النسخ الاحتياطي للنظام', icon: Archive, roles: ['admin', 'owner'] },
     ],
   },
 ]
@@ -260,7 +263,9 @@ export function AdminLayout() {
                 <div className="my-2 border-t border-border/60 mx-1" />
               )}
               <ul className="space-y-1 pt-0.5">
-                {group.items.map(({ to, label, icon: Icon, badgeKey, badgeTone, end }) => {
+                {group.items
+                  .filter((item) => !item.roles || (user?.role && item.roles.includes(user.role)))
+                  .map(({ to, label, icon: Icon, badgeKey, badgeTone, end }) => {
                   const count = badgeKey ? badgeCounts[badgeKey] : 0
                   return (
                     <li key={to}>

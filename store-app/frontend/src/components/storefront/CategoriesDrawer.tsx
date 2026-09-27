@@ -31,10 +31,11 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet'
-import { formatNumber } from '@/lib/format'
+import { formatNumber, whatsappUrl } from '@/lib/format'
 import { useMe } from '@/lib/queries/auth'
 import { useCart } from '@/lib/queries/cart'
 import { useCategories } from '@/lib/queries/catalog'
+import { useStoreSettings } from '@/lib/queries/storeSettings'
 import { useWishlistIds } from '@/lib/queries/wishlist'
 import { cn } from '@/lib/utils'
 import { isAdminRole } from '@/types/api'
@@ -51,6 +52,7 @@ export function CategoriesDrawer({ children }: CategoriesDrawerProps) {
   const { data: user } = useMe()
   const { data: cart } = useCart()
   const { data: wishlistIds } = useWishlistIds()
+  const { data: storeSettings } = useStoreSettings()
   const navigate = useNavigate()
 
   const cartCount = cart?.item_count ?? 0
@@ -240,7 +242,7 @@ export function CategoriesDrawer({ children }: CategoriesDrawerProps) {
             </span>
 
             <a
-              href="https://wa.me/218915555555"
+              href={whatsappUrl(storeSettings?.whatsapp, 'مرحباً، أود الاستفسار عن المنتجات والطلبات في نسائم ليبيا')}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-between rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs font-bold text-emerald-800 dark:text-emerald-300 hover:bg-emerald-500/20 transition-all shadow-2xs"

@@ -695,12 +695,13 @@ class AdminCartPromotionView(CsrfProtectedAPIView):
     def get(self, request):
         promo = CartPromotion.objects.first()
         if promo is None:
+            # Opening the settings screen must not switch free delivery on.
             promo = CartPromotion.objects.create(
                 title="توصيل مجاني لجميع المدن",
-                message="أضف {remaining} د.ل للحصول على توصيل مجاني!",
+                message="أضف {remaining} للحصول على توصيل مجاني!",
                 success_message="تهانينا! لقد حصلت على توصيل مجاني لكافة المدن 🚀",
                 min_order_amount=200.00,
-                is_active=True,
+                is_active=False,
             )
         return Response({"data": CartPromotionSerializer(promo).data})
 

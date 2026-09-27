@@ -75,5 +75,8 @@ def test_rendition_url_only_derives_for_uploaded_webp():
 @pytest.mark.django_db
 def test_dotfiles_and_the_stale_dist_media_are_not_served(client, settings):
     settings.ALLOWED_HOSTS = ["*"]
-    assert client.get("/.htaccess").status_code == 404
-    assert client.get("/.DS_Store").status_code == 404
+    # Falls through to the SPA shell (200, index.html) — never the file itself.
+    for url in ("/.htaccess", "/.DS_Store"):
+        response = client.get(url)
+        assert b"Passenger" not in response.content
+        assert response["Content-Type"].startswith("text/html")

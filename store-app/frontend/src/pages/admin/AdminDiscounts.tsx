@@ -33,7 +33,7 @@ function CartPromotionManagerCard() {
   const [isActive, setIsActive] = useState(true)
   const [minAmount, setMinAmount] = useState('200')
   const [title, setTitle] = useState('توصيل مجاني لجميع المدن')
-  const [message, setMessage] = useState('أضف {remaining} د.ل للحصول على توصيل مجاني!')
+  const [message, setMessage] = useState('أضف {remaining} للحصول على توصيل مجاني!')
   const [successMessage, setSuccessMessage] = useState('تهانينا! لقد حصلت على توصيل مجاني لكافة المدن 🚀')
   const [savedSuccess, setSavedSuccess] = useState(false)
 
@@ -42,7 +42,7 @@ function CartPromotionManagerCard() {
       setIsActive(promo.is_active)
       setMinAmount(String(Number(promo.min_order_amount) || 200))
       setTitle(promo.title || 'توصيل مجاني لجميع المدن')
-      setMessage(promo.message || 'أضف {remaining} د.ل للحصول على توصيل مجاني!')
+      setMessage(promo.message || 'أضف {remaining} للحصول على توصيل مجاني!')
       setSuccessMessage(promo.success_message || 'تهانينا! لقد حصلت على توصيل مجاني لكافة المدن 🚀')
     }
   }, [promo])
@@ -171,7 +171,7 @@ function CartPromotionManagerCard() {
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               className="w-full h-10 rounded-xl border border-input bg-background px-3 text-xs focus:ring-2 focus:ring-primary/20"
-              placeholder="أضف {remaining} د.ل للحصول على توصيل مجاني!"
+              placeholder="أضف {remaining} للحصول على توصيل مجاني!"
             />
             <span className="text-[11px] text-muted-foreground mt-1 block">
               استخدم <code className="rounded bg-muted px-1 py-0.5 text-primary font-mono">{'{remaining}'}</code> ليتم استبدالها بالمبلغ المتبقي تلقائياً.

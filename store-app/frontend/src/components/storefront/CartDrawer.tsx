@@ -75,7 +75,8 @@ export function CartDrawer({ children }: CartDrawerProps) {
                   {remainingForFree > 0 ? (
                     promo?.message ? (
                       promo.message.includes('{remaining}') ? (
-                        promo.message.split('{remaining}').map((part: string, index: number, arr: string[]) => (
+                        // formatPrice already appends «د.ل»; drop a hand-typed one after the placeholder.
+                        promo.message.replace(/\{remaining\}\s*د\.ل/g, '{remaining}').split('{remaining}').map((part: string, index: number, arr: string[]) => (
                           <span key={index}>
                             {part}
                             {index < arr.length - 1 && (

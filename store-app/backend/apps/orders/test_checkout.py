@@ -827,3 +827,12 @@ class TestCheckoutWhatsAppLink:
         settings.save()
 
         assert self._confirm(buyer_api, product, region, courier)["whatsapp_link"] == ""
+
+
+def test_opening_the_discounts_screen_does_not_switch_on_free_delivery(admin_api, api):
+    """Free delivery waives real fees, so it exists only when the owner enables it."""
+    created = admin_api.get(reverse("admin-cart-promotions")).json()["data"]
+
+    assert created["is_active"] is False
+    assert "د.ل" not in created["message"]  # the storefront appends the currency itself
+    assert api.get(reverse("active-cart-promotion")).json()["data"] is None

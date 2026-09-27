@@ -374,17 +374,27 @@ export function FragranceFinderQuizModal({ open, onClose }: FragranceFinderQuizM
 
                     {/* Actions */}
                     <div className="flex items-center gap-2 pt-1">
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          addToCart.mutate({ product_id: p.id, quantity: 1 })
-                        }}
-                        disabled={addToCart.isPending}
-                        className="flex-1 min-h-11 rounded-xl font-bold text-xs gap-1.5"
-                      >
-                        <ShoppingBag className="size-3.5" />
-                        <span>إضافة سريعة للسلة</span>
-                      </Button>
+                      {p.has_variants ? (
+                        // A sized product needs a size, which is chosen on its page.
+                        <Button size="sm" asChild className="flex-1 min-h-11 rounded-xl font-bold text-xs gap-1.5">
+                          <Link to={`/products/${encodeURIComponent(p.slug)}`} onClick={onClose}>
+                            <ShoppingBag className="size-3.5" />
+                            <span>اختيار الحجم</span>
+                          </Link>
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            addToCart.mutate({ product_id: p.id, quantity: 1 })
+                          }}
+                          disabled={addToCart.isPending}
+                          className="flex-1 min-h-11 rounded-xl font-bold text-xs gap-1.5"
+                        >
+                          <ShoppingBag className="size-3.5" />
+                          <span>إضافة سريعة للسلة</span>
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"

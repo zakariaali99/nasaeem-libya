@@ -26,7 +26,9 @@ export function ProductCard({ product, priority = false, sizes }: ProductCardPro
   const addToCart = useAddToCart()
   const updateItem = useUpdateCartItem()
 
-  const hasVariants = Boolean(product.variants && product.variants.length > 0)
+  // Listing payloads carry `has_variants` but not the `variants` array, so the
+  // flag decides: a sized product cannot be added without choosing a size.
+  const hasVariants = Boolean(product.has_variants || (product.variants && product.variants.length > 0))
   const cartItem = cart?.items.find((i) => i.product_id === product.id && !i.variant_id)
   const quantity = cartItem?.quantity ?? 0
 

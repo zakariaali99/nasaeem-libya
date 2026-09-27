@@ -126,7 +126,7 @@ class CartPromotion(TimestampedModel):
     message = models.CharField(
         "نص التشجيع",
         max_length=255,
-        default="أضف {remaining} د.ل للحصول على توصيل مجاني!",
+        default="أضف {remaining} للحصول على توصيل مجاني!",
     )
     success_message = models.CharField(
         "رسالة النجاح",
@@ -136,7 +136,8 @@ class CartPromotion(TimestampedModel):
     min_order_amount = models.DecimalField(
         "الحد الأدنى للطلب", max_digits=10, decimal_places=2, default=200.00
     )
-    is_active = models.BooleanField("مفعّل", default=True, db_index=True)
+    # Off until the owner turns it on: an active row waives delivery fees.
+    is_active = models.BooleanField("مفعّل", default=False, db_index=True)
 
     class Meta:
         verbose_name = "عرض السلة والشحن المجاني"

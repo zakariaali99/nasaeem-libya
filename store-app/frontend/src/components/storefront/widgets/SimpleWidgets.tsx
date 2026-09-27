@@ -34,6 +34,7 @@ export function ImageWidget({ widget, priority = false }: { widget: Widget; prio
         height={675}
         loading={priority ? 'eager' : 'lazy'}
         fetchPriority={priority ? 'high' : undefined}
+        decoding="async"
         className="max-h-80 w-auto object-contain"
       />
     </div>
@@ -96,6 +97,7 @@ export function PhotoLinkGrid({ widget }: { widget: Widget }) {
                   width={300}
                   height={225}
                   loading="lazy"
+                  decoding="async"
                   className="size-full object-contain"
                 />
               </div>

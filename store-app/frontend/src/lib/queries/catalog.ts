@@ -57,10 +57,23 @@ export function useProductBySlug(slug: string | undefined) {
 }
 
 export function useCategories() {
+  const initialData = (() => {
+    if (typeof window !== 'undefined') {
+      const win = window as unknown as { __BOOTSTRAP__?: { categories?: Category[] } }
+      if (win.__BOOTSTRAP__?.categories) {
+        const categories = win.__BOOTSTRAP__.categories
+        delete win.__BOOTSTRAP__.categories
+        return categories
+      }
+    }
+    return undefined
+  })()
+
   return useQuery({
     queryKey: catalogKeys.categories(),
     queryFn: async () => (await api.get<Category[]>('/categories/')).data,
-    staleTime: 5 * 60_000,
+    initialData,
+    staleTime: 10 * 60_000,
   })
 }
 

@@ -203,6 +203,7 @@ export function CategoryListWidget({ widget }: { widget: Widget }) {
                     width={120}
                     height={120}
                     loading="lazy"
+                    decoding="async"
                     className="size-full object-contain"
                   />
                 </div>

@@ -200,7 +200,7 @@ export function InstantSearchModal({ open, onClose }: InstantSearchModalProps) {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {products.map((p) => {
-                  const img = p.images?.[0]?.url
+                  const img = p.images?.[0]?.renditions?.thumb || p.images?.[0]?.url
                   return (
                     <Link
                       key={p.id}
@@ -212,6 +212,10 @@ export function InstantSearchModal({ open, onClose }: InstantSearchModalProps) {
                         <img
                           src={img}
                           alt={p.name}
+                          width={56}
+                          height={56}
+                          loading="lazy"
+                          decoding="async"
                           className="size-14 rounded-xl object-cover border border-border shrink-0"
                         />
                       ) : (

@@ -196,6 +196,8 @@ export function CategoriesDrawer({ children }: CategoriesDrawerProps) {
                           alt=""
                           width={24}
                           height={24}
+                          loading="lazy"
+                          decoding="async"
                           className="size-6 object-contain rounded-md shrink-0"
                         />
                       ) : (

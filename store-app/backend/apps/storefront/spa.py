@@ -259,12 +259,70 @@ def render_shell(request, path: str = ""):
             html = _apply_head(html, title=title, description=description, extra=extra)
 
     from apps.core.store_settings import get_public_store_settings
+    from apps.catalog.models import Category
+    from apps.catalog.serializers import CategorySerializer
+    from apps.storefront import services as storefront_services
+    from apps.storefront.serializers import StorefrontLayoutSerializer
+
+    bootstrap_data = {}
+    preload_tags = []
+
     try:
         settings_data = get_public_store_settings()
+        bootstrap_data["storeSettings"] = settings_data
+
+        # Categories for navigation drawer & menus
+        categories_qs = Category.objects.filter(is_active=True).order_by("name")
+        bootstrap_data["categories"] = CategorySerializer(categories_qs, many=True).data
+
+        # Homepage layout when landing on root
+        if path == "" or path == "/":
+            layout, widgets = storefront_services.cached_layout_rows()
+            if layout is not None:
+                context = {
+                    "request": request,
+                    "user": getattr(request, "user", None),
+                    "recent_ids": [],
+                    "widgets": widgets,
+                }
+                payload = StorefrontLayoutSerializer(layout, context=context).data
+                bootstrap_data["layout"] = {
+                    "layout": {
+                        "id": payload["id"],
+                        "name": payload["name"],
+                        "updated_at": payload["updated_at"],
+                    },
+                    "widgets": payload["widgets"],
+                }
+
+                # Preload hero image if available
+                for w in payload.get("widgets", []):
+                    w_type = w.get("type")
+                    w_data = w.get("data", {})
+                    if w_type == "hero_cta":
+                        hero_img = w_data.get("desktopImageUrl") or w_data.get("mobileImageUrl") or w_data.get("backgroundImageUrl")
+                        if hero_img:
+                            preload_tags.append(f'<link rel="preload" as="image" href="{escape(hero_img)}" fetchpriority="high">')
+                        break
+                    elif w_type == "carousel":
+                        slides = w_data.get("slides", [])
+                        if slides and slides[0].get("imageUrl"):
+                            preload_tags.append(f'<link rel="preload" as="image" href="{escape(slides[0]["imageUrl"])}" fetchpriority="high">')
+                        break
+
         settings_json = json.dumps(settings_data, ensure_ascii=False).replace("</", "<\\/")
-        injected_script = f"<script>window.__STORE_SETTINGS__ = {settings_json};</script>"
+        bootstrap_json = json.dumps(bootstrap_data, ensure_ascii=False).replace("</", "<\\/")
+
+        scripts = [
+            f"<script>window.__STORE_SETTINGS__ = {settings_json};</script>",
+            f"<script>window.__BOOTSTRAP__ = {bootstrap_json};</script>",
+        ]
+        if preload_tags:
+            scripts = preload_tags + scripts
+
+        injected_block = "\n  ".join(scripts)
         if "</head>" in html:
-            html = html.replace("</head>", f"  {injected_script}\n</head>", 1)
+            html = html.replace("</head>", f"  {injected_block}\n</head>", 1)
     except Exception:
         pass
 

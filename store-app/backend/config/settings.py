@@ -64,6 +64,7 @@ if "postgres" in (DATABASE_URL or ""):
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -226,6 +227,23 @@ STATIC_URL = "/django-static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = Path(config("MEDIA_ROOT", default=str(BASE_DIR / "media")))
+
+# --------------------------------------------------------------------------
+# Static & Asset Delivery (WhiteNoise with Brotli/Gzip)
+# --------------------------------------------------------------------------
+WHITENOISE_ROOT = BASE_DIR / "dist"
+WHITENOISE_MAX_AGE = 3600
+
+def whitenoise_immutable_file_test(path, url):
+    return bool(url.startswith("/assets/"))
+
+WHITENOISE_IMMUTABLE_FILE_TEST = whitenoise_immutable_file_test
+
+def whitenoise_add_headers(headers, path, url):
+    if url in ("/sw.js", "/manifest.webmanifest", "/index.html") or url.endswith(".html"):
+        headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+
+WHITENOISE_ADD_HEADERS_FUNCTION = whitenoise_add_headers
 
 # --------------------------------------------------------------------------
 # SEO shell

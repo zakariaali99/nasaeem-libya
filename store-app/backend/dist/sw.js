@@ -15,12 +15,14 @@
  *   the network, always.
  */
 
-const VERSION = 'v3'
+const VERSION = 'v4'
 const SHELL_CACHE = `shell-${VERSION}`
 const ASSET_CACHE = `assets-${VERSION}`
+const MEDIA_CACHE = `media-${VERSION}`
 const DATA_CACHE = `data-${VERSION}`
 
 const SHELL_URLS = ['/manifest.webmanifest', '/brand/logo.svg']
+const MAX_MEDIA_ENTRIES = 150
 
 // Money and personal state: network only, no exceptions.
 const NEVER_CACHE = [
@@ -33,6 +35,19 @@ const NEVER_CACHE = [
   '/api/auth',
   '/django-static',
 ]
+
+async function trimCache(cacheName, maxEntries) {
+  try {
+    const cache = await caches.open(cacheName)
+    const keys = await cache.keys()
+    if (keys.length > maxEntries) {
+      await cache.delete(keys[0])
+      trimCache(cacheName, maxEntries)
+    }
+  } catch {
+    /* Cache trimming is opportunistic */
+  }
+}
 
 self.addEventListener('install', (event) => {
   self.skipWaiting()
@@ -53,7 +68,7 @@ self.addEventListener('activate', (event) => {
       .then((keys) =>
         Promise.all(
           keys
-            .filter((key) => ![SHELL_CACHE, ASSET_CACHE, DATA_CACHE].includes(key))
+            .filter((key) => ![SHELL_CACHE, ASSET_CACHE, MEDIA_CACHE, DATA_CACHE].includes(key))
             .map((key) => caches.delete(key)),
         ),
       )
@@ -64,11 +79,10 @@ self.addEventListener('activate', (event) => {
 const isMoneyPath = (url) =>
   NEVER_CACHE.some((prefix) => url.pathname.startsWith(prefix))
 
-const isImmutableAsset = (url) =>
+const isStaticAsset = (url) =>
   url.pathname.startsWith('/assets/') ||
   url.pathname.startsWith('/fonts/') ||
-  url.pathname.startsWith('/brand/') ||
-  url.pathname.startsWith('/media/')
+  url.pathname.startsWith('/brand/')
 
 self.addEventListener('fetch', (event) => {
   const { request } = event
@@ -80,8 +94,8 @@ self.addEventListener('fetch', (event) => {
   // 1) The money path and everything personal: straight to the network.
   if (isMoneyPath(url)) return
 
-  // 2) Hashed assets, fonts, brand art, product media: cache-first.
-  if (isImmutableAsset(url)) {
+  // 2) Hashed build assets, fonts, brand art: cache-first.
+  if (isStaticAsset(url)) {
     event.respondWith(
       caches.match(request).then(
         (hit) =>
@@ -98,7 +112,29 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  // 3) Public API reads: network-first, fall back to the last known data.
+  // 3) Media images: stale-while-revalidate with max 150 items cache.
+  if (url.pathname.startsWith('/media/')) {
+    event.respondWith(
+      caches.open(MEDIA_CACHE).then((cache) =>
+        cache.match(request).then((cachedResponse) => {
+          const fetchPromise = fetch(request)
+            .then((networkResponse) => {
+              if (networkResponse.ok) {
+                cache.put(request, networkResponse.clone())
+                trimCache(MEDIA_CACHE, MAX_MEDIA_ENTRIES)
+              }
+              return networkResponse
+            })
+            .catch(() => cachedResponse)
+
+          return cachedResponse || fetchPromise
+        }),
+      ),
+    )
+    return
+  }
+
+  // 4) Public API reads: network-first, fall back to the last known data.
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(
       fetch(request)
@@ -123,7 +159,7 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  // 4) Navigations: try the network first, fall back to cache only when offline.
+  // 5) Navigations: try the network first, fall back to cache only when offline.
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request, { cache: 'no-cache' }).catch(() =>

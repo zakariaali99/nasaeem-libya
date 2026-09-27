@@ -66,7 +66,7 @@ export function FrequentlyBoughtTogether({ product, bundle }: FrequentlyBoughtTo
       {/* Visual Product Grid with + Operators */}
       <div className="flex flex-wrap items-center gap-3 pt-2">
         {allItems.map((item, index) => {
-          const img = item.images?.[0]?.url
+          const img = item.images?.[0]?.renditions?.thumb || item.images?.[0]?.url
           return (
             <div key={item.id} className="flex items-center gap-3">
               <div className="flex items-center gap-2.5 rounded-2xl border border-border bg-muted/20 p-2.5 shadow-2xs">
@@ -74,6 +74,10 @@ export function FrequentlyBoughtTogether({ product, bundle }: FrequentlyBoughtTo
                   <img
                     src={img}
                     alt={item.name}
+                    width={56}
+                    height={56}
+                    loading="lazy"
+                    decoding="async"
                     className="size-14 rounded-xl object-cover border border-border shrink-0"
                   />
                 ) : (

@@ -185,7 +185,7 @@ class TestProductList:
 
         ProductImage.objects.create(product=product, url="/media/products/x-full.webp")
         image = api.get(reverse("product-list")).json()["data"][0]["images"][0]
-        assert set(image["renditions"]) == {"thumb", "medium", "full"}
+        assert set(image["renditions"]) == {"thumb", "card", "medium", "full", "hero"}
         assert image["renditions"]["thumb"].endswith("x-thumb.webp")
 
     def test_the_list_issues_no_n_plus_one(self, api, django_assert_num_queries, category):
@@ -456,10 +456,10 @@ class TestImageUpload:
         )
         assert response.status_code == 201
         data = response.json()["data"]
-        assert set(data["renditions"]) == {"thumb", "medium", "full"}
+        assert set(data["renditions"]) == {"thumb", "card", "medium", "full", "hero"}
 
         written = sorted(p.name for p in (tmp_path / "products").iterdir())
-        assert len(written) == 3
+        assert len(written) == 5
         assert all(name.endswith(".webp") for name in written)
 
         from PIL import Image as PILImage

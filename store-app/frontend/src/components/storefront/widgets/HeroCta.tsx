@@ -37,15 +37,25 @@ export function HeroCta({ widget, priority = false }: { widget: Widget; priority
         <>
           <picture className="absolute inset-0 size-full">
             {mobileImageUrl ? (
-              <source media="(max-width: 640px)" srcSet={String(mobileImageUrl)} />
+              <source
+                media="(max-width: 640px)"
+                srcSet={`${String(mobileImageUrl).replace(/\.(jpg|jpeg|png|webp)$/i, '')}-card.webp 600w, ${String(mobileImageUrl)} 800w`}
+                sizes="100vw"
+              />
             ) : null}
+            <source
+              media="(min-width: 641px)"
+              srcSet={`${String(desktopImageUrl || mobileImageUrl).replace(/\.(jpg|jpeg|png|webp)$/i, '')}-hero.webp 1920w, ${String(desktopImageUrl || mobileImageUrl).replace(/\.(jpg|jpeg|png|webp)$/i, '')}-full.webp 1200w, ${String(desktopImageUrl || mobileImageUrl)} 1200w`}
+              sizes="100vw"
+            />
             <img
               src={String(desktopImageUrl || mobileImageUrl)}
               alt={String(displayTitle)}
-              width={1200}
-              height={500}
+              width={1920}
+              height={800}
               loading={priority ? 'eager' : 'lazy'}
               fetchPriority={priority ? 'high' : undefined}
+              decoding="async"
               className="size-full object-cover opacity-40"
             />
           </picture>

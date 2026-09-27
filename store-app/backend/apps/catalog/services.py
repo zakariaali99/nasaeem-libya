@@ -20,7 +20,13 @@ from django.utils.text import slugify
 
 from .models import InventoryLog, Product, ProductVariant, VariantValue
 
-RENDITIONS = {"thumb": 200, "medium": 600, "full": 1200}
+RENDITIONS = {
+    "thumb": 200,
+    "card": 600,
+    "medium": 600,
+    "full": 1200,
+    "hero": 1920,
+}
 
 
 class StockError(Exception):
@@ -260,7 +266,7 @@ def store_image(uploaded_file, *, subdir="products"):
     for name, size in RENDITIONS.items():
         rendition = image.copy()
         rendition.thumbnail((size, size), Image.LANCZOS)
-        rendition.save(directory / f"{stem}-{name}.webp", "WEBP", quality=85, method=4)
+        rendition.save(directory / f"{stem}-{name}.webp", "WEBP", quality=78, method=6)
 
     return f"{settings.MEDIA_URL}{subdir}/{stem}-full.webp"
 

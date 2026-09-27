@@ -19,13 +19,15 @@ logger = logging.getLogger(__name__)
 IMAGE_DERIVATIVES = {
     "thumb": (200, 200),
     "card": (600, 600),
-    "hero": (1600, 1600),
+    "medium": (600, 600),
+    "full": (1200, 1200),
+    "hero": (1920, 1920),
 }
 
 
 def process_fragrance_image(
     image_bytes: bytes,
-    quality: int = 85,
+    quality: int = 78,
 ) -> Dict[str, Tuple[bytes, str]]:
     """Process uploaded image into thumbnail, card, and hero WebP variants.
 

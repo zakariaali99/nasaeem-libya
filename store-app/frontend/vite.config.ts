@@ -3,12 +3,21 @@ import path from 'node:path'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig, loadEnv } from 'vite'
+import { compression } from 'vite-plugin-compression2'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
 
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      compression({
+        algorithms: ['gzip', 'brotliCompress'],
+        exclude: [/\.(br)$/, /\.(gz)$/],
+        threshold: 1024,
+      }),
+    ],
     resolve: { alias: { '@': path.resolve(__dirname, './src') } },
     server: {
       port: 5183,

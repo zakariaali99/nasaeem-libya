@@ -27,18 +27,16 @@ urlpatterns = [
 
 from django.views.static import serve
 
-_DIST_DIR = settings.BASE_DIR / "dist"
+
+def serve_media(request, path, **kwargs):
+    """Serve uploaded media with aggressive cache-control headers."""
+    response = serve(request, path, document_root=settings.MEDIA_ROOT, **kwargs)
+    response["Cache-Control"] = "public, max-age=2592000, immutable"
+    return response
+
 
 urlpatterns += [
-    re_path(r"^media/(?P<path>.*)$", serve, {"document_root": settings.MEDIA_ROOT}),
-    re_path(r"^assets/(?P<path>.*)$", serve, {"document_root": _DIST_DIR / "assets"}),
-    re_path(r"^fonts/(?P<path>.*)$", serve, {"document_root": _DIST_DIR / "fonts"}),
-    re_path(r"^brand/(?P<path>.*)$", serve, {"document_root": _DIST_DIR / "brand"}),
-    re_path(r"^brands/(?P<path>.*)$", serve, {"document_root": _DIST_DIR / "brands"}),
-    re_path(r"^providers/(?P<path>.*)$", serve, {"document_root": _DIST_DIR / "providers"}),
-    re_path(r"^favicon\.svg$", serve, {"document_root": _DIST_DIR, "path": "favicon.svg"}),
-    re_path(r"^sw\.js$", serve, {"document_root": _DIST_DIR, "path": "sw.js"}),
-    re_path(r"^manifest\.webmanifest$", serve, {"document_root": _DIST_DIR, "path": "manifest.webmanifest"}),
+    re_path(r"^media/(?P<path>.*)$", serve_media),
 ]
 
 # SPA shell — LAST. Serves every non-API, non-admin, non-asset path with the

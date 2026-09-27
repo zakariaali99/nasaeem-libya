@@ -15,12 +15,27 @@ export const storefrontKeys = {
  */
 export function useStorefrontLayout() {
   const recent = recentlyViewed().join(',')
+
+  const initialData = (() => {
+    if (!recent && typeof window !== 'undefined') {
+      const win = window as unknown as { __BOOTSTRAP__?: { layout?: StorefrontLayoutResponse } }
+      if (win.__BOOTSTRAP__?.layout) {
+        const layout = win.__BOOTSTRAP__.layout
+        // Clear bootstrap layout after consuming so subsequent updates refetch fresh
+        delete win.__BOOTSTRAP__.layout
+        return layout
+      }
+    }
+    return undefined
+  })()
+
   return useQuery({
     queryKey: storefrontKeys.layout(recent),
     queryFn: async () =>
       (await api.get<StorefrontLayoutResponse>('/storefront/layout/', {
         params: { recent: recent || undefined },
       })).data,
-    staleTime: 60_000,
+    initialData,
+    staleTime: 10 * 60_000,
   })
 }

@@ -143,6 +143,10 @@ export function CartDrawer({ children }: CartDrawerProps) {
                       <img
                         src={imgUrl}
                         alt={item.name}
+                        width={64}
+                        height={64}
+                        loading="lazy"
+                        decoding="async"
                         className="size-full object-cover"
                       />
                     ) : (

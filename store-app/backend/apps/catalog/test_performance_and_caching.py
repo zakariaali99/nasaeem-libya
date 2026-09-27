@@ -114,3 +114,57 @@ def test_image_pipeline_derivatives_generation():
     assert "thumb" in derivatives
     assert "card" in derivatives
     assert "hero" in derivatives
+
+
+@pytest.mark.django_db
+def test_optimize_media_command(tmp_path, settings):
+    import io
+    from io import StringIO
+    from PIL import Image
+    from django.core.management import call_command
+    from apps.catalog.models import ProductImage
+
+    settings.MEDIA_ROOT = str(tmp_path)
+    banners_dir = tmp_path / "banners"
+    banners_dir.mkdir(parents=True, exist_ok=True)
+    hero_jpg = banners_dir / "test-hero.jpg"
+
+    img = Image.new("RGB", (1000, 500), (200, 100, 50))
+    img.save(hero_jpg, "JPEG")
+
+    out = StringIO()
+    call_command("optimize_media", "--dry-run", stdout=out)
+    output = out.getvalue()
+    assert "DRY RUN" in output
+
+    out_real = StringIO()
+    call_command("optimize_media", stdout=out_real)
+    assert (banners_dir / "test-hero.webp").exists()
+    assert (banners_dir / "test-hero-card.webp").exists()
+
+
+@pytest.mark.django_db
+def test_spa_bootstrap_and_hero_preload(rf):
+    from apps.storefront.spa import render_shell
+    request = rf.get("/")
+    res = render_shell(request, path="")
+    assert res.status_code == 200
+    content = res.content.decode("utf-8")
+    assert "window.__BOOTSTRAP__ =" in content
+    assert "window.__STORE_SETTINGS__ =" in content
+
+
+@pytest.mark.django_db
+def test_media_serving_cache_headers(client, tmp_path, settings):
+    from PIL import Image
+    settings.MEDIA_ROOT = str(tmp_path)
+    banners = tmp_path / "banners"
+    banners.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (100, 100), (0, 0, 0)).save(banners / "sample.webp", "WEBP")
+
+    res = client.get("/media/banners/sample.webp", HTTP_HOST="localhost")
+    assert res.status_code == 200
+    assert "public" in res.headers.get("Cache-Control", "")
+    assert "max-age=2592000" in res.headers.get("Cache-Control", "")
+
+

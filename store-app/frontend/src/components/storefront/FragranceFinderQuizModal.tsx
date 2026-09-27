@@ -320,7 +320,7 @@ export function FragranceFinderQuizModal({ open, onClose }: FragranceFinderQuizM
             <div className="space-y-4">
               {results.map((rec) => {
                 const p = rec.product
-                const img = p.images?.[0]?.url
+                const img = p.images?.[0]?.renditions?.thumb || p.images?.[0]?.url
                 return (
                   <div
                     key={p.id}
@@ -331,6 +331,10 @@ export function FragranceFinderQuizModal({ open, onClose }: FragranceFinderQuizM
                         <img
                           src={img}
                           alt={p.name}
+                          width={64}
+                          height={64}
+                          loading="lazy"
+                          decoding="async"
                           className="size-16 rounded-xl object-cover border border-border shrink-0"
                         />
                       ) : (

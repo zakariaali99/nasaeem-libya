@@ -39,18 +39,20 @@ export function ProductImage({
     )
   }
 
-  const { thumb, medium, full } = image.renditions ?? {}
+  const { thumb, card, medium, full, hero } = (image.renditions as Record<string, string | undefined>) ?? {}
+  const cardOrMedium = card || medium
   const srcSet = [
     thumb && `${thumb} 200w`,
-    medium && `${medium} 600w`,
+    cardOrMedium && `${cardOrMedium} 600w`,
     full && `${full} 1200w`,
+    hero && `${hero} 1920w`,
   ]
     .filter(Boolean)
     .join(', ')
 
   return (
     <img
-      src={medium || image.url}
+      src={cardOrMedium || image.url}
       srcSet={srcSet || undefined}
       sizes={srcSet ? sizes : undefined}
       alt={alt}

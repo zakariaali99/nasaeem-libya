@@ -196,6 +196,10 @@ export function VerifiedPhotoReviews({ productId, productName, productSlug }: Ve
                   <img
                     src={rev.photo_url}
                     alt="تجربة العميل"
+                    width={80}
+                    height={80}
+                    loading="lazy"
+                    decoding="async"
                     className="size-20 rounded-xl object-cover border border-border shadow-2xs"
                   />
                 </div>

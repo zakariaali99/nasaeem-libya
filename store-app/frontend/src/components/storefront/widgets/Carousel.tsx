@@ -34,17 +34,28 @@ export function Carousel({ widget, priority = false }: CarouselProps) {
     <div className="relative overflow-hidden rounded-lg bg-muted">
       <div className={cn('relative w-full', hero ? 'aspect-[16/9] sm:aspect-[21/9]' : 'aspect-[16/9]')}>
         {slides.map((slide, slideIndex) => {
+          const isFirst = slideIndex === 0
+          const isEager = priority && isFirst
+          const base = slide.imageUrl.replace(/\.(jpg|jpeg|png|webp)$/i, '')
           const content = (
             <>
-              <img
-                src={slide.imageUrl}
-                alt={slide.title || ''}
-                width={1200}
-                height={675}
-                loading={priority && slideIndex === 0 ? 'eager' : 'lazy'}
-                fetchPriority={priority && slideIndex === 0 ? 'high' : undefined}
-                className="size-full object-contain"
-              />
+              <picture className="size-full">
+                <source
+                  type="image/webp"
+                  srcSet={`${base}-hero.webp 1920w, ${base}-full.webp 1200w, ${base}-card.webp 600w, ${slide.imageUrl} 1200w`}
+                  sizes="(max-width: 640px) 100vw, 1200px"
+                />
+                <img
+                  src={slide.imageUrl}
+                  alt={slide.title || ''}
+                  width={1200}
+                  height={675}
+                  loading={isEager ? 'eager' : 'lazy'}
+                  fetchPriority={isEager ? 'high' : undefined}
+                  decoding="async"
+                  className="size-full object-contain"
+                />
+              </picture>
               {slide.title || slide.subtitle ? (
                 <div className="absolute inset-x-0 bottom-0 bg-foreground/60 p-4 text-background">
                   {slide.title ? <p className="text-lg font-bold">{slide.title}</p> : null}

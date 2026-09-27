@@ -20,13 +20,10 @@ from django.utils.text import slugify
 
 from .models import InventoryLog, Product, ProductVariant, VariantValue
 
-RENDITIONS = {
-    "thumb": 200,
-    "card": 600,
-    "medium": 600,
-    "full": 1200,
-    "hero": 1920,
-}
+# Every stored image already has exactly these three files on disk; the names
+# are derived by convention in `rendition_urls`, so adding a name here would
+# advertise files that older uploads do not have.
+RENDITIONS = {"thumb": 200, "medium": 600, "full": 1200}
 
 
 class StockError(Exception):
@@ -202,6 +199,19 @@ def rendition_urls(url):
         name: f"{parent}/{stem}-{name}{path.suffix}" if parent not in (".", "") else f"{stem}-{name}{path.suffix}"
         for name in RENDITIONS
     }
+
+
+def rendition_url(url, name):
+    """One rendition of a free-form image url (banners, slides), or the url
+    itself when that image has no renditions.
+
+    Only WebP files under MEDIA_URL were written by `store_image` or
+    `optimize_media`, so only those are guaranteed to have siblings on disk;
+    a legacy JPG or an external url is returned untouched.
+    """
+    if not url or not url.startswith(settings.MEDIA_URL) or not url.lower().endswith(".webp"):
+        return url
+    return rendition_urls(url).get(name, url)
 
 
 def store_image(uploaded_file, *, subdir="products"):

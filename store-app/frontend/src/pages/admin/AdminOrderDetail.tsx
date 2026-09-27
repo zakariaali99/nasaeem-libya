@@ -372,7 +372,7 @@ export default function AdminOrderDetail() {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h4 className="font-bold text-sm text-foreground">الإجراء التالي المطلوب:</h4>
-                    <p className="text-xs text-muted-foreground">أكد المندوب تسليم العطر للعميل واستلام المبلغ كاش أو تأكيد التحويل.</p>
+                    <p className="text-xs text-muted-foreground">أكد المندوب تسليم العطر للعميل واستلام المبلغ أو تأكيد التحويل.</p>
                   </div>
                   <Button
                     loading={update.isPending}
@@ -380,7 +380,7 @@ export default function AdminOrderDetail() {
                     className="rounded-xl text-xs font-bold h-11 px-6 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
                   >
                     <CheckCircle2 className="size-4" />
-                    <span>تأكيد التسليم واستلام الكاش (اكتمل الطلب) ✅</span>
+                    <span>تأكيد التسليم واستلام المبلغ (اكتمل الطلب) ✅</span>
                   </Button>
                 </div>
               )}

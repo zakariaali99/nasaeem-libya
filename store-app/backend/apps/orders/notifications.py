@@ -24,7 +24,7 @@ def format_order_telegram_message(order) -> str:
         items_list.append(f"• {item.quantity}x {p_name} ({item.total_price} د.ل)")
 
     items_text = "\n".join(items_list) if items_list else "• منتجات عطرية"
-    payment_method_label = "الدفع عند الاستلام كاش 💵" if order.payment_method in ("cod", "manual_payment", "cash_on_delivery") else ("تحويل مصرفي 🏛️" if order.payment_method == "bank_transfer" else "دفع إلكتروني 💳")
+    payment_method_label = "الدفع عند الاستلام 💵" if order.payment_method in ("cod", "manual_payment", "cash_on_delivery") else ("تحويل مصرفي 🏛️" if order.payment_method == "bank_transfer" else "دفع إلكتروني 💳")
 
     msg = (
         f"🔔 *طلب جديد فاخر وارد الآن!*\n"
@@ -66,7 +66,7 @@ def format_bank_transfer_whatsapp_message(order, store_url: str = "") -> str:
     from apps.core.store_settings import get_store_settings
 
     settings = get_store_settings()
-    active_accounts = list(BankAccount.objects.filter(is_active=True).order_by("sort_order", "bank_name"))
+    active_accounts = list(BankAccount.objects.filter(is_active=True).order_by("sort_order", "bank_name")[:1])
 
     if active_accounts:
         bank_details_list = []
@@ -128,7 +128,7 @@ def format_cod_order_whatsapp_message(order) -> str:
         f"🏷️ *رقم الطلب:* #{order.order_number}\n\n"
         f"📦 *المنتجات:*\n{items_text}\n"
         f"──────────────\n"
-        f"💰 *المبلغ المطلوب عند الاستلام (كاش): {order.total} د.ل*\n"
+        f"💰 *المبلغ المطلوب عند الاستلام: {order.total} د.ل*\n"
         f"📍 التوصيل إلى: {city_name} — {order.shipping_address}\n\n"
         f"سيقوم مندوب التوصيل بالتواصل معك قبل الوصول لتسليمك الطلب ومعاينته. شكراً لاختيارك نسائم ليبيا! ✨"
     )

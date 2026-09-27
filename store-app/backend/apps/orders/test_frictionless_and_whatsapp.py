@@ -49,11 +49,18 @@ class TestFrictionlessCheckoutAndWhatsApp:
             shipping_address="شارع بن عاشور قرب مدرسة طرابلس",
         )
 
+        from apps.core.models import BankAccount
+
+        BankAccount.objects.create(
+            bank_name="مصرف الجمهورية", account_holder="نسائم ليبيا",
+            account_number="1122334455", iban="LY12000100000000011223344",
+        )
+
         msg_bank = format_bank_transfer_whatsapp_message(order)
         assert "نسائم ليبيا" in msg_bank
         assert "#202608BNK0001" in msg_bank
-        assert "0123456789" in msg_bank
-        assert "LY88000100000000012345678" in msg_bank
+        assert "1122334455" in msg_bank
+        assert "LY12000100000000011223344" in msg_bank
         assert "265" in msg_bank
 
         msg_cod = format_cod_order_whatsapp_message(order)

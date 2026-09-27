@@ -212,7 +212,7 @@ def normalise_widget_data(widget_type: str, data: dict | None) -> dict:
         default_items = [
             {"icon": "shield-check", "title": "عطور أصلية 100%", "subtitle": "ماركات عالمية وأصلية مضمونة"},
             {"icon": "truck", "title": "توصيل لجميع مدن ليبيا", "subtitle": "شحن سريع وموثوق لباب بيتك"},
-            {"icon": "credit-card", "title": "دفع آمن ومريح", "subtitle": "سداد، معاملات، بطاقات، أو كاش"},
+            {"icon": "credit-card", "title": "دفع آمن ومريح", "subtitle": "سداد، معاملات، بطاقات، أو عند الاستلام"},
         ]
         for item in data.get("items") or default_items:
             if isinstance(item, dict):

@@ -106,7 +106,7 @@ export function ThermalWaybill({
                 {formatPrice(data.payment.cod_amount)}
               </span>
               <span className="text-[9px] font-bold text-muted-foreground print:text-black block mt-0.5">
-                (كاش عند الاستلام بالدينار الليبي)
+                (الدفع عند الاستلام بالدينار الليبي)
               </span>
             </div>
           )}

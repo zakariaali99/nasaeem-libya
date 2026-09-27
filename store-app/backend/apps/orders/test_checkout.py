@@ -797,3 +797,33 @@ class TestStatusTransitions:
 
         product.refresh_from_db()
         assert product.reserved_stock == 0
+
+
+class TestCheckoutWhatsAppLink:
+    def _confirm(self, buyer_api, product, region, courier):
+        buyer_api.post(reverse("cart"), {"product_id": str(product.id)}, format="json")
+        draft = buyer_api.post(reverse("cart-checkout"), {}, format="json").json()["data"]
+        return buyer_api.post(reverse("checkout-confirm"), {
+            "order_id": draft["id"], "region_id": region.id, "address": "شارع النصر",
+            "delivery_method_code": courier.code, "payment_method": "moamalat",
+        }, format="json").json()
+
+    def test_the_invoice_link_opens_the_stores_whatsapp(self, buyer_api, product, region, courier):
+        from apps.core.store_settings import get_store_settings
+
+        settings = get_store_settings()
+        settings.whatsapp = "0923456789"
+        settings.save()
+
+        body = self._confirm(buyer_api, product, region, courier)
+        assert body["whatsapp_link"].startswith("https://wa.me/218923456789?text=")
+
+    def test_no_invoice_link_without_a_store_whatsapp(self, buyer_api, product, region, courier):
+        """Never fall back to the customer's own number for the store's chat."""
+        from apps.core.store_settings import get_store_settings
+
+        settings = get_store_settings()
+        settings.whatsapp = ""
+        settings.save()
+
+        assert self._confirm(buyer_api, product, region, courier)["whatsapp_link"] == ""

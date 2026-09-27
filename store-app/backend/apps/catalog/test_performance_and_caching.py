@@ -140,7 +140,7 @@ def test_optimize_media_command(tmp_path, settings):
     out_real = StringIO()
     call_command("optimize_media", stdout=out_real)
     assert (banners_dir / "test-hero.webp").exists()
-    assert (banners_dir / "test-hero-card.webp").exists()
+    assert (banners_dir / "test-hero-medium.webp").exists()
 
 
 @pytest.mark.django_db

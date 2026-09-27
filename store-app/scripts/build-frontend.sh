@@ -18,8 +18,9 @@ fi
 
 rm -rf "${BACKEND_DIST}"
 mkdir -p "${BACKEND_DIST}"
-cp -R "${FRONTEND_DIR}/dist/"* "${BACKEND_DIST}/"
-cp -R "${FRONTEND_DIR}/dist/".* "${BACKEND_DIST}/" 2>/dev/null || true
+# `dist/.` copies every entry including dotfiles, without the `.*` glob that
+# also matches `..` on older shells.
+cp -R "${FRONTEND_DIR}/dist/." "${BACKEND_DIST}/"
 
 if [ -n "${TMP_HTACCESS}" ] && [ -f "${TMP_HTACCESS}" ]; then
     if [ ! -f "${BACKEND_DIST}/.htaccess" ]; then

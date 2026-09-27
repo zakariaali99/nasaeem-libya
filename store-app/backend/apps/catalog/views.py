@@ -292,6 +292,37 @@ class ProductBySlugView(APIView):
         return Response({"data": serialized_data})
 
 
+def category_tree(request=None, *, admin=False):
+    """Root categories with nested `children`, and the total count.
+
+    Shared by the API and the SPA shell bootstrap so both hand the client the
+    same shape. The public tree is cached; the admin tree includes inactive rows.
+    """
+    queryset = Category.objects.all()
+    if not admin:
+        queryset = queryset.filter(is_active=True)
+
+    categories = list(queryset.order_by("name"))
+    by_parent = {}
+    for category in categories:
+        by_parent.setdefault(category.parent_id, []).append(category)
+    for category in categories:
+        category._children = by_parent.get(category.id, [])
+
+    roots = by_parent.get(None, [])
+    data = CategorySerializer(roots, many=True, context={"request": request}).data
+    if not admin:
+        cache.set("store:categories:tree", data, 86400)
+    return data, len(categories)
+
+
+def public_category_tree(request=None):
+    cached = cache.get("store:categories:tree")
+    if cached is not None:
+        return cached
+    return category_tree(request)[0]
+
+
 class CategoryListView(APIView):
     def get_permissions(self):
         return [AllowAny()] if self.request.method == "GET" else [IsAdminRole()]
@@ -303,22 +334,8 @@ class CategoryListView(APIView):
             if cached is not None:
                 return Response({"data": cached, "meta": {"total": len(cached)}})
 
-        queryset = Category.objects.all()
-        if not admin:
-            queryset = queryset.filter(is_active=True)
-
-        categories = list(queryset.order_by("name"))
-        by_parent = {}
-        for category in categories:
-            by_parent.setdefault(category.parent_id, []).append(category)
-        for category in categories:
-            category._children = by_parent.get(category.id, [])
-
-        roots = by_parent.get(None, [])
-        serializer = CategorySerializer(roots, many=True, context={"request": request})
-        if not admin:
-            cache.set("store:categories:tree", serializer.data, 86400)
-        return Response({"data": serializer.data, "meta": {"total": len(categories)}})
+        data, total = category_tree(request, admin=admin)
+        return Response({"data": data, "meta": {"total": total}})
 
     def post(self, request):
         serializer = CategorySerializer(data=request.data, context={"request": request})

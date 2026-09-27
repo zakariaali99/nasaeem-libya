@@ -201,7 +201,7 @@ def test_telegram_order_alert_formatting(executive_dataset):
     assert "#ORD-EXEC-001" in msg
     assert "طرابلس" in msg
     assert "كلوب دي نوي إنتنس" in msg
-    assert "الدفع عند الاستلام كاش" in msg
+    assert "الدفع عند الاستلام" in msg
 
 
 @pytest.mark.django_db

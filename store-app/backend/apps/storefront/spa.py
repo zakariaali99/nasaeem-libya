@@ -19,6 +19,7 @@ is served the shell unchanged: its default title and description (already in
 from __future__ import annotations
 
 import json
+import logging
 import re
 from decimal import Decimal
 from functools import lru_cache
@@ -26,12 +27,15 @@ from pathlib import Path
 from urllib.parse import quote, unquote
 
 from django.conf import settings
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import Q
 from django.http import Http404, HttpResponse
 from django.utils.html import escape
 from django.views.decorators.cache import cache_control
 
 from apps.catalog.models import Product
+
+logger = logging.getLogger(__name__)
 
 _TITLE_RE = re.compile(r"<title>.*?</title>", re.IGNORECASE | re.DOTALL)
 _DESC_RE = re.compile(r'<meta\s+name="description"[^>]*>', re.IGNORECASE)
@@ -230,6 +234,88 @@ def sitemap_xml(request):
     return HttpResponse("\n".join(body), content_type="application/xml; charset=utf-8")
 
 
+def _script_json(value) -> str:
+    """JSON safe to inline in a <script>: UUIDs/decimals/dates via Django's
+    encoder, and `</` escaped so a value can never close the tag."""
+    return json.dumps(value, ensure_ascii=False, cls=DjangoJSONEncoder).replace("</", "<\\/")
+
+
+def _hero_preload_tags(widgets) -> list[str]:
+    """Preload exactly the image the first hero/carousel will render, one per
+    breakpoint, so a phone never downloads the desktop banner."""
+    from apps.catalog.services import rendition_url
+
+    for widget in widgets:
+        data = widget.get("data") or {}
+        if widget.get("type") == "hero_cta":
+            desktop = data.get("desktopImageUrl") or data.get("backgroundImageUrl") or data.get("mobileImageUrl")
+            mobile = data.get("mobileImageUrl") or desktop
+        elif widget.get("type") == "carousel":
+            slides = data.get("slides") or []
+            desktop = mobile = slides[0].get("imageUrl") if slides else None
+        else:
+            continue
+        if not desktop:
+            return []
+        return [
+            f'<link rel="preload" as="image" href="{escape(rendition_url(mobile, "full"))}" '
+            f'media="(max-width: 640px)" fetchpriority="high">',
+            f'<link rel="preload" as="image" href="{escape(desktop)}" '
+            f'media="(min-width: 641px)" fetchpriority="high">',
+        ]
+    return []
+
+
+def _bootstrap_block(request, path: str) -> str:
+    """Store settings + first-paint data inlined into the shell, saving the
+    client its first API round-trips. Each part is independent: a failure is
+    logged and that part omitted, and the client falls back to fetching it."""
+    from apps.catalog.views import public_category_tree
+    from apps.core.store_settings import get_public_store_settings
+    from apps.storefront import services as storefront_services
+    from apps.storefront.serializers import StorefrontLayoutSerializer
+
+    tags: list[str] = []
+    bootstrap: dict = {}
+
+    try:
+        tags.append(f"<script>window.__STORE_SETTINGS__ = {_script_json(get_public_store_settings())};</script>")
+    except Exception:
+        logger.exception("SPA shell: store settings bootstrap failed")
+
+    try:
+        bootstrap["categories"] = public_category_tree(request)
+    except Exception:
+        logger.exception("SPA shell: categories bootstrap failed")
+
+    if path in ("", "/"):
+        try:
+            layout, widgets = storefront_services.cached_layout_rows()
+            if layout is not None:
+                context = {
+                    "request": request,
+                    "user": getattr(request, "user", None),
+                    "recent_ids": [],
+                    "widgets": widgets,
+                }
+                payload = StorefrontLayoutSerializer(layout, context=context).data
+                bootstrap["layout"] = {
+                    "layout": {
+                        "id": payload["id"],
+                        "name": payload["name"],
+                        "updated_at": payload["updated_at"],
+                    },
+                    "widgets": payload["widgets"],
+                }
+                tags = _hero_preload_tags(payload["widgets"]) + tags
+        except Exception:
+            logger.exception("SPA shell: layout bootstrap failed")
+
+    if bootstrap:
+        tags.append(f"<script>window.__BOOTSTRAP__ = {_script_json(bootstrap)};</script>")
+    return "\n  ".join(tags)
+
+
 @cache_control(no_cache=True)
 def render_shell(request, path: str = ""):
     """Catch-all for SPA routes. Product pages get injected SEO; everything else
@@ -258,72 +344,9 @@ def render_shell(request, path: str = ""):
             title, description, extra = _product_head(request, product)
             html = _apply_head(html, title=title, description=description, extra=extra)
 
-    from apps.core.store_settings import get_public_store_settings
-    from apps.catalog.models import Category
-    from apps.catalog.serializers import CategorySerializer
-    from apps.storefront import services as storefront_services
-    from apps.storefront.serializers import StorefrontLayoutSerializer
-
-    bootstrap_data = {}
-    preload_tags = []
-
-    try:
-        settings_data = get_public_store_settings()
-        bootstrap_data["storeSettings"] = settings_data
-
-        # Categories for navigation drawer & menus
-        categories_qs = Category.objects.filter(is_active=True).order_by("name")
-        bootstrap_data["categories"] = CategorySerializer(categories_qs, many=True).data
-
-        # Homepage layout when landing on root
-        if path == "" or path == "/":
-            layout, widgets = storefront_services.cached_layout_rows()
-            if layout is not None:
-                context = {
-                    "request": request,
-                    "user": getattr(request, "user", None),
-                    "recent_ids": [],
-                    "widgets": widgets,
-                }
-                payload = StorefrontLayoutSerializer(layout, context=context).data
-                bootstrap_data["layout"] = {
-                    "layout": {
-                        "id": payload["id"],
-                        "name": payload["name"],
-                        "updated_at": payload["updated_at"],
-                    },
-                    "widgets": payload["widgets"],
-                }
-
-                # Preload hero image if available
-                for w in payload.get("widgets", []):
-                    w_type = w.get("type")
-                    w_data = w.get("data", {})
-                    if w_type == "hero_cta":
-                        hero_img = w_data.get("desktopImageUrl") or w_data.get("mobileImageUrl") or w_data.get("backgroundImageUrl")
-                        if hero_img:
-                            preload_tags.append(f'<link rel="preload" as="image" href="{escape(hero_img)}" fetchpriority="high">')
-                        break
-                    elif w_type == "carousel":
-                        slides = w_data.get("slides", [])
-                        if slides and slides[0].get("imageUrl"):
-                            preload_tags.append(f'<link rel="preload" as="image" href="{escape(slides[0]["imageUrl"])}" fetchpriority="high">')
-                        break
-
-        settings_json = json.dumps(settings_data, ensure_ascii=False).replace("</", "<\\/")
-        bootstrap_json = json.dumps(bootstrap_data, ensure_ascii=False).replace("</", "<\\/")
-
-        scripts = [
-            f"<script>window.__STORE_SETTINGS__ = {settings_json};</script>",
-            f"<script>window.__BOOTSTRAP__ = {bootstrap_json};</script>",
-        ]
-        if preload_tags:
-            scripts = preload_tags + scripts
-
-        injected_block = "\n  ".join(scripts)
-        if "</head>" in html:
-            html = html.replace("</head>", f"  {injected_block}\n</head>", 1)
-    except Exception:
-        pass
+    if "</head>" in html:
+        head_block = _bootstrap_block(request, path)
+        if head_block:
+            html = html.replace("</head>", f"  {head_block}\n</head>", 1)
 
     return HttpResponse(html, content_type="text/html; charset=utf-8")

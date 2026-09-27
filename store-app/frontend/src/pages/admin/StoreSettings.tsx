@@ -415,26 +415,22 @@ export default function AdminStoreSettingsPage() {
           <div>
             <h2 className="text-base font-black text-foreground flex items-center gap-2">
               <Building2 className="size-5 text-primary" />
-              الحسابات المصرفية المعتمدة ({bankAccounts.length})
+              الحساب المصرفي
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              يمكنك إضافة أكثر من حساب مصرفي (مثل الجمهورية، التجاري، الأمان...) وتفعيلها أو تعطيلها.
+              الحساب الذي يظهر للعملاء عند اختيار التحويل المصرفي. للمتجر حساب واحد، ويمكنك تعديله في أي وقت.
             </p>
           </div>
-          <Button type="button" onClick={openAddAccount} className="rounded-xl font-bold gap-1.5 self-start">
-            <Plus className="size-4" />
-            <span>إضافة حساب مصرفي</span>
-          </Button>
         </div>
 
         {bankAccounts.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-border p-12 text-center space-y-3">
             <Building2 className="size-10 text-muted-foreground mx-auto opacity-50" />
-            <p className="text-sm font-bold text-foreground">لا توجد حسابات مصرفية مضافة</p>
-            <p className="text-xs text-muted-foreground">أضف حساباً مصرفياً ليتمكن العملاء من تحويل قيمة الطلبات.</p>
+            <p className="text-sm font-bold text-foreground">لم يُضف حساب مصرفي بعد</p>
+            <p className="text-xs text-muted-foreground">أضف الحساب ليتمكن العملاء من تحويل قيمة الطلبات.</p>
             <Button onClick={openAddAccount} variant="outline" className="rounded-xl font-bold mt-2">
               <Plus className="size-4 me-1" />
-              إضافة أول حساب
+              إضافة الحساب المصرفي
             </Button>
           </div>
         ) : (

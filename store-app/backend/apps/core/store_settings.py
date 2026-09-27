@@ -28,7 +28,7 @@ def get_public_store_settings() -> dict:
             "iban": acc.iban,
             "sort_order": acc.sort_order,
         }
-        for acc in BankAccount.objects.filter(is_active=True).order_by("sort_order", "bank_name")
+        for acc in BankAccount.objects.filter(is_active=True).order_by("sort_order", "bank_name")[:1]
     ]
     return {
         "store_name": settings.store_name,

@@ -38,7 +38,7 @@ const TRUST_BADGES = [
   {
     icon: ShieldCheck,
     title: 'دفع آمن ومريح',
-    description: 'الدفع عند الاستلام كاش أو تحويل مصرفي مباشر',
+    description: 'الدفع عند الاستلام أو تحويل مصرفي مباشر',
   },
 ]
 
@@ -141,21 +141,10 @@ export function Footer() {
         </nav>
       </div>
 
-      {/* Payment Badges & Copyright */}
+      {/* Copyright */}
       <div className="border-t border-border/80 bg-muted/30 px-4 py-6">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 sm:flex-row text-center sm:text-start text-xs text-muted-foreground">
+        <div className="mx-auto flex max-w-6xl items-center justify-center text-center text-xs text-muted-foreground">
           <p className="leading-relaxed">© {currentYear} {legalName}. جميع الحقوق محفوظة.</p>
-          <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3">
-            <span className="text-[11px] font-semibold text-foreground shrink-0">طرق الدفع المعتمدة:</span>
-            <div className="flex flex-wrap items-center justify-center gap-1.5">
-              <span className="rounded-lg border border-border bg-card px-2.5 py-1 text-[11px] font-bold text-foreground">
-                الدفع عند الاستلام كاش
-              </span>
-              <span className="rounded-lg border border-border bg-card px-2.5 py-1 text-[11px] font-bold text-foreground">
-                تحويل مصرفي مباشر
-              </span>
-            </div>
-          </div>
         </div>
       </div>
     </footer>

@@ -2,6 +2,7 @@ import { ArrowLeft, ShieldCheck, ShoppingBag, Sparkles, Truck } from 'lucide-rea
 import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
+import { renditionUrl } from '@/lib/images'
 import { cn } from '@/lib/utils'
 import type { Widget } from '@/types/api'
 
@@ -35,18 +36,13 @@ export function HeroCta({ widget, priority = false }: { widget: Widget; priority
     <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white shadow-xl border border-border/40 animate-fade-rise">
       {hasImage ? (
         <>
+          {/* One URL per breakpoint, matching the preload tags the server
+              emits (spa._hero_preload_tags), so a phone downloads only the
+              1200px rendition and never the desktop original. */}
           <picture className="absolute inset-0 size-full">
-            {mobileImageUrl ? (
-              <source
-                media="(max-width: 640px)"
-                srcSet={`${String(mobileImageUrl).replace(/\.(jpg|jpeg|png|webp)$/i, '')}-card.webp 600w, ${String(mobileImageUrl)} 800w`}
-                sizes="100vw"
-              />
-            ) : null}
             <source
-              media="(min-width: 641px)"
-              srcSet={`${String(desktopImageUrl || mobileImageUrl).replace(/\.(jpg|jpeg|png|webp)$/i, '')}-hero.webp 1920w, ${String(desktopImageUrl || mobileImageUrl).replace(/\.(jpg|jpeg|png|webp)$/i, '')}-full.webp 1200w, ${String(desktopImageUrl || mobileImageUrl)} 1200w`}
-              sizes="100vw"
+              media="(max-width: 640px)"
+              srcSet={renditionUrl(String(mobileImageUrl || desktopImageUrl), 'full')}
             />
             <img
               src={String(desktopImageUrl || mobileImageUrl)}

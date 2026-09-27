@@ -44,6 +44,12 @@ class AdminBankAccountListCreateView(APIView):
         return Response({"data": serializer.data})
 
     def post(self, request):
+        # The store publishes exactly one account; the existing one is edited.
+        if BankAccount.objects.exists():
+            return Response(
+                {"message": "للمتجر حساب مصرفي واحد — عدّل الحساب الحالي بدلاً من إضافة حساب جديد"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         serializer = BankAccountSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         account = serializer.save()

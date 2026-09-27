@@ -598,7 +598,7 @@ export function QuickOrderModal({ open, onOpenChange }: QuickOrderModalProps) {
                     onChange={(e) => setPaymentMethodCode(e.target.value)}
                     className="h-9 text-xs"
                   >
-                    <option value="manual_payment">الدفع عند الاستلام (COD / كاش)</option>
+                    <option value="manual_payment">الدفع عند الاستلام (COD)</option>
                     <option value="bank_cards_on_delivery">بطاقة مصرفية عند الاستلام (POS)</option>
                     <option value="sadad_pay">سداد باي (Sadad Pay)</option>
                     <option value="moamalat">بطاقة محلية (تداول / معاملات)</option>

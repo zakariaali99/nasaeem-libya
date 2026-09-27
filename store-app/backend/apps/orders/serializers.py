@@ -593,12 +593,12 @@ class ExecutiveAnalyticsSerializer(serializers.Serializer):
         )
         payment_methods_breakdown = []
         payment_labels = {
-            "manual_payment": "الدفع عند الاستلام (كاش COD)",
+            "manual_payment": "الدفع عند الاستلام (COD)",
             "bank_cards_on_delivery": "بطاقة مصرفية عند الاستلام (POS)",
             "moamalat": "شبكة تداول / معاملات المصرفية",
             "sadad_pay": "سداد باي (Sadad Pay)",
             "binance_pay": "بينانس باي الرقمي",
-            "cod": "الدفع عند الاستلام (كاش COD)",
+            "cod": "الدفع عند الاستلام (COD)",
         }
         for pm in payment_groups:
             code = pm["payment_method"] or "manual_payment"

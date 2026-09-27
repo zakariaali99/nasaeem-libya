@@ -13,7 +13,7 @@ export function TrustBadgesWidget({ widget }: { widget: Widget }) {
   const items = (data.items as Array<{ icon?: string; title?: string; subtitle?: string }>) || [
     { icon: 'shield-check', title: 'عطور أصلية 100%', subtitle: 'ماركات عالمية وأصلية مضمونة' },
     { icon: 'truck', title: 'توصيل لجميع مدن ليبيا', subtitle: 'شحن سريع وموثوق لباب بيتك' },
-    { icon: 'credit-card', title: 'دفع آمن ومريح', subtitle: 'سداد، معاملات، بطاقات، أو كاش' },
+    { icon: 'credit-card', title: 'دفع آمن ومريح', subtitle: 'سداد، معاملات، بطاقات، أو عند الاستلام' },
   ]
 
   return (

@@ -43,7 +43,7 @@ export function ProductTrustBadges() {
         </div>
         <div>
           <span className="block text-xs font-black text-foreground">دفع نقداً أو تحويل</span>
-          <span className="block text-[10px] text-muted-foreground">كاش عند الاستلام أو تحويل</span>
+          <span className="block text-[10px] text-muted-foreground">عند الاستلام أو تحويل</span>
         </div>
       </div>
     </div>

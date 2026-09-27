@@ -2,6 +2,7 @@ import { ChevronRight } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
+import { renditionUrl } from '@/lib/images'
 import { cn } from '@/lib/utils'
 import type { Widget } from '@/types/api'
 
@@ -36,15 +37,11 @@ export function Carousel({ widget, priority = false }: CarouselProps) {
         {slides.map((slide, slideIndex) => {
           const isFirst = slideIndex === 0
           const isEager = priority && isFirst
-          const base = slide.imageUrl.replace(/\.(jpg|jpeg|png|webp)$/i, '')
           const content = (
             <>
               <picture className="size-full">
-                <source
-                  type="image/webp"
-                  srcSet={`${base}-hero.webp 1920w, ${base}-full.webp 1200w, ${base}-card.webp 600w, ${slide.imageUrl} 1200w`}
-                  sizes="(max-width: 640px) 100vw, 1200px"
-                />
+                {/* Matches the server's preload tags for the first slide. */}
+                <source media="(max-width: 640px)" srcSet={renditionUrl(slide.imageUrl, 'full')} />
                 <img
                   src={slide.imageUrl}
                   alt={slide.title || ''}

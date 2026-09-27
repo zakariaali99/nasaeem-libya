@@ -352,15 +352,20 @@ class CheckoutConfirmView(CsrfProtectedAPIView):
         import urllib.parse
         dispatch_realtime_order_alert(order)
 
-        # Build recipient phone in international format (Store customer service WhatsApp)
+        def wa_number(phone):
+            """`09XXXXXXXX` -> `2189XXXXXXXX`, the form wa.me expects."""
+            digits = re.sub(r"[^\d]", "", phone or "")
+            if digits.startswith("0"):
+                return "218" + digits[1:]
+            if digits and not digits.startswith("218"):
+                return "218" + digits
+            return digits
+
+        # The invoice goes TO the store (the customer sends it from their own
+        # WhatsApp); the welcome note goes to the customer's own chat.
         from apps.core.store_settings import get_store_settings
-        store_settings = get_store_settings()
-        store_whatsapp = store_settings.whatsapp or (order.user.phone_number if order.user else customer_phone) or ""
-        clean_recipient = re.sub(r"[^\d]", "", store_whatsapp)
-        if clean_recipient.startswith("0"):
-            clean_recipient = "218" + clean_recipient[1:]
-        elif clean_recipient and not clean_recipient.startswith("218"):
-            clean_recipient = "218" + clean_recipient
+        store_number = wa_number(get_store_settings().whatsapp)
+        customer_number = wa_number(order.user.phone_number if order.user else customer_phone)
 
         payment_method = (payload.get("payment_method") or "").lower()
         is_bank = payment_method in ("bank_transfer", "bank")
@@ -371,8 +376,8 @@ class CheckoutConfirmView(CsrfProtectedAPIView):
             invoice_msg = format_cod_order_whatsapp_message(order)
 
         whatsapp_link = (
-            f"https://wa.me/{clean_recipient}?text={urllib.parse.quote(invoice_msg)}"
-            if clean_recipient
+            f"https://wa.me/{store_number}?text={urllib.parse.quote(invoice_msg)}"
+            if store_number
             else ""
         )
 
@@ -384,8 +389,8 @@ class CheckoutConfirmView(CsrfProtectedAPIView):
                 phone_number=user.phone_number,
                 temp_password="000000",
             )
-            if clean_recipient:
-                account_whatsapp_link = f"https://wa.me/{clean_recipient}?text={urllib.parse.quote(account_whatsapp_msg)}"
+            if customer_number:
+                account_whatsapp_link = f"https://wa.me/{customer_number}?text={urllib.parse.quote(account_whatsapp_msg)}"
 
         request.session.pop(DETAILS_SESSION_KEY, None)
         request.session.pop("draft_order_id", None)

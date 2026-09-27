@@ -172,13 +172,19 @@ export default function CheckoutPage() {
 
       const confirmedOrder = (result as any).order || result
       const whatsappLink = (result as any).whatsapp_link
+      const orderNumber = confirmedOrder.order_number || order.order_number
 
+      // Not opened automatically: the confirmation page offers it as a button
+      // the customer may or may not use.
       if (whatsappLink) {
-        sessionStorage.setItem('last_whatsapp_link', whatsappLink)
-        window.open(whatsappLink, '_blank')
+        try {
+          sessionStorage.setItem(`whatsapp_link:${orderNumber}`, whatsappLink)
+        } catch {
+          // storage unavailable (private mode) — the page simply shows no button
+        }
       }
 
-      navigate(`/checkout/complete?order=${encodeURIComponent(confirmedOrder.order_number || order.order_number)}`)
+      navigate(`/checkout/complete?order=${encodeURIComponent(orderNumber)}`)
     } catch (failure) {
       if (failure instanceof ApiError) {
         setFieldErrors(failure.errors ?? {})
@@ -408,7 +414,7 @@ export default function CheckoutPage() {
                 <div className="flex-1 space-y-1">
                   <div className="flex items-center gap-2">
                     <Banknote className="size-4 text-emerald-600 dark:text-emerald-400" />
-                    <span className="font-bold text-sm text-foreground">الدفع عند الاستلام كاش</span>
+                    <span className="font-bold text-sm text-foreground">الدفع عند الاستلام</span>
                   </div>
                   <p className="text-xs text-muted-foreground">
                     الدفع نقداً للمندوب عند استلام العطر ومعاينته والتأكد من جودته.

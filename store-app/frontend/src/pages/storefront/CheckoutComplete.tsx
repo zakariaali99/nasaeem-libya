@@ -26,11 +26,12 @@ export default function CheckoutCompletePage() {
   }
 
   useEffect(() => {
-    const link = sessionStorage.getItem('last_whatsapp_link')
-    if (link) {
-      setWhatsappLink(link)
+    try {
+      setWhatsappLink(reference ? sessionStorage.getItem(`whatsapp_link:${reference}`) : null)
+    } catch {
+      setWhatsappLink(null)
     }
-  }, [])
+  }, [reference])
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-12 animate-fade-rise space-y-6">
@@ -54,10 +55,10 @@ export default function CheckoutCompletePage() {
         <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 sm:p-5 text-center space-y-3">
           <div className="flex items-center justify-center gap-2 text-emerald-800 dark:text-emerald-300 font-bold text-sm">
             <MessageSquare className="size-4" />
-            <span>تم توليد رسالة الفاتورة الخاصة بطلبك</span>
+            <span>تواصل معنا عبر واتساب (اختياري)</span>
           </div>
           <p className="text-xs text-muted-foreground">
-            انقر على الزر أدناه لمتابعة طلبك عبر واتساب وإرسال الإشعار فوراً:
+            يمكنك إرسال تفاصيل طلبك إلينا عبر واتساب لمتابعته بسرعة:
           </p>
           <a
             href={whatsappLink}
@@ -66,7 +67,7 @@ export default function CheckoutCompletePage() {
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 text-xs sm:text-sm font-bold shadow-md transition-colors"
           >
             <MessageSquare className="size-4" />
-            <span>فتح محادثة واتساب وإرسال الفاتورة</span>
+            <span>إرسال الطلب عبر واتساب</span>
           </a>
         </div>
       )}
@@ -76,7 +77,7 @@ export default function CheckoutCompletePage() {
         <div className="space-y-4">
           <div className="flex items-center gap-2 text-primary font-bold text-sm border-b border-border pb-2">
             <Building2 className="size-4" />
-            <span>بيانات الحسابات المصرفية للتحويل المباشر</span>
+            <span>بيانات الحساب المصرفي للتحويل المباشر</span>
           </div>
 
           {(storeSettings?.bank_accounts || []).length === 0 ? (

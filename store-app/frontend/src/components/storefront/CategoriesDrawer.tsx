@@ -243,18 +243,20 @@ export function CategoriesDrawer({ children }: CategoriesDrawerProps) {
               خدمة العملاء والتوصيل
             </span>
 
-            <a
-              href={whatsappUrl(storeSettings?.whatsapp, 'مرحباً، أود الاستفسار عن المنتجات والطلبات في نسائم ليبيا')}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-between rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs font-bold text-emerald-800 dark:text-emerald-300 hover:bg-emerald-500/20 transition-all shadow-2xs"
-            >
-              <div className="flex items-center gap-2.5">
-                <MessageCircle className="size-4 text-emerald-600 dark:text-emerald-400" />
-                <span>تواصل مع الدعم عبر واتساب</span>
-              </div>
-              <ArrowLeft className="size-3.5 rtl:rotate-0" />
-            </a>
+            {storeSettings?.whatsapp ? (
+              <a
+                href={whatsappUrl(storeSettings?.whatsapp, 'مرحباً، أود الاستفسار عن المنتجات والطلبات في نسائم ليبيا')}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs font-bold text-emerald-800 dark:text-emerald-300 hover:bg-emerald-500/20 transition-all shadow-2xs"
+              >
+                <div className="flex items-center gap-2.5">
+                  <MessageCircle className="size-4 text-emerald-600 dark:text-emerald-400" />
+                  <span>تواصل مع الدعم عبر واتساب</span>
+                </div>
+                <ArrowLeft className="size-3.5 rtl:rotate-0" />
+              </a>
+            ) : null}
 
             <div className="flex items-center gap-2 text-[11px] text-muted-foreground px-3 py-1">
               <Truck className="size-3.5 text-primary shrink-0" />

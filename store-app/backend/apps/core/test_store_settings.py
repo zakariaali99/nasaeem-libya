@@ -204,3 +204,34 @@ def test_spa_render_shell_injects_store_settings(rf):
     assert response.status_code == 200
     content = response.content.decode("utf-8")
     assert "window.__STORE_SETTINGS__ =" in content
+
+
+def test_the_store_has_a_single_bank_account(api_client, admin_user):
+    api_client.force_authenticate(admin_user)
+    payload = {"bank_name": "مصرف الجمهورية", "account_holder": "نسائم", "account_number": "1234567"}
+
+    assert api_client.post("/api/admin/bank-accounts/", payload, format="json").status_code == 201
+    second = api_client.post("/api/admin/bank-accounts/", {**payload, "account_number": "7654321"}, format="json")
+    assert second.status_code == 400
+    assert BankAccount.objects.count() == 1
+    assert len(get_public_store_settings()["bank_accounts"]) == 1
+
+
+@pytest.mark.django_db
+def test_placeholder_contacts_are_cleared_by_migration():
+    """0009 removes the demo account and demo numbers seeded by 0008."""
+    import importlib
+
+    from django.apps import apps as django_apps
+
+    migration = importlib.import_module("apps.core.migrations.0009_clear_placeholder_store_contacts")
+    BankAccount.objects.all().delete()
+    BankAccount.objects.create(bank_name="تجريبي", account_holder="x", account_number="0123456789")
+    StoreSettings.objects.update_or_create(pk=1, defaults={"whatsapp": "0915555555", "phone": "0923456789"})
+
+    migration.clear_placeholders(django_apps, None)
+
+    settings = StoreSettings.objects.get(pk=1)
+    assert settings.whatsapp == ""
+    assert settings.phone == "0923456789"  # a real number is left alone
+    assert not BankAccount.objects.exists()

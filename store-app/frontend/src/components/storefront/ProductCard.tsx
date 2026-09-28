@@ -30,19 +30,29 @@ export function ProductCard({ product, priority = false, sizes }: ProductCardPro
   // Listing payloads carry `has_variants` but not the `variants` array, so the
   // flag decides: a sized product cannot be added without choosing a size.
   const hasVariants = Boolean(product.has_variants || (product.variants && product.variants.length > 0))
-  // A single size needs no choosing; several are offered as buttons on the card.
+  // A single size needs no choosing. Several are offered as toggle buttons:
+  // tap to choose, tap again to un-choose, and any number can be chosen at
+  // once — each chosen size becomes its own line in the cart.
   const choices = product.variant_choices ?? []
-  const [chosenId, setChosenId] = useState<string | null>(null)
+  const [chosenIds, setChosenIds] = useState<string[]>([])
+  const [justAdded, setJustAdded] = useState(false)
   const onlyChoice = choices.length === 1 ? choices[0] : null
-  const chosen = onlyChoice ?? choices.find((choice) => choice.id === chosenId) ?? null
   const showPicker = hasVariants && choices.length > 1
+  const chosenMany = choices.filter((choice) => chosenIds.includes(choice.id))
+  const chosen = onlyChoice ?? (chosenMany.length === 1 ? chosenMany[0] : null)
   // An older payload without `variant_choices` still sends the customer to the product page.
   const canAddFromCard = !hasVariants || choices.length > 0
-  const inStock = chosen ? chosen.in_stock : product.in_stock
+  const inStock = onlyChoice ? onlyChoice.in_stock : product.in_stock
 
-  const cartItem = cart?.items.find((i) =>
-    i.product_id === product.id && (chosen ? i.variant_id === chosen.id : !i.variant_id),
-  )
+  const toggleChoice = (id: string) =>
+    setChosenIds((current) => (current.includes(id) ? current.filter((x) => x !== id) : [...current, id]))
+
+  const inCartFor = (variantId: string | null) =>
+    cart?.items.find((i) =>
+      i.product_id === product.id && (variantId ? i.variant_id === variantId : !i.variant_id),
+    )
+  // The +/- counter only applies when the card maps to one cart line.
+  const cartItem = showPicker ? undefined : inCartFor(onlyChoice?.id ?? null)
   const quantity = cartItem?.quantity ?? 0
 
   const isWishlisted = Boolean(wishlistIds?.includes(product.id))
@@ -53,13 +63,28 @@ export function ProductCard({ product, priority = false, sizes }: ProductCardPro
     toggleWishlist.mutate(product.id)
   }
 
-  const handleQuickAdd = (e: React.MouseEvent) => {
+  const handleQuickAdd = async (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    if (!inStock || (hasVariants && !chosen)) return
+    if (showPicker) {
+      if (chosenMany.length === 0) return
+      try {
+        // One line per size, added in turn so the cart never races itself.
+        for (const choice of chosenMany) {
+          await addToCart.mutateAsync({ product_id: product.id, variant_id: choice.id, quantity: 1 })
+        }
+        setChosenIds([])
+        setJustAdded(true)
+        window.setTimeout(() => setJustAdded(false), 2000)
+      } catch {
+        // useAddToCart rolls the optimistic count back; the choice stays so the customer can retry.
+      }
+      return
+    }
+    if (!inStock) return
     addToCart.mutate({
       product_id: product.id,
-      variant_id: chosen?.id ?? null,
+      variant_id: onlyChoice?.id ?? null,
       quantity: 1,
     })
   }
@@ -140,18 +165,20 @@ export function ProductCard({ product, priority = false, sizes }: ProductCardPro
         {product.in_stock && (
           <div className="space-y-2 pt-1">
             {showPicker ? (
-              <div role="group" aria-label="اختر الحجم" className="flex flex-wrap gap-1.5">
+              <div role="group" aria-label="اختر حجماً أو أكثر" className="flex flex-wrap gap-1.5">
                 {choices.map((choice) => {
-                  const isChosen = chosen?.id === choice.id
+                  const isChosen = chosenIds.includes(choice.id)
+                  const inCart = inCartFor(choice.id)?.quantity ?? 0
                   return (
                     <button
                       key={choice.id}
                       type="button"
                       aria-pressed={isChosen}
                       disabled={!choice.in_stock}
+                      title={inCart ? `في السلة: ${inCart}` : undefined}
                       onClick={(e) => {
                         e.preventDefault()
-                        setChosenId(choice.id)
+                        toggleChoice(choice.id)
                       }}
                       className={cn(
                         'min-h-9 rounded-lg border-2 px-2.5 text-xs font-bold transition-colors',
@@ -163,6 +190,12 @@ export function ProductCard({ product, priority = false, sizes }: ProductCardPro
                       )}
                     >
                       {choice.label}
+                      {inCart ? (
+                        <span className="ms-1 rounded-full bg-emerald-600 px-1.5 text-[10px] text-white">
+                          {inCart}
+                          <span className="sr-only"> في السلة</span>
+                        </span>
+                      ) : null}
                       {choice.in_stock ? null : <span className="sr-only"> — غير متوفر</span>}
                     </button>
                   )
@@ -213,11 +246,19 @@ export function ProductCard({ product, priority = false, sizes }: ProductCardPro
                 type="button"
                 variant="outline"
                 onClick={handleQuickAdd}
-                disabled={addToCart.isPending || (hasVariants && !chosen) || !inStock}
+                disabled={addToCart.isPending || (showPicker ? chosenMany.length === 0 : !inStock)}
                 className="w-full min-h-[44px] h-11 text-xs font-bold rounded-xl hover:bg-primary hover:text-primary-foreground transition-all flex items-center justify-center gap-1.5 shadow-2xs"
               >
                 <ShoppingBag className="size-4" />
-                <span>{hasVariants && !chosen ? 'اختر الحجم أولاً' : 'أضف للسلة'}</span>
+                <span>
+                  {justAdded
+                    ? 'تمت الإضافة ✓'
+                    : showPicker && chosenMany.length === 0
+                      ? 'اختر الحجم أولاً'
+                      : chosenMany.length > 1
+                        ? `أضف ${chosenMany.length} أحجام للسلة`
+                        : 'أضف للسلة'}
+                </span>
               </Button>
             )}
           </div>

@@ -80,15 +80,27 @@ export function isCombinationAvailable(
   )
 }
 
+/** Active variants carrying any of the picked values — the lines a
+ * multi-pick adds. Only meaningful for a single option axis (sizes). */
+export function pickedVariants(variants: ProductVariant[], pickedValueIds: string[]): ProductVariant[] {
+  return variants.filter(
+    (variant) => variant.is_active && variant.values.some((value) => pickedValueIds.includes(value.id)),
+  )
+}
+
 export interface VariantSelectorProps {
   variants: ProductVariant[]
   selection: VariantSelection
   onChange: (selection: VariantSelection) => void
+  /** Multi-pick mode (single option axis): values toggle on and off freely. */
+  picked?: string[]
+  onTogglePick?: (valueId: string) => void
 }
 
-export function VariantSelector({ variants, selection, onChange }: VariantSelectorProps) {
+export function VariantSelector({ variants, selection, onChange, picked, onTogglePick }: VariantSelectorProps) {
   const groups = optionGroups(variants)
   if (groups.length === 0) return null
+  const multi = picked !== undefined && onTogglePick !== undefined
 
   return (
     <div className="space-y-4">
@@ -97,15 +109,25 @@ export function VariantSelector({ variants, selection, onChange }: VariantSelect
           <legend className="mb-2 text-sm font-bold">{group.name}</legend>
           <div className="flex flex-wrap gap-2">
             {group.values.map((value) => {
-              const isSelected = selection[group.id] === value.id
-              const available = isCombinationAvailable(variants, selection, group.id, value.id)
+              const isSelected = multi ? picked.includes(value.id) : selection[group.id] === value.id
+              const available = isCombinationAvailable(variants, multi ? {} : selection, group.id, value.id)
               return (
                 <button
                   key={value.id}
                   type="button"
                   disabled={!available}
                   aria-pressed={isSelected}
-                  onClick={() => onChange({ ...selection, [group.id]: value.id })}
+                  onClick={() => {
+                    if (multi) {
+                      onTogglePick(value.id)
+                    } else if (isSelected) {
+                      // Tapping the chosen value again un-chooses it.
+                      const { [group.id]: _removed, ...rest } = selection
+                      onChange(rest)
+                    } else {
+                      onChange({ ...selection, [group.id]: value.id })
+                    }
+                  }}
                   className={cn(
                     'inline-flex h-11 min-w-16 items-center justify-center rounded-xl border-2 px-4 text-base font-bold transition-colors duration-200',
                     'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',

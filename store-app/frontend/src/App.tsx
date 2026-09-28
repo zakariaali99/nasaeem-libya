@@ -5,6 +5,7 @@ import { RouterProvider, createBrowserRouter } from 'react-router-dom'
 import { RouteErrorBoundary } from '@/components/ErrorBoundary'
 import { RequireAuth } from '@/components/RequireAuth'
 import { StorefrontLayout } from '@/components/layout/StorefrontLayout'
+import { RootLayout } from '@/components/layout/ScrollToTop'
 import CategoryListingPage from '@/pages/storefront/CategoryListing'
 import CollectionListingPage from '@/pages/storefront/CollectionListing'
 import HomePage from '@/pages/storefront/Home'
@@ -104,6 +105,7 @@ function withSuspense(element: React.ReactNode) {
 
 const router = createBrowserRouter([
   {
+    element: <RootLayout />,
     errorElement: <RouteErrorBoundary />,
     children: [
       // The storefront shell: header, footer and bottom navigation, shared by

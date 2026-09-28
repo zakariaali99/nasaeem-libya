@@ -22,6 +22,7 @@ import {
 } from '@/lib/queries/cart'
 import { useStorefrontLayout } from '@/lib/queries/storefront'
 import { usePageTitle } from '@/lib/usePageTitle'
+import { FEATURES } from '@/lib/features'
 import type { CartLine } from '@/types/api'
 
 export default function CartPage() {
@@ -112,7 +113,7 @@ export default function CartPage() {
 
         {/* Desktop Sticky Summary */}
         <aside className="space-y-5 lg:sticky lg:top-24 lg:self-start">
-          <LoyaltyVipBadge />
+          {FEATURES.loyalty ? <LoyaltyVipBadge /> : null}
           <DiscountForm currentCode={cart.discount_code} error={cart.discount_error} />
           
           <div className="rounded-2xl border border-border bg-card p-5 shadow-xs space-y-4">

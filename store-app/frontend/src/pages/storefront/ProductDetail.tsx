@@ -18,6 +18,7 @@ import { VerifiedPhotoReviews } from '@/components/storefront/VerifiedPhotoRevie
 import {
   VariantSelector,
   matchVariant,
+  pickedVariants,
   soleVariantSelection,
   optionGroups,
   type VariantSelection,
@@ -34,6 +35,8 @@ import { useStorefrontLayout } from '@/lib/queries/storefront'
 import { useToggleWishlist, useWishlistIds } from '@/lib/queries/wishlist'
 import { rememberViewed } from '@/lib/recentlyViewed'
 import { usePageTitle } from '@/lib/usePageTitle'
+import { FEATURES } from '@/lib/features'
+import { formatPrice } from '@/lib/format'
 import type { Product, ProductVariant } from '@/types/api'
 
 export default function ProductDetailPage() {
@@ -94,15 +97,38 @@ function ProductView({
 
   const variants = product.variants ?? []
   const groups = optionGroups(variants)
-  const variant = matchVariant(variants, selection, groups)
+  // One option axis (a perfume's sizes): the customer may pick several sizes,
+  // each added as its own cart line, and tap a size again to drop it.
+  const multiPick = groups.length === 1
+  const [pickedValueIds, setPickedValueIds] = useState<string[]>([])
+  useEffect(() => {
+    setPickedValueIds(Object.values(soleVariantSelection(variants)))
+  }, [product.id])
+  const togglePick = (valueId: string) =>
+    setPickedValueIds((current) =>
+      current.includes(valueId) ? current.filter((id) => id !== valueId) : [...current, valueId],
+    )
+  const picked = multiPick ? pickedVariants(variants, pickedValueIds) : []
+  const variant = multiPick
+    ? picked.length === 1 ? picked[0] ?? null : null
+    : matchVariant(variants, selection, groups)
+  const severalPicked = picked.length > 1
 
   // The variant, when one is chosen, is the source of truth for price and
   // stock. Its price may be null, meaning "same as the product".
   const price = variant?.price ?? product.price
   const compareAt = variant?.compare_at_price ?? product.compare_at_price
-  const availableStock = variant ? variant.available_stock : product.available_stock
-  const inStock = variant ? variant.available_stock > 0 : product.in_stock
-  const needsChoice = groups.length > 0 && !variant
+  const availableStock = variant
+    ? variant.available_stock
+    : severalPicked
+      ? Math.min(...picked.map((item) => item.available_stock))
+      : product.available_stock
+  const inStock = variant
+    ? variant.available_stock > 0
+    : severalPicked
+      ? picked.every((item) => item.available_stock > 0)
+      : product.in_stock
+  const needsChoice = groups.length > 0 && !variant && !severalPicked
 
   const [quantity, setQuantity] = useState(1)
   const [added, setAdded] = useState(false)
@@ -118,8 +144,20 @@ function ProductView({
     setAdded(false)
   }, [max, variant?.id])
 
-  const addLine = () => {
+  const addLine = async () => {
     setAdded(false)
+    if (severalPicked) {
+      try {
+        // One cart line per size, added in turn so the cart never races itself.
+        for (const item of picked) {
+          await addToCart.mutateAsync({ product_id: product.id, variant_id: item.id, quantity })
+        }
+        setAdded(true)
+      } catch {
+        // the error alert below reads addToCart.error
+      }
+      return
+    }
     addToCart.mutate(
       { product_id: product.id, variant_id: variant?.id ?? null, quantity },
       { onSuccess: () => setAdded(true) },
@@ -129,9 +167,11 @@ function ProductView({
   const canAdd = inStock && !needsChoice && !addToCart.isPending
   const addLabel = needsChoice
     ? `اختر ${groups.map((group) => group.name).join(' و')}`
-    : inStock
-      ? 'أضف إلى السلة'
-      : 'غير متوفر حالياً'
+    : !inStock
+      ? 'غير متوفر حالياً'
+      : severalPicked
+        ? `أضف ${picked.length} أحجام إلى السلة`
+        : 'أضف إلى السلة'
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6">
@@ -198,7 +238,27 @@ function ProductView({
           />
 
           {variants.length > 0 ? (
-            <VariantSelector variants={variants} selection={selection} onChange={onSelect} />
+            <VariantSelector
+              variants={variants}
+              selection={selection}
+              onChange={onSelect}
+              picked={multiPick ? pickedValueIds : undefined}
+              onTogglePick={multiPick ? togglePick : undefined}
+            />
+          ) : null}
+
+          {severalPicked ? (
+            <ul className="space-y-1 rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm" role="status">
+              {picked.map((item) => (
+                <li key={item.id} className="flex justify-between gap-3">
+                  <span>{item.values.map((value) => value.value).join(' / ')}</span>
+                  <span className="font-bold tabular-nums">{formatPrice(item.price ?? product.price)}</span>
+                </li>
+              ))}
+              <li className="text-xs text-muted-foreground pt-1">
+                يُضاف كل حجم كسطر منفصل في السلة، بالكمية المختارة.
+              </li>
+            </ul>
           ) : null}
 
           {needsChoice ? (
@@ -295,10 +355,12 @@ function ProductView({
         </section>
       )}
 
-      {/* Verified Customer Photo Reviews */}
-      <section className="mt-10">
-        <VerifiedPhotoReviews productId={product.id} productName={product.name} productSlug={product.slug} />
-      </section>
+      {/* Verified Customer Photo Reviews — on hold, see lib/features.ts */}
+      {FEATURES.reviews ? (
+        <section className="mt-10">
+          <VerifiedPhotoReviews productId={product.id} productName={product.name} productSlug={product.slug} />
+        </section>
+      ) : null}
 
       <Specs product={product} variant={variant} />
       <RelatedProducts product={product} />

@@ -28,6 +28,15 @@ export function optionGroups(variants: ProductVariant[]): OptionGroup[] {
   return [...groups.values()]
 }
 
+/** A product sold in a single active variant needs no choosing: that
+ * variant's values, pre-selected. Otherwise an empty selection. */
+export function soleVariantSelection(variants: ProductVariant[]): VariantSelection {
+  const active = variants.filter((variant) => variant.is_active)
+  const sole = active.length === 1 ? active[0] : undefined
+  if (!sole) return {}
+  return Object.fromEntries(sole.values.map((value) => [value.option, value.id]))
+}
+
 /** The variant matching every selected value, or null while a choice is open. */
 export function matchVariant(
   variants: ProductVariant[],
@@ -85,7 +94,7 @@ export function VariantSelector({ variants, selection, onChange }: VariantSelect
     <div className="space-y-4">
       {groups.map((group) => (
         <fieldset key={group.id}>
-          <legend className="mb-2 text-sm font-medium">{group.name}</legend>
+          <legend className="mb-2 text-sm font-bold">{group.name}</legend>
           <div className="flex flex-wrap gap-2">
             {group.values.map((value) => {
               const isSelected = selection[group.id] === value.id
@@ -98,11 +107,11 @@ export function VariantSelector({ variants, selection, onChange }: VariantSelect
                   aria-pressed={isSelected}
                   onClick={() => onChange({ ...selection, [group.id]: value.id })}
                   className={cn(
-                    'inline-flex h-11 min-w-11 items-center justify-center rounded-md border px-4 text-base transition-colors duration-200',
+                    'inline-flex h-11 min-w-16 items-center justify-center rounded-xl border-2 px-4 text-base font-bold transition-colors duration-200',
                     'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
                     isSelected
-                      ? 'border-primary bg-primary text-primary-foreground'
-                      : 'border-input bg-background text-foreground hover:bg-muted',
+                      ? 'border-primary bg-primary text-primary-foreground shadow-sm'
+                      : 'border-primary/30 bg-primary/5 text-foreground hover:border-primary',
                     !available && 'cursor-not-allowed line-through opacity-50',
                   )}
                 >

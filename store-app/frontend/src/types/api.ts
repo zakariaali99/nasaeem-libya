@@ -147,12 +147,22 @@ export interface Product {
   collections: Collection[]
   discounts: DiscountBadge[]
   discount_percent: number | null
+  /** Listing payloads only: the active sizes a card offers as buttons. */
+  variant_choices?: VariantChoice[]
   variants?: ProductVariant[]
   perfume_details?: PerfumeDetails
   bundles?: ProductBundle[]
   meta_title?: string
   meta_description?: string
   created_at?: string
+}
+
+export interface VariantChoice {
+  id: string
+  label: string
+  price: string
+  compare_at_price: string | null
+  in_stock: boolean
 }
 
 export interface InventoryRow {

@@ -71,6 +71,8 @@ def product_queryset():
             "categories",
             "collections",
             "variants",
+            # Labels for the size buttons on product cards (`variant_choices`).
+            "variants__values__option",
             Prefetch("discounts", queryset=Discount.objects.filter(is_active=True)),
         )
     )

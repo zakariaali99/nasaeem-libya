@@ -374,7 +374,7 @@ export function FragranceFinderQuizModal({ open, onClose }: FragranceFinderQuizM
 
                     {/* Actions */}
                     <div className="flex items-center gap-2 pt-1">
-                      {p.has_variants ? (
+                      {p.has_variants && (p.variant_choices?.length ?? 0) !== 1 ? (
                         // A sized product needs a size, which is chosen on its page.
                         <Button size="sm" asChild className="flex-1 min-h-11 rounded-xl font-bold text-xs gap-1.5">
                           <Link to={`/products/${encodeURIComponent(p.slug)}`} onClick={onClose}>
@@ -386,7 +386,9 @@ export function FragranceFinderQuizModal({ open, onClose }: FragranceFinderQuizM
                         <Button
                           size="sm"
                           onClick={() => {
-                            addToCart.mutate({ product_id: p.id, quantity: 1 })
+                            // A single size is added as that size.
+                            const sole = p.variant_choices?.length === 1 ? p.variant_choices[0] : undefined
+                            addToCart.mutate({ product_id: p.id, variant_id: sole?.id ?? null, quantity: 1 })
                           }}
                           disabled={addToCart.isPending}
                           className="flex-1 min-h-11 rounded-xl font-bold text-xs gap-1.5"

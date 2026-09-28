@@ -18,6 +18,7 @@ import { VerifiedPhotoReviews } from '@/components/storefront/VerifiedPhotoRevie
 import {
   VariantSelector,
   matchVariant,
+  soleVariantSelection,
   optionGroups,
   type VariantSelection,
 } from '@/components/storefront/VariantSelector'
@@ -42,7 +43,7 @@ export default function ProductDetailPage() {
 
   useEffect(() => {
     if (product?.id) rememberViewed(product.id)
-    setSelection({})
+    setSelection(soleVariantSelection(product?.variants ?? []))
   }, [product?.id])
 
   usePageTitle(

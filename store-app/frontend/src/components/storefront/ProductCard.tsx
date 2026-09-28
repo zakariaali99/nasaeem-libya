@@ -1,4 +1,5 @@
 import { Heart, Minus, Plus, ShoppingBag } from 'lucide-react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { DiscountBadge } from '@/components/storefront/DiscountBadge'
@@ -29,7 +30,19 @@ export function ProductCard({ product, priority = false, sizes }: ProductCardPro
   // Listing payloads carry `has_variants` but not the `variants` array, so the
   // flag decides: a sized product cannot be added without choosing a size.
   const hasVariants = Boolean(product.has_variants || (product.variants && product.variants.length > 0))
-  const cartItem = cart?.items.find((i) => i.product_id === product.id && !i.variant_id)
+  // A single size needs no choosing; several are offered as buttons on the card.
+  const choices = product.variant_choices ?? []
+  const [chosenId, setChosenId] = useState<string | null>(null)
+  const onlyChoice = choices.length === 1 ? choices[0] : null
+  const chosen = onlyChoice ?? choices.find((choice) => choice.id === chosenId) ?? null
+  const showPicker = hasVariants && choices.length > 1
+  // An older payload without `variant_choices` still sends the customer to the product page.
+  const canAddFromCard = !hasVariants || choices.length > 0
+  const inStock = chosen ? chosen.in_stock : product.in_stock
+
+  const cartItem = cart?.items.find((i) =>
+    i.product_id === product.id && (chosen ? i.variant_id === chosen.id : !i.variant_id),
+  )
   const quantity = cartItem?.quantity ?? 0
 
   const isWishlisted = Boolean(wishlistIds?.includes(product.id))
@@ -43,9 +56,10 @@ export function ProductCard({ product, priority = false, sizes }: ProductCardPro
   const handleQuickAdd = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    if (!product.in_stock || hasVariants) return
+    if (!inStock || (hasVariants && !chosen)) return
     addToCart.mutate({
       product_id: product.id,
+      variant_id: chosen?.id ?? null,
       quantity: 1,
     })
   }
@@ -105,7 +119,10 @@ export function ProductCard({ product, priority = false, sizes }: ProductCardPro
 
       <div className="mt-auto flex flex-col gap-2 p-2.5 sm:p-3.5 pt-1">
         <div className="flex flex-wrap items-center justify-between gap-1.5 min-w-0">
-          <Price price={product.price} compareAtPrice={product.compare_at_price} />
+          <Price
+            price={chosen?.price ?? product.price}
+            compareAtPrice={chosen ? chosen.compare_at_price : product.compare_at_price}
+          />
           <StockBadge
             trackQuantity={product.track_quantity}
             availableStock={product.available_stock}
@@ -113,10 +130,47 @@ export function ProductCard({ product, priority = false, sizes }: ProductCardPro
           />
         </div>
 
+        {onlyChoice ? (
+          <p className="text-[11px] text-muted-foreground">
+            الحجم: <span className="font-bold text-foreground">{onlyChoice.label}</span>
+          </p>
+        ) : null}
+
         {/* Quick Action Buttons */}
         {product.in_stock && (
-          <div className="pt-1">
-            {hasVariants ? (
+          <div className="space-y-2 pt-1">
+            {showPicker ? (
+              <div role="group" aria-label="اختر الحجم" className="flex flex-wrap gap-1.5">
+                {choices.map((choice) => {
+                  const isChosen = chosen?.id === choice.id
+                  return (
+                    <button
+                      key={choice.id}
+                      type="button"
+                      aria-pressed={isChosen}
+                      disabled={!choice.in_stock}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        setChosenId(choice.id)
+                      }}
+                      className={cn(
+                        'min-h-9 rounded-lg border-2 px-2.5 text-xs font-bold transition-colors',
+                        'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                        isChosen
+                          ? 'border-primary bg-primary text-primary-foreground'
+                          : 'border-primary/30 bg-primary/5 text-foreground hover:border-primary',
+                        !choice.in_stock && 'cursor-not-allowed line-through opacity-50',
+                      )}
+                    >
+                      {choice.label}
+                      {choice.in_stock ? null : <span className="sr-only"> — غير متوفر</span>}
+                    </button>
+                  )
+                })}
+              </div>
+            ) : null}
+
+            {!canAddFromCard ? (
               <Button asChild variant="outline" className="w-full min-h-[44px] h-11 text-xs font-bold rounded-xl shadow-2xs">
                 <Link to={`/products/${encodeURIComponent(product.slug)}`}>
                   اختيار الحجم والخيارات
@@ -159,11 +213,11 @@ export function ProductCard({ product, priority = false, sizes }: ProductCardPro
                 type="button"
                 variant="outline"
                 onClick={handleQuickAdd}
-                disabled={addToCart.isPending}
+                disabled={addToCart.isPending || (hasVariants && !chosen) || !inStock}
                 className="w-full min-h-[44px] h-11 text-xs font-bold rounded-xl hover:bg-primary hover:text-primary-foreground transition-all flex items-center justify-center gap-1.5 shadow-2xs"
               >
                 <ShoppingBag className="size-4" />
-                <span>أضف للسلة</span>
+                <span>{hasVariants && !chosen ? 'اختر الحجم أولاً' : 'أضف للسلة'}</span>
               </Button>
             )}
           </div>

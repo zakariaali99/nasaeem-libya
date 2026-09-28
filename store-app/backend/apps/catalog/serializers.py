@@ -125,6 +125,7 @@ class ProductListSerializer(serializers.ModelSerializer):
     available_stock = serializers.SerializerMethodField()
     in_stock = serializers.SerializerMethodField()
     discount_percent = serializers.SerializerMethodField()
+    variant_choices = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -133,7 +134,29 @@ class ProductListSerializer(serializers.ModelSerializer):
             "images", "has_variants", "track_quantity", "stock", "reserved_stock",
             "available_stock", "in_stock", "is_active",
             "categories", "collections", "discounts", "discount_percent",
+            "variant_choices",
         ]
+
+    def get_variant_choices(self, obj):
+        """The sizes a card can offer as buttons, so a customer adds straight
+        from a listing instead of opening every product. Active variants only;
+        a sold-out one stays listed (disabled on the card) rather than
+        vanishing. Reads the prefetched variants, so no query per product."""
+        choices = []
+        for variant in obj.variants.all():
+            if not variant.is_active:
+                continue
+            values = sorted(variant.values.all(), key=lambda v: (v.option.name, v.value))
+            choices.append({
+                "id": str(variant.id),
+                "label": " / ".join(v.value for v in values) or variant.sku,
+                "price": str(variant.price if variant.price is not None else obj.price),
+                "compare_at_price": (
+                    str(variant.compare_at_price) if variant.compare_at_price is not None else None
+                ),
+                "in_stock": (not obj.track_quantity) or variant.stock - variant.reserved_stock > 0,
+            })
+        return choices
 
     def get_available_stock(self, obj):
         """What a customer can actually buy.

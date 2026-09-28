@@ -13,6 +13,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Prefetch, Q
 from django.shortcuts import get_object_or_404
@@ -827,8 +828,12 @@ class FragranceFinderView(APIView):
         return Response({"data": recommendations})
 
 
+REVIEWS_ON_HOLD = "التقييمات متوقفة مؤقتاً"
+
+
 class ProductReviewsView(APIView):
-    """Product reviews listing and verified buyer submission with +50 points loyalty reward."""
+    """Product reviews listing and verified buyer submission (+50 loyalty points while
+    FEATURE_LOYALTY is on). Closed entirely while FEATURE_REVIEWS is off."""
 
     def get_permissions(self):
         return [AllowAny()] if self.request.method == "GET" else [IsAuthenticated()]
@@ -837,6 +842,8 @@ class ProductReviewsView(APIView):
         product = Product.objects.filter(pk=pk).first()
         if product is None:
             return Response({"message": "المنتج غير موجود"}, status=status.HTTP_404_NOT_FOUND)
+        if not settings.FEATURE_REVIEWS:
+            return Response({"message": REVIEWS_ON_HOLD}, status=status.HTTP_404_NOT_FOUND)
 
         reviews = product.reviews.filter(is_approved=True)
         total = reviews.count()
@@ -867,6 +874,9 @@ class ProductReviewsView(APIView):
         from apps.core.models import LoyaltyTransaction
         from apps.orders.models import OrderItem, OrderStatus
 
+        if not settings.FEATURE_REVIEWS:
+            return Response({"message": REVIEWS_ON_HOLD}, status=status.HTTP_403_FORBIDDEN)
+
         product = Product.objects.filter(pk=pk).first()
         if product is None:
             return Response({"message": "المنتج غير موجود"}, status=status.HTTP_404_NOT_FOUND)
@@ -896,23 +906,28 @@ class ProductReviewsView(APIView):
             photo_url=photo_url,
             is_verified_buyer=is_verified,
             is_approved=True,
-            points_awarded=True,
+            points_awarded=settings.FEATURE_LOYALTY,
         )
 
-        # 50 Loyalty Points Bonus
-        request.user.loyalty_points += 50
-        request.user.save(update_fields=["loyalty_points", "updated_at"])
-        LoyaltyTransaction.objects.create(
-            user=request.user,
-            points_change=50,
-            transaction_type="REVIEW_BONUS",
-            description=f"مكافأة تقييم وتصوير تجربة عطر {product.name}",
-        )
+        # 50 Loyalty Points Bonus — only while the loyalty programme is on.
+        if settings.FEATURE_LOYALTY:
+            request.user.loyalty_points += 50
+            request.user.save(update_fields=["loyalty_points", "updated_at"])
+            LoyaltyTransaction.objects.create(
+                user=request.user,
+                points_change=50,
+                transaction_type="REVIEW_BONUS",
+                description=f"مكافأة تقييم وتصوير تجربة عطر {product.name}",
+            )
 
         return Response(
             {
                 "data": ProductReviewSerializer(review).data,
-                "message": "شكراً لك! تم نشر تقييمك وإضافة 50 نقطة مكافأة إلى رصيدك الملكي 🎁",
+                "message": (
+                    "شكراً لك! تم نشر تقييمك وإضافة 50 نقطة مكافأة إلى رصيدك الملكي 🎁"
+                    if settings.FEATURE_LOYALTY
+                    else "شكراً لك! تم نشر تقييمك."
+                ),
                 "bonus_points": 50,
             },
             status=status.HTTP_201_CREATED,

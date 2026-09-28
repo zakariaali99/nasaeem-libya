@@ -48,8 +48,15 @@ def sample_product(db):
     return prod
 
 
+@pytest.fixture
+def features_on(settings):
+    """Reviews and loyalty are on hold by default; these tests cover them switched on."""
+    settings.FEATURE_REVIEWS = True
+    settings.FEATURE_LOYALTY = True
+
+
 @pytest.mark.django_db
-def test_product_review_submission_and_loyalty_bonus(api_client, customer_user, sample_product):
+def test_product_review_submission_and_loyalty_bonus(api_client, customer_user, sample_product, features_on):
     # Customer has not bought yet
     api_client.force_authenticate(user=customer_user)
     initial_points = customer_user.loyalty_points
@@ -90,7 +97,7 @@ def test_product_review_submission_and_loyalty_bonus(api_client, customer_user, 
 
 
 @pytest.mark.django_db
-def test_vip_loyalty_summary_and_tier_recalculation(api_client, customer_user):
+def test_vip_loyalty_summary_and_tier_recalculation(api_client, customer_user, features_on):
     api_client.force_authenticate(user=customer_user)
 
     # Initial Silver Tier
@@ -147,3 +154,39 @@ def test_abandoned_cart_recovery_admin_flow(api_client, admin_user, customer_use
 
     cart.refresh_from_db()
     assert cart.is_recovered is True
+
+
+@pytest.mark.django_db
+def test_on_hold_reviews_and_points_are_closed_but_kept(api_client, customer_user, sample_product):
+    """Default (on hold): nothing public, nothing awarded, existing data untouched."""
+    ProductReview.objects.create(
+        product=sample_product, user=customer_user, rating=5, comment="قديم", is_approved=True,
+    )
+    api_client.force_authenticate(customer_user)
+
+    assert api_client.get(f"/api/products/{sample_product.id}/reviews/").status_code == 404
+    posted = api_client.post(
+        f"/api/products/{sample_product.id}/reviews/", {"rating": 5, "comment": "رائع"}, format="json",
+    )
+    assert posted.status_code == 403
+    assert api_client.get("/api/orders/loyalty/me/").status_code == 404
+
+    customer_user.refresh_from_db()
+    assert customer_user.loyalty_points == 0
+    assert ProductReview.objects.count() == 1  # the existing review is kept
+
+
+@pytest.mark.django_db
+def test_reviews_on_without_loyalty_award_no_points(api_client, customer_user, sample_product, settings):
+    settings.FEATURE_REVIEWS = True
+    settings.FEATURE_LOYALTY = False
+    api_client.force_authenticate(customer_user)
+
+    posted = api_client.post(
+        f"/api/products/{sample_product.id}/reviews/", {"rating": 4, "comment": "جيد"}, format="json",
+    )
+
+    assert posted.status_code == 201
+    customer_user.refresh_from_db()
+    assert customer_user.loyalty_points == 0
+    assert not LoyaltyTransaction.objects.exists()

@@ -246,6 +246,17 @@ def whitenoise_add_headers(headers, path, url):
 WHITENOISE_ADD_HEADERS_FUNCTION = whitenoise_add_headers
 
 # --------------------------------------------------------------------------
+# Features on hold
+#
+# Put on hold by the owner on 2026-09-28 until the client decides. Nothing is
+# deleted: data and admin screens stay; switched off, the public endpoints stop
+# serving/accepting and no points are awarded. Set to True in .env to restore
+# (the storefront has matching flags in frontend/src/lib/features.ts).
+# --------------------------------------------------------------------------
+FEATURE_REVIEWS = config("FEATURE_REVIEWS", default=False, cast=bool)
+FEATURE_LOYALTY = config("FEATURE_LOYALTY", default=False, cast=bool)
+
+# --------------------------------------------------------------------------
 # SEO shell
 #
 # Rule 1 forbids a Node runtime, so crawlers cannot be handed a JS-rendered

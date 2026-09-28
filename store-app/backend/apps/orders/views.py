@@ -6,6 +6,7 @@ Authentication is required at checkout, not at add-to-cart.
 
 from decimal import Decimal
 
+from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
 from django.shortcuts import get_object_or_404
@@ -913,6 +914,8 @@ class LoyaltySummaryView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        if not settings.FEATURE_LOYALTY:
+            return Response({"message": "برنامج النقاط متوقف مؤقتاً"}, status=status.HTTP_404_NOT_FOUND)
         user = request.user
         points = user.loyalty_points
         spend = user.lifetime_spend

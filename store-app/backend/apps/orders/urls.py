@@ -31,6 +31,7 @@ urlpatterns = [
     path("admin/orders/bulk-action/", views.AdminBulkOrderActionView.as_view(), name="admin-bulk-order-action"),
 
     # Plan 02 — Thermal Waybills & Official Invoicing Suite
+    path("admin/orders/<uuid:pk>/edit/", views.AdminOrderEditView.as_view(), name="admin-order-edit"),
     path("admin/orders/<str:lookup>/waybill/", views.AdminOrderWaybillView.as_view(), name="admin-order-waybill"),
     path("admin/orders/<str:lookup>/invoice/", views.AdminOrderInvoiceView.as_view(), name="admin-order-invoice"),
     path("admin/orders/batch-waybills/", views.AdminBatchWaybillsView.as_view(), name="admin-batch-waybills"),

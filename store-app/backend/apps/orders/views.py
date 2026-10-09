@@ -561,6 +561,54 @@ class OrderDetailView(APIView):
                          "message": "تم تحديث الطلب"})
 
 
+class AdminOrderEditView(CsrfProtectedAPIView):
+    """`PUT /api/admin/orders/<uuid:pk>/edit/` — change an order's lines,
+    destination, address, notes and courier until it leaves with the courier.
+
+    Prices are never taken from the request: kept lines keep the price the
+    customer was quoted, new lines are priced from the catalogue."""
+
+    permission_classes = [IsAdminRole]
+
+    def put(self, request, pk):
+        order = get_object_or_404(Order, pk=pk)
+        data = request.data
+        items = data.get("items")
+        if not isinstance(items, list):
+            return Response(
+                {"message": "قائمة الأصناف مطلوبة", "errors": {"items": ["قائمة الأصناف مطلوبة"]}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        def text(field, limit):
+            value = data.get(field)
+            if value is None:
+                return None
+            if not isinstance(value, str) or len(value) > limit:
+                raise services.CheckoutError("قيمة غير صحيحة", field=field)
+            return value
+
+        try:
+            services.edit_order(
+                order,
+                items=[row for row in items if isinstance(row, dict)],
+                city_id=text("city_id", 64) or None,
+                region_id=text("region_id", 64) or None,
+                address=text("address", 500),
+                customer_notes=text("customer_notes", 1000),
+                delivery_method_code=text("delivery_method_code", 50) or None,
+            )
+        except services.CheckoutError as exc:
+            body = {"message": exc.message}
+            if exc.field:
+                body["errors"] = {exc.field: [exc.message]}
+            return Response(body, status=exc.status)
+
+        order = order_queryset().get(pk=order.pk)
+        return Response({"data": OrderSerializer(order, context={"request": request}).data,
+                         "message": "تم حفظ تعديلات الطلب"})
+
+
 class DiscountListView(CsrfProtectedAPIView):
     """Validation is public (the cart screen checks a code); management is admin."""
 

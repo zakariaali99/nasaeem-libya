@@ -52,6 +52,38 @@ export function useUpdateOrder(lookup?: string) {
   })
 }
 
+export interface OrderEditLine {
+  /** An existing line keeps its quoted price; a new line has no `id`. */
+  id?: string
+  product_id?: string
+  variant_id?: string | null
+  quantity: number
+}
+
+export interface OrderEditBody {
+  items: OrderEditLine[]
+  city_id?: string
+  region_id?: string
+  address?: string
+  customer_notes?: string
+  delivery_method_code?: string
+}
+
+/** Operator: rewrite an order's lines and destination. Addressed by the order's
+ * id; the detail cache is keyed by whatever the page was opened with. */
+export function useEditOrder(orderId: string, lookup: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (body: OrderEditBody) =>
+      (await api.put<Order>(`/admin/orders/${orderId}/edit/`, body)).data,
+    onSuccess: (data) => {
+      queryClient.setQueryData(orderKeys.detail(lookup), data)
+      queryClient.invalidateQueries({ queryKey: ['orders'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+  })
+}
+
 export interface ShipmentResultData {
   success: boolean
   tracking_number: string | null

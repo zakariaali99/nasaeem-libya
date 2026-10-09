@@ -4,6 +4,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 
 import { OrderSummary } from '@/components/storefront/OrderSummary'
 import { Button } from '@/components/ui/button'
+import { LineThumb } from '@/components/ui/line-thumb'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatPrice } from '@/lib/format'
 import { useOrder } from '@/lib/queries/delivery'
@@ -151,11 +152,14 @@ export default function CheckoutCompletePage() {
         <div className="space-y-4">
           <ul className="space-y-2.5 rounded-2xl border border-border bg-card p-4 text-xs sm:text-sm">
             {order.items.map((item) => (
-              <li key={item.id} className="flex justify-between gap-3 border-b border-border/40 pb-2 last:border-0 last:pb-0">
-                <span className="min-w-0">
-                  <span className="font-bold text-foreground line-clamp-1">{item.product_name}</span>
-                  <span className="text-muted-foreground font-mono">
-                    {item.variant_label ? `${item.variant_label} · ` : ''}×{item.quantity}
+              <li key={item.id} className="flex items-center justify-between gap-3 border-b border-border/40 pb-2 last:border-0 last:pb-0">
+                <span className="flex min-w-0 items-center gap-2.5">
+                  <LineThumb image={item.image} alt={item.product_name} size={48} />
+                  <span className="min-w-0">
+                    <span className="block font-bold text-foreground line-clamp-1">{item.product_name}</span>
+                    <span className="text-muted-foreground font-mono">
+                      {item.variant_label ? `${item.variant_label} · ` : ''}×{item.quantity}
+                    </span>
                   </span>
                 </span>
                 <span className="shrink-0 font-mono font-bold text-price">{formatPrice(item.total_price)}</span>

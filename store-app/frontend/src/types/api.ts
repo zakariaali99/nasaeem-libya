@@ -439,6 +439,8 @@ export interface Order {
   items: OrderLine[]
   created_at: string
   user?: { id: string; name: string; phone_number: string } | null
+  /** Lines and address may still change (not yet with the courier). */
+  editable?: boolean
   /** Admin-only: the order's payment attempts. `null` for customers. */
   admin_payments?: {
     id: string

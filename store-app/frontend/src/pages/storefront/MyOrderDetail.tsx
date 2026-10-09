@@ -4,6 +4,7 @@ import { Check, CheckCircle2, Clock, Copy, Package, Truck } from 'lucide-react'
 import { StatusBadge } from '@/components/admin/StatusBadge'
 import { ErrorState } from '@/components/storefront/ErrorState'
 import { Button } from '@/components/ui/button'
+import { LineThumb } from '@/components/ui/line-thumb'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatPrice } from '@/lib/format'
 import { usePageTitle } from '@/lib/usePageTitle'
@@ -131,13 +132,16 @@ export default function MyOrderDetail() {
         <h2 className="mb-4 text-base font-bold text-foreground">المنتجات المطلوبة</h2>
         <ul className="divide-y divide-border/60">
           {(order.items ?? []).map((item) => (
-            <li key={item.id} className="flex items-center justify-between py-3 text-sm">
-              <div>
-                <span className="font-semibold text-foreground">{item.product_name}</span>
-                {item.variant_label && (
-                  <span className="block text-xs text-muted-foreground">{item.variant_label}</span>
-                )}
-                <span className="text-xs text-muted-foreground">الكمية: {item.quantity}</span>
+            <li key={item.id} className="flex items-center justify-between gap-3 py-3 text-sm">
+              <div className="flex min-w-0 items-center gap-3">
+                <LineThumb image={item.image} alt={item.product_name} size={56} />
+                <div className="min-w-0">
+                  <span className="font-semibold text-foreground">{item.product_name}</span>
+                  {item.variant_label && (
+                    <span className="block text-xs text-muted-foreground">{item.variant_label}</span>
+                  )}
+                  <span className="text-xs text-muted-foreground">الكمية: {item.quantity}</span>
+                </div>
               </div>
               <span className="font-mono font-bold text-foreground">{formatPrice(item.total_price)}</span>
             </li>

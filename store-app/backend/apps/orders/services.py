@@ -189,6 +189,19 @@ def validate_discount(discount: Discount, *, subtotal: Decimal, products=()) -> 
             field="discount_code",
         )
 
+    amount = discount_amount(discount, subtotal=subtotal, products=products)
+    if amount is None:
+        raise CheckoutError("كود الخصم لا ينطبق على المنتجات في السلة", field="discount_code")
+    return amount
+
+
+def discount_amount(discount: Discount, *, subtotal: Decimal, products=()) -> Decimal | None:
+    """The money a discount takes off, with no validity checks (dates, usage,
+    minimum). `None` when a product-scoped discount matches no line.
+
+    Split out of `validate_discount()` so an admin edit of an existing order can
+    re-apply the discount the customer already redeemed to the new basket.
+    """
     # Product scope: when `products` is non-empty the discount applies only to
     # the matching lines, not to the whole basket.
     scoped_ids = set(discount.products.values_list("id", flat=True))
@@ -198,7 +211,7 @@ def validate_discount(discount: Discount, *, subtotal: Decimal, products=()) -> 
             Decimal("0.00"),
         )
         if eligible <= 0:
-            raise CheckoutError("كود الخصم لا ينطبق على المنتجات في السلة", field="discount_code")
+            return None
         base = eligible
     else:
         base = subtotal
@@ -513,7 +526,10 @@ def cart_summary(
     """What the cart screen shows. Every number is computed here, server-side —
     the client never sends a total and is never believed about one."""
     lines = (
-        list(cart.items.select_related("product", "variant").prefetch_related("product__images"))
+        list(
+            cart.items.select_related("product", "variant")
+            .prefetch_related("product__images", "variant__values")
+        )
         if cart
         else []
     )
@@ -664,6 +680,187 @@ def finalise_order(
         dispatch_realtime_order_alert(order)
     except Exception:
         pass
+    return order
+
+
+# --------------------------------------------------------------------------
+# Admin order edit — change lines and destination before the order ships
+# --------------------------------------------------------------------------
+
+def order_is_editable(order: Order) -> bool:
+    """Lines and address may change until the parcel leaves with the courier."""
+    return (
+        order.status in (OrderStatus.PENDING, OrderStatus.PROCESSING)
+        and order.shipping_status == ShippingStatus.PENDING
+    )
+
+
+@transaction.atomic
+def edit_order(
+    order: Order,
+    *,
+    items: list[dict],
+    city_id: str | None = None,
+    region_id: str | None = None,
+    address: str | None = None,
+    customer_notes: str | None = None,
+    delivery_method_code: str | None = None,
+) -> Order:
+    """Replace an order's lines (and optionally its destination) as an operator.
+
+    `items` is the complete wanted basket: `{"id"?, "product_id", "variant_id"?,
+    "quantity"}`. A row carrying the `id` of an existing line keeps that line's
+    snapshotted name and price; a row without one is a new line priced from the
+    catalogue now. Existing lines that are left out are removed.
+
+    Stock follows the same rule as cancellation: an unpaid order holds a
+    reservation, a paid one has already taken units off the shelf, so the
+    difference is applied to `reserved_stock` or `stock` respectively.
+    """
+    order = Order.objects.select_for_update().get(pk=order.pk)
+    if not order_is_editable(order):
+        raise CheckoutError("لا يمكن تعديل الطلب بعد تسليمه للمندوب أو إغلاقه", status=409)
+    if not items:
+        raise CheckoutError("يجب أن يحتوي الطلب على صنف واحد على الأقل", field="items")
+
+    current = {str(item.id): item for item in order.items.all()}
+
+    # ---- normalise the wanted lines ----------------------------------------
+    wanted = []
+    for row in items:
+        quantity = row.get("quantity")
+        if not isinstance(quantity, int) or not 1 <= quantity <= 999:
+            raise CheckoutError("الكمية يجب أن تكون بين 1 و 999", field="items")
+        existing = None
+        if row.get("id"):
+            existing = current.get(str(row["id"]))
+            if existing is None:
+                raise CheckoutError("أحد أصناف الطلب غير موجود", field="items")
+            product_id, variant_id = existing.product_id, existing.variant_id
+            if product_id is None and quantity != existing.quantity:
+                raise CheckoutError(
+                    f"لا يمكن تغيير كمية «{existing.product_name}» لأنه حُذف من المتجر", field="items"
+                )
+        else:
+            product_id, variant_id = row.get("product_id"), row.get("variant_id") or None
+            if not product_id:
+                raise CheckoutError("يرجى اختيار المنتج", field="items")
+        wanted.append((existing, product_id, variant_id, quantity))
+
+    # ---- lock every row we will touch, sorted by primary key ----------------
+    product_ids = sorted({str(p) for _, p, _, _ in wanted if p} | {str(i.product_id) for i in current.values() if i.product_id})
+    variant_ids = sorted({str(v) for _, _, v, _ in wanted if v} | {str(i.variant_id) for i in current.values() if i.variant_id})
+    products = {
+        str(p.id): p
+        for p in Product.objects.select_for_update().filter(id__in=product_ids).order_by("id")
+    }
+    variants = {
+        str(v.id): v
+        for v in ProductVariant.objects.select_for_update().filter(id__in=variant_ids).order_by("id")
+    }
+
+    # ---- price the new basket ----------------------------------------------
+    priced = []  # (existing, product, variant, quantity, unit_price)
+    for existing, product_id, variant_id, quantity in wanted:
+        product = products.get(str(product_id))
+        variant = variants.get(str(variant_id)) if variant_id else None
+        if existing is None:
+            if product is None or not product.is_active:
+                raise CheckoutError("المنتج غير متاح", field="items")
+            if variant_id and (variant is None or variant.product_id != product.id or not variant.is_active):
+                raise CheckoutError(f"الحجم المحدد لـ «{product.name}» غير متاح", field="items")
+            if variant is None and product.has_variants:
+                raise CheckoutError(f"يرجى اختيار حجم «{product.name}»", field="items")
+            price = unit_price(product, variant)
+        else:
+            price = money(existing.unit_price)
+        priced.append((existing, product, variant, quantity, price))
+
+    # ---- stock: apply the difference per (product, variant) -----------------
+    def key(product_id, variant_id):
+        return (str(product_id), str(variant_id) if variant_id else None)
+
+    delta: dict[tuple, int] = {}
+    for item in current.values():
+        if item.product_id:
+            k = key(item.product_id, item.variant_id)
+            delta[k] = delta.get(k, 0) - item.quantity
+    for _, product, variant, quantity, _ in priced:
+        if product is None:
+            continue
+        k = key(product.id, variant.id if variant else None)
+        delta[k] = delta.get(k, 0) + quantity
+
+    paid = order.payments.filter(status=PaymentStatus.COMPLETED).exists()
+    for (product_id, variant_id), change in delta.items():
+        product = products.get(product_id)
+        if change == 0 or product is None or not product.track_quantity:
+            continue
+        holder = variants.get(variant_id) if variant_id else product
+        if holder is None:
+            continue
+        if change > 0:
+            stock = available_stock(product, holder if variant_id else None)
+            if stock is not None and stock < change:
+                raise OutOfStock(f"الكمية المتوفرة من «{product.name}» هي {max(stock, 0)} فقط")
+        if paid:
+            holder.stock -= change
+            holder.save(update_fields=["stock", "updated_at"])
+        else:
+            holder.reserved_stock = max(holder.reserved_stock + change, 0)
+            holder.save(update_fields=["reserved_stock", "updated_at"])
+
+    # ---- rewrite the lines --------------------------------------------------
+    kept_ids = set()
+    new_lines = []
+    for existing, product, variant, quantity, price in priced:
+        line_total = money(price * quantity)
+        if existing is not None:
+            kept_ids.add(existing.id)
+            if existing.quantity != quantity:
+                existing.quantity = quantity
+                existing.total_price = line_total
+                existing.save(update_fields=["quantity", "total_price", "updated_at"])
+        else:
+            new_lines.append(OrderItem(
+                order=order, product=product, variant=variant, quantity=quantity,
+                unit_price=price, total_price=line_total, product_name=product.name,
+            ))
+    order.items.exclude(id__in=kept_ids).delete()
+    OrderItem.objects.bulk_create(new_lines)
+
+    # ---- destination -------------------------------------------------------
+    if region_id or city_id:
+        region, city = resolve_destination(region_id=region_id or None, city_id=city_id or None)
+        order.shipping_region, order.shipping_city = region, city
+    if address is not None:
+        if not address.strip():
+            raise CheckoutError("العنوان مطلوب", field="address")
+        order.shipping_address = address.strip()
+    if customer_notes is not None:
+        order.customer_notes = customer_notes.strip()
+    if delivery_method_code:
+        method = DeliveryMethod.objects.filter(code=delivery_method_code, is_active=True).first()
+        if method is None:
+            raise CheckoutError("طريقة التوصيل غير متاحة", field="delivery_method_code")
+        order.delivery_method = method
+
+    # ---- totals, from the stored lines ---------------------------------------
+    lines = [(product.id, money(price * quantity)) for _, product, _, quantity, price in priced if product]
+    subtotal = money(sum((money(price * quantity) for _, _, _, quantity, price in priced), Decimal("0.00")))
+    if order.discount_id:
+        discount_total = discount_amount(order.discount, subtotal=subtotal, products=lines) or Decimal("0.00")
+    else:
+        discount_total = min(money(order.discount_total), subtotal)
+    shipping_total, delivery_discount = delivery_fee(
+        region=order.shipping_region, city=order.shipping_city, subtotal=subtotal
+    )
+    order.subtotal = subtotal
+    order.discount_total = discount_total
+    order.shipping_total = shipping_total
+    order.delivery_discount_amount = delivery_discount
+    order.total = money(subtotal - discount_total + shipping_total + money(order.gift_wrap_fee))
+    order.save()
     return order
 
 

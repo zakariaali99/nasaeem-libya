@@ -9,6 +9,7 @@ import {
   MapPin,
   MessageCircle,
   Package,
+  Pencil,
   Phone,
   Printer,
   RotateCcw,
@@ -20,11 +21,13 @@ import {
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
+import { OrderEditDialog } from '@/components/admin/OrderEditDialog'
 import { OrderTrackingTimeline } from '@/components/admin/OrderTrackingTimeline'
 import { RefundModal } from '@/components/admin/RefundModal'
 import { StatusBadge } from '@/components/admin/StatusBadge'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { LineThumb } from '@/components/ui/line-thumb'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatDateTime, formatPrice } from '@/lib/format'
 import { useOrder, useUpdateOrder } from '@/lib/queries/orders'
@@ -47,6 +50,7 @@ export default function AdminOrderDetail() {
   const [copied, setCopied] = useState(false)
   const [copiedTracking, setCopiedTracking] = useState(false)
   const [refundModalOpen, setRefundModalOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
 
   usePageTitle(order ? `الطلب #${order.order_number} — لوحة التحكم` : 'تفاصيل الطلب')
 
@@ -131,6 +135,17 @@ export default function AdminOrderDetail() {
 
         {/* Header Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
+          {order.editable && (
+            <Button
+              size="sm"
+              onClick={() => setEditOpen(true)}
+              className="rounded-xl text-xs font-bold gap-1.5 h-10 px-3.5 shadow-2xs"
+            >
+              <Pencil className="size-4" />
+              <span>تعديل الطلب</span>
+            </Button>
+          )}
+
           {whatsappUrl && (
             <Button
               asChild
@@ -252,9 +267,7 @@ export default function AdminOrderDetail() {
               {(order.items ?? []).map((item) => (
                 <div key={item.id} className="p-4 sm:p-5 flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3.5 min-w-0">
-                    <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-muted/40 border border-border p-1">
-                      <Package className="size-6 text-muted-foreground" />
-                    </div>
+                    <LineThumb image={item.image} alt={item.product_name} size={48} />
                     <div className="min-w-0">
                       <h4 className="font-bold text-xs sm:text-sm text-foreground truncate">{item.product_name}</h4>
                       {item.variant_label && (
@@ -521,7 +534,7 @@ export default function AdminOrderDetail() {
               <div>
                 <span className="text-muted-foreground block mb-0.5">المدينة والمنطقة:</span>
                 <p className="font-bold text-foreground text-sm">
-                  {order.shipping_city || order.shipping_region || '—'}
+                  {[order.city_name, order.region_name].filter(Boolean).join(' — ') || '—'}
                 </p>
               </div>
 
@@ -611,6 +624,8 @@ export default function AdminOrderDetail() {
           </div>
         </div>
       </div>
+
+      <OrderEditDialog order={order} lookup={orderIdOrNumber} open={editOpen} onOpenChange={setEditOpen} />
 
       <RefundModal
         order={order}

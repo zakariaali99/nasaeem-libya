@@ -28,6 +28,17 @@ from .models import (
 )
 
 
+def first_image(product):
+    """The product's lead image, read from the `images` prefetch when present.
+
+    `images.first()` would work too, but iterating `.all()` reuses the prefetch
+    cache, so a basket or order of N lines costs one image query, not N.
+    """
+    if product is None:
+        return None
+    return next(iter(product.images.all()), None)
+
+
 class CartPromotionSerializer(serializers.ModelSerializer):
     class Meta:
         model = CartPromotion
@@ -69,7 +80,7 @@ class CartItemSerializer(serializers.Serializer):
         return services.available_stock(item["line"].product, item["line"].variant)
 
     def get_image(self, item):
-        image = item["line"].product.images.first()
+        image = first_image(item["line"].product)
         return ProductImageSerializer(image, context=self.context).data if image else None
 
 
@@ -165,9 +176,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
         ]
 
     def get_image(self, item):
-        if not item.product:
-            return None
-        image = item.product.images.first()
+        image = first_image(item.product)
         return ProductImageSerializer(image, context=self.context).data if image else None
 
     def get_variant_label(self, item):
@@ -187,6 +196,8 @@ class OrderSerializer(serializers.ModelSerializer):
     )
     payment_status = serializers.SerializerMethodField()
     admin_payments = serializers.SerializerMethodField()
+    user = serializers.SerializerMethodField()
+    editable = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
@@ -199,12 +210,31 @@ class OrderSerializer(serializers.ModelSerializer):
             "billing_address", "customer_notes", "tracking_number", "tracking_url",
             "is_gift", "gift_wrap_type", "gift_wrap_fee", "gift_sender_name",
             "gift_recipient_name", "gift_message", "hide_invoice_prices",
-            "items", "created_at", "admin_payments",
+            "items", "created_at", "admin_payments", "user", "editable",
         ]
 
+    @staticmethod
+    def _payments(order):
+        # Sorted in Python so the `payments` prefetch is reused, not re-queried.
+        return sorted(order.payments.all(), key=lambda p: p.created_at, reverse=True)
+
     def get_payment_status(self, order):
-        payment = order.payments.order_by("-created_at").first()
-        return payment.status if payment else None
+        payments = self._payments(order)
+        return payments[0].status if payments else None
+
+    def get_user(self, order):
+        if order.user is None:
+            return None
+        return {
+            "id": str(order.user.id),
+            "name": order.user.name,
+            "phone_number": order.user.phone_number,
+        }
+
+    def get_editable(self, order):
+        from .services import order_is_editable
+
+        return order_is_editable(order)
 
     def get_admin_payments(self, order):
         """The order's payment attempts, for the operator's fulfilment screen.
@@ -222,7 +252,7 @@ class OrderSerializer(serializers.ModelSerializer):
                 "verified_at": payment.verified_at,
                 "created_at": payment.created_at,
             }
-            for payment in order.payments.order_by("-created_at")
+            for payment in self._payments(order)
         ]
 
 

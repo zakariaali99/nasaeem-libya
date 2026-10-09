@@ -16,6 +16,7 @@ import { OrderSummary } from '@/components/storefront/OrderSummary'
 import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { LineThumb } from '@/components/ui/line-thumb'
 import { Select } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
@@ -473,14 +474,17 @@ export default function CheckoutPage() {
               ملخص الأصناف في الطلب
             </h3>
             
-            <ul className="space-y-2.5 text-xs max-h-48 overflow-y-auto">
+            <ul className="space-y-2.5 text-xs max-h-72 overflow-y-auto">
               {order.items.map((item) => (
-                <li key={item.id} className="flex justify-between gap-3 border-b border-border/40 pb-2 last:border-0 last:pb-0">
-                  <div className="min-w-0">
-                    <span className="font-bold text-foreground line-clamp-1">{item.product_name}</span>
-                    <span className="text-muted-foreground font-mono">
-                      {item.variant_label ? `${item.variant_label} · ` : ''}×{item.quantity}
-                    </span>
+                <li key={item.id} className="flex items-center justify-between gap-3 border-b border-border/40 pb-2 last:border-0 last:pb-0">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <LineThumb image={item.image} alt={item.product_name} size={48} />
+                    <div className="min-w-0">
+                      <span className="block font-bold text-foreground line-clamp-1">{item.product_name}</span>
+                      <span className="text-muted-foreground font-mono">
+                        {item.variant_label ? `${item.variant_label} · ` : ''}×{item.quantity}
+                      </span>
+                    </div>
                   </div>
                   <span className="shrink-0 font-mono font-bold text-price">{formatPrice(item.total_price)}</span>
                 </li>

@@ -1,3 +1,4 @@
+import { FEATURES, SHIPPING_QUOTE_NOTE, SHIPPING_QUOTE_SHORT } from '@/lib/features'
 import { formatPrice } from '@/lib/format'
 
 export interface OrderSummaryProps {
@@ -23,6 +24,11 @@ export function OrderSummary({
 }: OrderSummaryProps) {
   const hasDiscount = Number(discountTotal) > 0
   const hasShipping = Number(shippingTotal) > 0
+  // Delivery is quoted by the store on confirmation: no fee to show, and the
+  // total must say it leaves delivery out. An older order that was charged a
+  // fee still shows it.
+  const quotedLater = !FEATURES.shippingFees && !hasShipping && !isFreeShipping
+  const note = quotedLater ? SHIPPING_QUOTE_SHORT : shippingNote
 
   return (
     <dl className="space-y-2 rounded-lg border border-border bg-card p-4 text-sm">
@@ -37,15 +43,21 @@ export function OrderSummary({
             ? 'مجاني 🚀'
             : hasShipping
               ? formatPrice(shippingTotal)
-              : shippingNote ?? formatPrice(0)
+              : note ?? formatPrice(0)
         }
         tone={isFreeShipping ? 'success' : undefined}
-        muted={!hasShipping && !isFreeShipping && Boolean(shippingNote)}
+        muted={!hasShipping && !isFreeShipping && Boolean(note)}
       />
       <div className="flex items-baseline justify-between gap-4 border-t border-border pt-2">
-        <dt className="text-base font-semibold">الإجمالي</dt>
+        <dt className="text-base font-semibold">
+          الإجمالي
+          {quotedLater ? <span className="ms-1 text-xs font-normal text-muted-foreground">(بدون التوصيل)</span> : null}
+        </dt>
         <dd className="text-lg font-bold tabular-nums text-price">{formatPrice(total)}</dd>
       </div>
+      {quotedLater ? (
+        <p className="rounded-md bg-muted/60 p-2.5 text-xs leading-relaxed text-muted-foreground">{SHIPPING_QUOTE_NOTE}</p>
+      ) : null}
     </dl>
   )
 }

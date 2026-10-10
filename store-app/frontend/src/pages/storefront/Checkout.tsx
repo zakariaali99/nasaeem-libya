@@ -21,6 +21,7 @@ import { Select } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import { ApiError } from '@/lib/api'
+import { FEATURES } from '@/lib/features'
 import { formatPrice } from '@/lib/format'
 import { useConfirmCheckout } from '@/lib/queries/cart'
 import { useCities, useDeliveryMethods, useOrder, useRegions } from '@/lib/queries/delivery'
@@ -197,13 +198,20 @@ export default function CheckoutPage() {
   }
 
   const isFreeShipping = Boolean(
-    promo?.is_active && order && Number(order.subtotal) >= Number(promo.min_order_amount),
+    FEATURES.shippingFees &&
+      promo?.is_active &&
+      order &&
+      Number(order.subtotal) >= Number(promo.min_order_amount),
   )
-  const regularShipping = selectedRegion
-    ? selectedRegion.delivery_fee
-    : selectedCity
-      ? selectedCity.delivery_fee
-      : order.shipping_total
+  // With delivery quoted by the store on confirmation there is no fee to
+  // preview; the server charges none either.
+  const regularShipping = !FEATURES.shippingFees
+    ? '0.00'
+    : selectedRegion
+      ? selectedRegion.delivery_fee
+      : selectedCity
+        ? selectedCity.delivery_fee
+        : order.shipping_total
   const shipping = isFreeShipping ? '0.00' : regularShipping
   const giftWrapFee = gifting.is_gift && gifting.gift_wrap_type === 'ROYAL_VELVET' ? 15 : 0
   const total = (

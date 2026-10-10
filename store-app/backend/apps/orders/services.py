@@ -20,6 +20,7 @@ import logging
 from datetime import timedelta
 from decimal import Decimal
 
+from django.conf import settings
 from django.db import connection, transaction
 from django.db.models import F
 from django.db.models.functions import Greatest
@@ -45,6 +46,9 @@ from .models import (
 )
 
 TWO_PLACES = Decimal("0.01")
+
+# Payment codes collected at the door: an order paid this way is not paid yet.
+PAY_ON_DELIVERY = {"manual_payment", "bank_cards_on_delivery", "cod", "cash_on_delivery"}
 
 # An unconfirmed draft holds stock for this long, then releases it. Long enough
 # to fill in an address on a slow connection; short enough that one abandoned
@@ -285,7 +289,12 @@ def delivery_fee(
 ) -> tuple[Decimal, Decimal]:
     """The fee comes from the region, falling back to its city.
     Returns (actual_shipping_fee, delivery_discount_amount).
+
+    With `FEATURE_SHIPPING_FEES` off the system charges nothing: the store
+    quotes delivery to the customer directly when it confirms the order.
     """
+    if not settings.FEATURE_SHIPPING_FEES:
+        return Decimal("0.00"), Decimal("0.00")
     base_fee = Decimal("0.00")
     if region is not None and region.delivery_fee and region.delivery_fee > 0:
         base_fee = money(region.delivery_fee)
@@ -705,8 +714,14 @@ def edit_order(
     address: str | None = None,
     customer_notes: str | None = None,
     delivery_method_code: str | None = None,
+    shipping_total: Decimal | None = None,
 ) -> Order:
     """Replace an order's lines (and optionally its destination) as an operator.
+
+    `shipping_total` is the delivery price the operator agreed with the
+    customer; it is the one amount taken from the request, and only an admin
+    can send it. Left out, the fee is recomputed when the system charges fees
+    and otherwise kept as it is.
 
     `items` is the complete wanted basket: `{"id"?, "product_id", "variant_id"?,
     "quantity"}`. A row carrying the `id` of an existing line keeps that line's
@@ -852,15 +867,25 @@ def edit_order(
         discount_total = discount_amount(order.discount, subtotal=subtotal, products=lines) or Decimal("0.00")
     else:
         discount_total = min(money(order.discount_total), subtotal)
-    shipping_total, delivery_discount = delivery_fee(
-        region=order.shipping_region, city=order.shipping_city, subtotal=subtotal
-    )
+    if shipping_total is not None:
+        shipping_total, delivery_discount = money(shipping_total), Decimal("0.00")
+    elif settings.FEATURE_SHIPPING_FEES:
+        shipping_total, delivery_discount = delivery_fee(
+            region=order.shipping_region, city=order.shipping_city, subtotal=subtotal
+        )
+    else:
+        shipping_total, delivery_discount = money(order.shipping_total), money(order.delivery_discount_amount)
     order.subtotal = subtotal
     order.discount_total = discount_total
     order.shipping_total = shipping_total
     order.delivery_discount_amount = delivery_discount
     order.total = money(subtotal - discount_total + shipping_total + money(order.gift_wrap_fee))
     order.save()
+    # A payment still waiting to be collected or verified is for the order as
+    # it now stands; a completed one is history and is left alone.
+    order.payments.filter(
+        status__in=(PaymentStatus.PENDING, PaymentStatus.WAITING_FOR_VERIFICATION)
+    ).update(amount=order.total)
     return order
 
 
@@ -981,7 +1006,7 @@ def quick_create_admin_order(
     import re
     import secrets
     from apps.core.models import User, Role, City, Region
-    from apps.catalog.services import adjust_stock
+    from apps.catalog.services import adjust_stock, reserve_stock
     from apps.payments.models import Payment
 
     if not items:
@@ -1015,9 +1040,8 @@ def quick_create_admin_order(
         if region:
             city = region.city
     if not region and shipping_city_id:
+        # The city alone: never guess a region, its fee would be someone else's.
         city = City.objects.filter(id=shipping_city_id, is_active=True).first()
-        if city:
-            region = city.regions.filter(is_active=True).first()
 
     # 3. Delivery Method resolution
     delivery_method = None
@@ -1053,11 +1077,15 @@ def quick_create_admin_order(
             raise CheckoutError(f"المنتج #{p_id} غير متاح للطلب")
 
         variant = locked_variants.get(v_id) if v_id else None
-        if v_id and (not variant or not variant.is_active):
+        if v_id and (not variant or not variant.is_active or variant.product_id != product.id):
             raise CheckoutError(f"الخيار المحدد للمنتج «{product.name}» غير متاح")
+        if variant is None and product.has_variants:
+            raise CheckoutError(f"يرجى اختيار حجم «{product.name}»")
 
-        unit_price = Decimal(str(variant.price if variant else product.price))
-        line_total = (unit_price * qty).quantize(TWO_PLACES)
+        # A variant's price may be null ("same as the product"): `unit_price()`
+        # handles that, `Decimal(str(None))` would crash the request.
+        price = unit_price(product, variant)
+        line_total = (price * qty).quantize(TWO_PLACES)
         subtotal += line_total
 
         # Check available stock
@@ -1065,7 +1093,8 @@ def quick_create_admin_order(
         if product.track_quantity:
             available = target.stock - target.reserved_stock
             if qty > available:
-                label = f"{product.name} ({variant.label})" if variant else product.name
+                size = " / ".join(v.value for v in variant.values.all()) if variant else ""
+                label = f"{product.name} ({size})" if size else product.name
                 raise CheckoutError(
                     f"الكمية المطلوبة من «{label}» ({qty}) غير متوفرة في المخزون (المتبقي: {available})"
                 )
@@ -1074,7 +1103,7 @@ def quick_create_admin_order(
             "product": product,
             "variant": variant,
             "quantity": qty,
-            "unit_price": unit_price,
+            "unit_price": price,
             "total_price": line_total,
         })
 
@@ -1087,18 +1116,20 @@ def quick_create_admin_order(
         )
 
     # 6. Shipping & Promotions
-    shipping_fee = Decimal(str(region.delivery_fee if region else (city.delivery_fee if city else "0.00")))
-    delivery_discount_amount = Decimal("0.00")
-    shipping_total = shipping_fee
-
-    promo = CartPromotion.objects.filter(is_active=True).first()
-    if promo and promo.is_active and subtotal >= promo.min_order_amount:
-        delivery_discount_amount = shipping_fee
-        shipping_total = Decimal("0.00")
+    # Same rule as the storefront: region fee, falling back to the city, with
+    # the free-delivery promotion applied.
+    shipping_total, delivery_discount_amount = delivery_fee(region=region, city=city, subtotal=subtotal)
 
     total = (subtotal - discount_total + shipping_total).quantize(TWO_PLACES)
     if total < Decimal("0.00"):
         total = Decimal("0.00")
+
+    # Collected on delivery (cash or card at the door) means not paid yet: the
+    # units are reserved, exactly like a storefront checkout, and leave the
+    # shelf when the operator confirms the payment. Deducting here as well made
+    # that confirmation take the stock a second time, and a cancellation
+    # "released" a reservation that never existed.
+    paid_now = (payment_method_code or "manual_payment") not in PAY_ON_DELIVERY
 
     # 7. Create Order record
     order_num = next_order_number(payment_method_code or "MAN")
@@ -1122,7 +1153,7 @@ def quick_create_admin_order(
         finalised_at=timezone.now(),
     )
 
-    # 8. Create OrderItems & immediately deduct stock
+    # 8. Create OrderItems, then reserve (pay on delivery) or deduct (paid) stock
     for line in validated_lines:
         OrderItem.objects.create(
             order=order,
@@ -1131,8 +1162,13 @@ def quick_create_admin_order(
             quantity=line["quantity"],
             unit_price=line["unit_price"],
             total_price=line["total_price"],
+            product_name=line["product"].name,
         )
-        if line["product"].track_quantity:
+        if not line["product"].track_quantity:
+            continue
+        if not paid_now:
+            reserve_stock(product=line["product"], variant=line["variant"], quantity=line["quantity"])
+        else:
             adjust_stock(
                 product=line["product"],
                 variant=line["variant"],
@@ -1147,7 +1183,7 @@ def quick_create_admin_order(
         order=order,
         method_code=payment_method_code or "manual_payment",
         amount=total,
-        status=PaymentStatus.COMPLETED if payment_method_code != "manual_payment" else PaymentStatus.WAITING_FOR_VERIFICATION,
+        status=PaymentStatus.COMPLETED if paid_now else PaymentStatus.WAITING_FOR_VERIFICATION,
         reference_id=f"MAN_{order.order_number}",
     )
 

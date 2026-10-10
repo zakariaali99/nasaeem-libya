@@ -255,6 +255,10 @@ WHITENOISE_ADD_HEADERS_FUNCTION = whitenoise_add_headers
 # --------------------------------------------------------------------------
 FEATURE_REVIEWS = config("FEATURE_REVIEWS", default=False, cast=bool)
 FEATURE_LOYALTY = config("FEATURE_LOYALTY", default=False, cast=bool)
+# Delivery fees are quoted to the customer by the store when it confirms the
+# order (owner's decision, 2026-10-10), so the system charges none. Set to True
+# to charge the city/region fees from the dashboard again.
+FEATURE_SHIPPING_FEES = config("FEATURE_SHIPPING_FEES", default=False, cast=bool)
 
 # --------------------------------------------------------------------------
 # SEO shell

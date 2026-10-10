@@ -22,6 +22,13 @@ def clear_cache():
     cache.clear()
 
 
+@pytest.fixture(autouse=True)
+def shipping_fees_on(settings):
+    """The fee arithmetic is what the suite exercises; production ships with
+    the flag off (delivery is quoted by the store), covered by its own test."""
+    settings.FEATURE_SHIPPING_FEES = True
+
+
 @pytest.fixture
 def customer(db):
     return User.objects.create_user(

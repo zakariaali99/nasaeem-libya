@@ -117,7 +117,7 @@ export function FrequentlyBoughtTogether({ product, bundle }: FrequentlyBoughtTo
           </div>
           <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
             <Sparkles className="size-3" />
-            <span>توفير مؤكد بقيمة {formatPrice(bundle.savings_amount)} + شحن مجاني فوري</span>
+            <span>توفير مؤكد بقيمة {formatPrice(bundle.savings_amount)}</span>
           </p>
         </div>
 

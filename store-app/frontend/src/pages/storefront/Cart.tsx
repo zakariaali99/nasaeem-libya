@@ -105,10 +105,13 @@ export default function CartPage() {
             ))}
           </ul>
 
-          <div className="flex items-center gap-2 rounded-2xl border border-border bg-muted/20 p-4 text-xs text-muted-foreground">
-            <Truck className="size-5 text-primary shrink-0" />
-            <span>يتم احتساب رسوم التوصيل الدقيقة بناءً على مدينتك في الخطوة التالية.</span>
-          </div>
+          {/* With delivery quoted on confirmation the summary carries the note. */}
+          {FEATURES.shippingFees ? (
+            <div className="flex items-center gap-2 rounded-2xl border border-border bg-muted/20 p-4 text-xs text-muted-foreground">
+              <Truck className="size-5 text-primary shrink-0" />
+              <span>يتم احتساب رسوم التوصيل الدقيقة بناءً على مدينتك في الخطوة التالية.</span>
+            </div>
+          ) : null}
         </div>
 
         {/* Desktop Sticky Summary */}

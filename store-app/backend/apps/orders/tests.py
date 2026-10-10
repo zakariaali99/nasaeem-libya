@@ -227,9 +227,12 @@ class TestAdminQuickOrderAndBulkActions:
         assert len(data["items"]) == 1
         assert data["items"][0]["quantity"] == 2
 
-        # Verify stock was atomically deducted
+        # Cash on delivery is not paid yet: the units are reserved, like a
+        # storefront checkout, and the line keeps the product's name.
         product.refresh_from_db()
-        assert product.stock == initial_stock - 2
+        assert product.stock == initial_stock
+        assert product.reserved_stock == 2
+        assert data["items"][0]["product_name"] == product.name
 
         # Verify customer was created
         from apps.core.models import User
@@ -258,6 +261,69 @@ class TestAdminQuickOrderAndBulkActions:
         )
         assert res.status_code == 400
         assert "غير متوفرة" in res.json()["message"]
+
+    def _quick(self, admin_client, city, items):
+        return admin_client.post(
+            "/api/admin/orders/quick-create/",
+            {"customer_name": "سالم", "customer_phone": "0924445566", "shipping_city_id": str(city.id),
+             "shipping_address": "طرابلس", "items": items},
+            content_type="application/json",
+        )
+
+    def test_quick_create_with_a_size_that_inherits_the_product_price(self, admin_client, product, variant, city):
+        variant.price = None
+        variant.save()
+
+        res = self._quick(admin_client, city, [{"product_id": str(product.id), "variant_id": str(variant.id), "quantity": 1}])
+
+        assert res.status_code == 201, res.json()
+        assert res.json()["data"]["items"][0]["unit_price"] == "450.00"
+        variant.refresh_from_db()
+        assert variant.reserved_stock == 1
+
+    def test_quick_create_refuses_a_sized_product_without_a_size(self, admin_client, product, variant, city):
+        product.has_variants = True
+        product.save()
+
+        res = self._quick(admin_client, city, [{"product_id": str(product.id), "quantity": 1}])
+
+        assert res.status_code == 400
+        assert "حجم" in res.json()["message"]
+
+    def test_quick_create_names_the_size_when_it_is_out_of_stock(self, admin_client, product, variant, city):
+        res = self._quick(admin_client, city, [{"product_id": str(product.id), "variant_id": str(variant.id), "quantity": 9}])
+
+        assert res.status_code == 400
+        assert "50 مل" in res.json()["message"]
+
+    def test_confirming_a_quick_cod_order_takes_the_stock_exactly_once(self, admin_client, product, city):
+        from apps.payments.models import Payment
+        from apps.payments.services import confirm_payment
+
+        res = self._quick(admin_client, city, [{"product_id": str(product.id), "quantity": 2}])
+        order = Order.objects.get(order_number=res.json()["data"]["order_number"])
+
+        confirm_payment(payment=Payment.objects.get(order=order))
+
+        product.refresh_from_db()
+        assert (product.stock, product.reserved_stock) == (8, 0)
+
+    def test_a_prepaid_quick_order_takes_the_stock_at_once(self, admin_client, product, city):
+        res = admin_client.post(
+            "/api/admin/orders/quick-create/",
+            {"customer_phone": "0924445567", "shipping_city_id": str(city.id), "shipping_address": "x",
+             "payment_method_code": "sadad_pay", "items": [{"product_id": str(product.id), "quantity": 1}]},
+            content_type="application/json",
+        )
+        assert res.status_code == 201
+        product.refresh_from_db()
+        assert (product.stock, product.reserved_stock) == (9, 0)
+
+    def test_quick_order_with_a_city_only_uses_the_city_fee(self, admin_client, product, city, region):
+        res = self._quick(admin_client, city, [{"product_id": str(product.id), "quantity": 1}])
+        data = res.json()["data"]
+        assert data["shipping_region"] is None
+        assert data["shipping_total"] == "15.00"
 
     def test_customer_lookup_by_phone(self, admin_client, customer):
         customer.name = "محمود التاجوري"

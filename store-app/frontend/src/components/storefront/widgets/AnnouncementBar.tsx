@@ -28,7 +28,7 @@ export function AnnouncementBar({ widget }: { widget: Widget }) {
 
   if (dismissed) return null
 
-  const displayMessage = message || 'عرض حصري: شحن مجاني لكافة المدن الليبية عند الطلب بقيمة 200 د.ل أو أكثر'
+  const displayMessage = message || 'توصيل إلى جميع المدن الليبية'
   const displayTitle = title || 'تنبيه حصري'
 
   const Icon = ICONS[(icon as keyof typeof ICONS) ?? 'megaphone'] ?? Sparkles

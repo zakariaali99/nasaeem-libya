@@ -1,6 +1,7 @@
 import { Eye, Flame, Truck } from 'lucide-react'
 import * as React from 'react'
 
+import { FEATURES } from '@/lib/features'
 import type { Product } from '@/types/api'
 
 interface LiveSocialProofProps {
@@ -29,7 +30,9 @@ export function LiveSocialProof({ product }: LiveSocialProofProps) {
 
   const stock = product.available_stock
   const isLowStock = product.in_stock && stock > 0 && stock <= 5
-  const isFreeShippingEligible = parseFloat(product.price || '0') >= 150
+  // A hard-coded "free delivery over 150" promise nobody approved: shown only
+  // if delivery fees are charged at all, and never while they are quoted.
+  const isFreeShippingEligible = FEATURES.shippingFees && parseFloat(product.price || '0') >= 150
 
   return (
     <div className="space-y-2.5">

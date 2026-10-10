@@ -115,6 +115,20 @@ class TestOrderEdit:
         variant.refresh_from_db()
         assert variant.reserved_stock == 1
 
+    def test_a_waiting_payment_follows_the_new_total(self, owner_api, order):
+        from apps.orders.models import PaymentStatus
+        from apps.payments.models import Payment
+
+        payment = Payment.objects.create(
+            order=order, method_code="manual_payment", amount=order.total,
+            status=PaymentStatus.WAITING_FOR_VERIFICATION,
+        )
+
+        owner_api.put(edit_url(order), {"items": [{"id": str(order.items.get().id), "quantity": 1}]}, format="json")
+
+        payment.refresh_from_db()
+        assert payment.amount == Decimal("455.00")
+
     def test_an_empty_order_is_refused(self, owner_api, order):
         response = owner_api.put(edit_url(order), {"items": []}, format="json")
         assert response.status_code == 400
@@ -174,3 +188,37 @@ class TestOrderPayload:
         assert body["user"] == {"id": str(customer.id), "name": customer.name, "phone_number": customer.phone_number}
         assert body["editable"] is True
         assert body["items"][0]["image"]["renditions"]["thumb"] == "/media/products/oud-thumb.webp"
+
+
+class TestShippingFeesOff:
+    def test_no_delivery_fee_is_charged_when_the_store_quotes_it_directly(
+        self, settings, customer, product, region
+    ):
+        settings.FEATURE_SHIPPING_FEES = False
+        cart = Cart.objects.create(user=customer)
+        CartItem.objects.create(cart=cart, product=product, quantity=1)
+
+        order = services.checkout(cart=cart, user=customer, region_id=region.id, address="شارع 1")
+
+        assert order.shipping_total == Decimal("0.00")
+        assert order.total == Decimal("450.00")
+
+    def test_the_operator_records_the_delivery_price_agreed_with_the_customer(
+        self, settings, owner, customer, product, region
+    ):
+        settings.FEATURE_SHIPPING_FEES = False
+        cart = Cart.objects.create(user=customer)
+        CartItem.objects.create(cart=cart, product=product, quantity=1)
+        order = services.checkout(cart=cart, user=customer, region_id=region.id, address="شارع 1")
+        client = APIClient()
+        client.force_authenticate(user=owner)
+
+        body = client.put(edit_url(order), {"items": lines(order), "shipping_total": "20"}, format="json").json()["data"]
+        assert (body["shipping_total"], body["total"]) == ("20.00", "470.00")
+
+        # A later edit that does not mention delivery keeps the agreed price.
+        body = client.put(edit_url(order), {"items": [{"id": body["items"][0]["id"], "quantity": 2}]}, format="json").json()["data"]
+        assert (body["shipping_total"], body["total"]) == ("20.00", "920.00")
+
+        bad = client.put(edit_url(order), {"items": lines(order), "shipping_total": "-5"}, format="json")
+        assert bad.status_code == 400

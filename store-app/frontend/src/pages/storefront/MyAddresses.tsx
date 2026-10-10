@@ -6,6 +6,7 @@ import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/storefront/EmptyState'
+import { FEATURES } from '@/lib/features'
 import { formatPrice } from '@/lib/format'
 import { usePageTitle } from '@/lib/usePageTitle'
 import { useCities, useRegions } from '@/lib/queries/delivery'
@@ -114,7 +115,7 @@ function AddressForm({ address, onDone }: { address: Address | null; onDone: () 
           <Select {...props} value={regionId} onChange={(e) => setRegionId(e.target.value)} disabled={!cityId} required>
             <option value="">{cityId ? 'اختر المنطقة' : 'اختر المدينة أولاً'}</option>
             {(regionData?.regions ?? []).map((region) => (
-              <option key={region.id} value={region.id}>{region.name} — {formatPrice(region.delivery_fee)}</option>
+              <option key={region.id} value={region.id}>{region.name}{FEATURES.shippingFees ? ` — ${formatPrice(region.delivery_fee)}` : ''}</option>
             ))}
           </Select>
         )}

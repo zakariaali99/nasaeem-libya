@@ -82,9 +82,16 @@ def format_bank_transfer_whatsapp_message(order, store_url: str = "") -> str:
 
     note_text = f"\n\n📝 *ملاحظة:* {settings.bank_transfer_note}" if settings.bank_transfer_note else ""
 
+    if order.shipping_total and order.shipping_total > 0:
+        delivery_line = f"🚚 رسوم التوصيل ({city_name}): {order.shipping_total} د.ل\n"
+        total_line = f"💰 *المبلغ الإجمالي المطلوب تحويله: {order.total} د.ل*\n\n"
+    else:
+        delivery_line = f"🚚 سعر التوصيل ({city_name}): سنبلغك به عند تأكيد الطلب\n"
+        total_line = f"💰 *قيمة المنتجات: {order.total} د.ل* (غير شاملة التوصيل)\n\n"
+
     msg += (
-        f"🚚 رسوم التوصيل ({city_name}): {order.shipping_total} د.ل\n"
-        f"💰 *المبلغ الإجمالي المطلوب تحويله: {order.total} د.ل*\n\n"
+        f"{delivery_line}"
+        f"{total_line}"
         f"{bank_block}"
         f"{note_text}\n\n"
         f"📸 *خطوة التأكيد:* يرجى الرد على هذه الرسالة بصورة إشعار التحويل المصرفي ليتم تأكيد طلبك والبدء في شحنه فوراً 🚚.\n"

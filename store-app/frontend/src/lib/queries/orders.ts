@@ -67,6 +67,8 @@ export interface OrderEditBody {
   address?: string
   customer_notes?: string
   delivery_method_code?: string
+  /** The delivery price the operator agreed with the customer. */
+  shipping_total?: string
 }
 
 /** Operator: rewrite an order's lines and destination. Addressed by the order's

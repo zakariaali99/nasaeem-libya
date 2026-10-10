@@ -29,6 +29,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { LineThumb } from '@/components/ui/line-thumb'
 import { Skeleton } from '@/components/ui/skeleton'
+import { FEATURES } from '@/lib/features'
 import { formatDateTime, formatPrice } from '@/lib/format'
 import { useOrder, useUpdateOrder } from '@/lib/queries/orders'
 import { useVerifyPayment } from '@/lib/queries/payments'
@@ -87,10 +88,10 @@ export default function AdminOrderDetail() {
 
   const phoneNumber = order.user?.phone_number || ''
   const cleanPhone = phoneNumber.replace(/[^0-9]/g, '')
+  // Opens the customer's chat with an empty box: the operator writes their own
+  // message (owner's request — no pre-written text).
   const whatsappUrl = cleanPhone
-    ? `https://wa.me/${cleanPhone.startsWith('0') ? '218' + cleanPhone.slice(1) : cleanPhone}?text=${encodeURIComponent(
-        `مرحباً ${order.user?.name || 'عميلنا العزيز'}، بخصوص طلبك رقم #${order.order_number} من متجر نسائم ليبيا للعطور...`,
-      )}`
+    ? `https://wa.me/${cleanPhone.startsWith('0') ? '218' + cleanPhone.slice(1) : cleanPhone}`
     : null
 
   // Determine current active step index
@@ -299,7 +300,13 @@ export default function AdminOrderDetail() {
               )}
               <div className="flex justify-between text-muted-foreground">
                 <span>رسوم التوصيل والشحن:</span>
-                <span className="font-mono font-semibold text-foreground">{formatPrice(order.shipping_total)}</span>
+                {Number(order.shipping_total) > 0 || FEATURES.shippingFees ? (
+                  <span className="font-mono font-semibold text-foreground">{formatPrice(order.shipping_total)}</span>
+                ) : (
+                  <span className="font-semibold text-warning">
+                    لم يُحدَّد بعد — أدخله من «تعديل الطلب» بعد الاتفاق مع العميل
+                  </span>
+                )}
               </div>
               <div className="flex justify-between border-t border-border/80 pt-2 text-sm font-extrabold text-foreground">
                 <span>المبلغ الإجمالي النهائي:</span>

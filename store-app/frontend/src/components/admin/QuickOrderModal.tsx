@@ -26,7 +26,9 @@ import {
 import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { LineThumb } from '@/components/ui/line-thumb'
 import { Select } from '@/components/ui/select'
+import { FEATURES, SHIPPING_QUOTE_SHORT } from '@/lib/features'
 import { formatPrice } from '@/lib/format'
 import { useProducts } from '@/lib/queries/catalog'
 import { useCities, useDeliveryMethods, useRegions } from '@/lib/queries/delivery'
@@ -36,11 +38,12 @@ import {
   useCustomerLookup,
   useQuickCreateOrder,
 } from '@/lib/queries/orders'
-import type { Product, ProductVariant } from '@/types/api'
+import type { Product, VariantChoice } from '@/types/api'
 
 interface SelectedLineItem {
   product: Product
-  variant?: ProductVariant
+  /** The chosen size, from the list payload's `variant_choices`. */
+  choice?: VariantChoice
   quantity: number
   unitPrice: number
 }
@@ -70,10 +73,24 @@ export function QuickOrderModal({ open, onOpenChange }: QuickOrderModalProps) {
   // Product search combobox state
   const [productQuery, setProductQuery] = React.useState('')
   const [productSearchFocused, setProductSearchFocused] = React.useState(false)
+  const [productTerm, setProductTerm] = React.useState('')
+
+  // Debounced: one request per pause in typing, not per keystroke.
+  React.useEffect(() => {
+    const timer = setTimeout(() => setProductTerm(productQuery.trim()), 300)
+    return () => clearTimeout(timer)
+  }, [productQuery])
 
   // Queries
   const { data: customerResults } = useCustomerLookup(customerPhone)
-  const { data: productsData } = useProducts({ is_active: true, limit: 100 })
+  // Searched on the server across the whole catalogue — a client-side filter
+  // over the first page could never find most of the store's products.
+  const { data: productsData, isFetching: productsLoading } = useProducts(
+    productTerm.length >= 2
+      ? { search: productTerm, is_active: true, limit: 10 }
+      : { is_active: true, limit: 6 },
+    { enabled: open && (productSearchFocused || productTerm.length >= 2) },
+  )
   const { data: cityData } = useCities()
   const { data: regionData } = useRegions(shippingCityId || undefined)
   const { data: deliveryMethods } = useDeliveryMethods()
@@ -82,7 +99,7 @@ export function QuickOrderModal({ open, onOpenChange }: QuickOrderModalProps) {
 
   const cities = cityData?.cities ?? []
   const regions = regionData?.regions ?? []
-  const allProducts = productsData?.items ?? []
+  const searchResults = productsData?.items ?? []
 
   // Reset regions when city changes
   React.useEffect(() => {
@@ -96,22 +113,7 @@ export function QuickOrderModal({ open, onOpenChange }: QuickOrderModalProps) {
     }
   }, [deliveryMethods, deliveryMethodCode])
 
-  // Filter products for autocomplete dropdown
-  const filteredProducts = React.useMemo(() => {
-    const q = productQuery.toLowerCase().trim()
-    let pool = allProducts
-    if (q) {
-      pool = allProducts.filter(
-        (p) =>
-          p.name.toLowerCase().includes(q) ||
-          p.sku?.toLowerCase().includes(q) ||
-          p.categories?.some((c) => c.name.toLowerCase().includes(q)),
-      )
-    } else if (!productSearchFocused) {
-      pool = allProducts.slice(0, 6)
-    }
-    return [...pool].sort((a, b) => (b.available_stock > 0 ? 1 : 0) - (a.available_stock > 0 ? 1 : 0)).slice(0, 10)
-  }, [allProducts, productQuery, productSearchFocused])
+  const showResults = productSearchFocused || productTerm.length >= 2
 
   // Autocomplete customer selection
   const handleSelectCustomer = (c: CustomerLookupResult) => {
@@ -124,12 +126,11 @@ export function QuickOrderModal({ open, onOpenChange }: QuickOrderModalProps) {
   }
 
   // Add product line item
-  const handleAddProduct = (product: Product, variant?: ProductVariant) => {
-    const rawPrice = variant?.price ?? product.price ?? '0'
-    const price = parseFloat(rawPrice)
+  const handleAddProduct = (product: Product, choice?: VariantChoice) => {
+    const price = parseFloat(choice?.price ?? product.price ?? '0')
     setSelectedItems((prev) => {
       const existingIdx = prev.findIndex(
-        (it) => it.product.id === product.id && it.variant?.id === variant?.id,
+        (it) => it.product.id === product.id && it.choice?.id === choice?.id,
       )
       if (existingIdx >= 0) {
         const updated = [...prev]
@@ -140,13 +141,14 @@ export function QuickOrderModal({ open, onOpenChange }: QuickOrderModalProps) {
         ...prev,
         {
           product,
-          variant,
+          choice,
           quantity: 1,
           unitPrice: price,
         },
       ]
     })
     setProductQuery('')
+    setProductSearchFocused(false)
   }
 
   // Update item quantity
@@ -183,13 +185,16 @@ export function QuickOrderModal({ open, onOpenChange }: QuickOrderModalProps) {
     [cities, shippingCityId],
   )
 
-  const rawShippingFee = selectedRegion
+  const rawShippingFee = !FEATURES.shippingFees
+    ? 0
+    : selectedRegion
     ? parseFloat(selectedRegion.delivery_fee)
     : selectedCity
     ? parseFloat(selectedCity.delivery_fee)
     : 0
 
   const qualifiesFreeShipping = Boolean(
+    FEATURES.shippingFees &&
     promo?.is_active && promo.min_order_amount && subtotal >= parseFloat(promo.min_order_amount),
   )
 
@@ -224,7 +229,7 @@ export function QuickOrderModal({ open, onOpenChange }: QuickOrderModalProps) {
         customer_notes: customerNotes,
         items: selectedItems.map((it) => ({
           product_id: it.product.id,
-          variant_id: it.variant?.id || undefined,
+          variant_id: it.choice?.id || undefined,
           quantity: it.quantity,
         })),
       })
@@ -365,73 +370,75 @@ export function QuickOrderModal({ open, onOpenChange }: QuickOrderModalProps) {
                 <Input
                   id="quick-product-search"
                   value={productQuery}
-                  onChange={(e) => setProductQuery(e.target.value)}
+                  onChange={(e) => {
+                    setProductQuery(e.target.value)
+                    setProductSearchFocused(true)
+                  }}
                   onFocus={() => setProductSearchFocused(true)}
                   placeholder="ابحث عن العطور أو اختر من القائمة..."
                   className="h-9 ps-9 text-xs"
                 />
               </div>
 
-              {filteredProducts.length > 0 && (
-                <div className="absolute top-full start-0 z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-border bg-popover p-1.5 shadow-lg animate-fade-rise space-y-1">
-                  {filteredProducts.map((p) => (
-                    <div key={p.id} className="rounded-md p-1.5 hover:bg-muted/70 transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          {p.images?.[0]?.url ? (
-                            <img
-                              src={p.images[0].url}
-                              alt={p.name}
-                              className="size-8 rounded object-cover border border-border/60"
-                            />
-                          ) : (
-                            <div className="size-8 rounded bg-muted flex items-center justify-center text-muted-foreground text-[10px]">
-                              عطر
-                            </div>
-                          )}
-                          <div>
-                            <p className="text-xs font-bold text-foreground">{p.name}</p>
-                            <p className="text-[10px] text-muted-foreground">
-                              {p.categories?.[0]?.name || 'عطر فاخر'} — المتوفر: {p.available_stock} قطعة
-                            </p>
-                          </div>
+              {showResults && (
+                <div className="absolute top-full start-0 z-50 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border border-border bg-popover p-1.5 shadow-lg animate-fade-rise space-y-1">
+                  <div className="flex items-center justify-between px-1.5 pb-1 text-[10px] text-muted-foreground">
+                    <span>{productTerm.length >= 2 ? 'نتائج البحث' : 'أحدث المنتجات — اكتب حرفين للبحث في كل المتجر'}</span>
+                    <button
+                      type="button"
+                      onClick={() => setProductSearchFocused(false)}
+                      className="rounded px-1.5 py-0.5 hover:bg-muted"
+                    >
+                      إغلاق
+                    </button>
+                  </div>
+                  {searchResults.map((p) => {
+                    const choices = p.variant_choices ?? []
+                    const sized = p.has_variants && choices.length > 0
+                    return (
+                      <div key={p.id} className="flex flex-wrap items-center gap-2 rounded-md p-1.5 hover:bg-muted/70 transition-colors">
+                        <LineThumb image={p.images?.[0]} alt={p.name} size={36} className="rounded-lg" />
+                        <div className="min-w-0 flex-1 basis-32">
+                          <p className="truncate text-xs font-bold text-foreground">{p.name}</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            <span className="font-mono font-bold text-primary">{formatPrice(p.price)}</span>
+                            {' — '}
+                            {p.in_stock ? `المتوفر: ${p.available_stock ?? '∞'}` : 'نفد المخزون'}
+                          </p>
                         </div>
-
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-mono font-bold text-primary">
-                            {formatPrice(p.price)}
-                          </span>
+                        {sized ? (
+                          <div className="ms-auto flex flex-wrap justify-end gap-1.5">
+                            {choices.map((choice) => (
+                              <button
+                                key={choice.id}
+                                type="button"
+                                disabled={!choice.in_stock}
+                                onClick={() => handleAddProduct(p, choice)}
+                                className="rounded-lg border border-primary/40 px-2 py-1 text-[11px] font-bold text-primary hover:bg-primary/10 disabled:border-border disabled:text-muted-foreground disabled:line-through disabled:opacity-60"
+                              >
+                                + {choice.label} · {formatPrice(choice.price)}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
                           <Button
                             type="button"
                             size="sm"
                             variant="secondary"
-                            disabled={p.available_stock <= 0}
-                            onClick={() => handleAddProduct(p)}
-                            className="h-7 text-xs px-2.5 disabled:opacity-50"
+                            disabled={!p.in_stock}
+                            onClick={() => handleAddProduct(p, choices[0])}
+                            className="ms-auto h-7 text-xs px-2.5 disabled:opacity-50"
                           >
                             <Plus className="size-3.5 me-1" />
-                            {p.available_stock > 0 ? 'إضافة' : 'نفد'}
+                            {p.in_stock ? 'إضافة' : 'نفد'}
                           </Button>
-                        </div>
+                        )}
                       </div>
-
-                      {/* Variant options if product has variants */}
-                      {p.variants && p.variants.length > 0 && (
-                        <div className="mt-1.5 flex flex-wrap gap-1.5 ps-10 border-t border-border/40 pt-1">
-                          {p.variants.map((v) => (
-                            <button
-                              key={v.id}
-                              type="button"
-                              onClick={() => handleAddProduct(p, v)}
-                              className="rounded border border-border/70 bg-card px-2 py-0.5 text-[11px] hover:border-primary text-foreground transition-colors"
-                            >
-                              {v.values?.map((val) => val.value).join(' / ') || v.sku} — {formatPrice(v.price || p.price)}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                    )
+                  })}
+                  {!productsLoading && searchResults.length === 0 && (
+                    <p className="p-3 text-center text-xs text-muted-foreground">لا توجد منتجات مطابقة</p>
+                  )}
                 </div>
               )}
             </div>
@@ -444,25 +451,13 @@ export function QuickOrderModal({ open, onOpenChange }: QuickOrderModalProps) {
             ) : (
               <div className="space-y-2 divide-y divide-border/60">
                 {selectedItems.map((item, idx) => (
-                  <div key={`${item.product.id}-${item.variant?.id || 'base'}`} className="flex items-center justify-between pt-2">
+                  <div key={`${item.product.id}-${item.choice?.id || 'base'}`} className="flex items-center justify-between pt-2">
                     <div className="flex items-center gap-2.5">
-                      {item.product.images?.[0]?.url ? (
-                        <img
-                          src={item.product.images[0].url}
-                          alt={item.product.name}
-                          className="size-9 rounded-lg object-cover border border-border"
-                        />
-                      ) : (
-                        <div className="size-9 rounded-lg bg-muted flex items-center justify-center text-muted-foreground text-xs">
-                          عطر
-                        </div>
-                      )}
+                      <LineThumb image={item.product.images?.[0]} alt={item.product.name} size={36} className="rounded-lg" />
                       <div>
                         <p className="text-xs font-bold text-foreground">{item.product.name}</p>
-                        {item.variant && (
-                          <p className="text-[10px] text-muted-foreground">
-                            {item.variant.values?.map((v) => v.value).join(' / ') || item.variant.sku}
-                          </p>
+                        {item.choice && (
+                          <p className="text-[10px] text-muted-foreground">{item.choice.label}</p>
                         )}
                         <p className="text-[11px] font-mono text-muted-foreground">
                           {formatPrice(item.unitPrice)}
@@ -534,7 +529,7 @@ export function QuickOrderModal({ open, onOpenChange }: QuickOrderModalProps) {
                     <option value="">اختر المدينة...</option>
                     {cities.map((city) => (
                       <option key={city.id} value={city.id}>
-                        {city.name} ({formatPrice(city.delivery_fee)})
+                        {city.name}{FEATURES.shippingFees ? ` (${formatPrice(city.delivery_fee)})` : ''}
                       </option>
                     ))}
                   </Select>
@@ -551,7 +546,7 @@ export function QuickOrderModal({ open, onOpenChange }: QuickOrderModalProps) {
                     <option value="">اختر الحي / المنطقة...</option>
                     {regions.map((reg) => (
                       <option key={reg.id} value={reg.id}>
-                        {reg.name} ({formatPrice(reg.delivery_fee)})
+                        {reg.name}{FEATURES.shippingFees ? ` (${formatPrice(reg.delivery_fee)})` : ''}
                       </option>
                     ))}
                   </Select>
@@ -650,7 +645,7 @@ export function QuickOrderModal({ open, onOpenChange }: QuickOrderModalProps) {
                 {qualifiesFreeShipping ? (
                   <span className="text-success font-bold">مجاني (0.00 د.ل)</span>
                 ) : (
-                  formatPrice(finalShippingFee)
+                  FEATURES.shippingFees ? formatPrice(finalShippingFee) : SHIPPING_QUOTE_SHORT
                 )}
               </span>
             </div>

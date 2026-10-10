@@ -58,6 +58,7 @@ export function OrderEditDialog({ order, lookup, open, onOpenChange }: OrderEdit
   const [address, setAddress] = React.useState(order.shipping_address ?? '')
   const [notes, setNotes] = React.useState(order.customer_notes ?? '')
   const [methodCode, setMethodCode] = React.useState('')
+  const [shippingFee, setShippingFee] = React.useState(order.shipping_total ?? '')
   const [error, setError] = React.useState<string | null>(null)
 
   const { data: cityData } = useCities()
@@ -75,6 +76,7 @@ export function OrderEditDialog({ order, lookup, open, onOpenChange }: OrderEdit
     setRegionId(order.shipping_region ?? '')
     setAddress(order.shipping_address ?? '')
     setNotes(order.customer_notes ?? '')
+    setShippingFee(order.shipping_total ?? '')
     setError(null)
   }, [open, order])
 
@@ -130,6 +132,11 @@ export function OrderEditDialog({ order, lookup, open, onOpenChange }: OrderEdit
     if (regionId) body.region_id = regionId
     if (address.trim()) body.address = address
     if (methodCode) body.delivery_method_code = methodCode
+    // Sent only when the operator changed it, so an untouched field never
+    // overrides a fee the system computed.
+    if (shippingFee.trim() !== '' && Number(shippingFee) !== Number(order.shipping_total)) {
+      body.shipping_total = shippingFee.trim()
+    }
     edit.mutate(body, {
       onSuccess: () => onOpenChange(false),
       onError: (err) => setError(err instanceof ApiError ? err.message : 'تعذّر حفظ التعديلات'),
@@ -261,6 +268,23 @@ export function OrderEditDialog({ order, lookup, open, onOpenChange }: OrderEdit
                 ))}
               </Select>
             </Field>
+            <Field
+              id="edit-shipping"
+              label="سعر التوصيل المتفق عليه (د.ل)"
+              hint="يُضاف إلى إجمالي الطلب والفاتورة ومبلغ التحصيل عند المندوب."
+            >
+              <Input
+                id="edit-shipping"
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step="0.5"
+                dir="ltr"
+                value={shippingFee}
+                onChange={(e) => setShippingFee(e.target.value)}
+                className="font-mono"
+              />
+            </Field>
             <Field id="edit-notes" label="ملاحظات العميل">
               <Textarea id="edit-notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
             </Field>
@@ -270,8 +294,10 @@ export function OrderEditDialog({ order, lookup, open, onOpenChange }: OrderEdit
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
             <p className="text-xs text-muted-foreground">
-              المجموع الفرعي الجديد (تقديري):{' '}
-              <span className="font-mono text-sm font-extrabold text-foreground">{formatPrice(subtotal)}</span>
+              المجموع الجديد مع التوصيل (تقديري، قبل الخصم):{' '}
+              <span className="font-mono text-sm font-extrabold text-foreground">
+                {formatPrice(subtotal + (Number(shippingFee) || 0))}
+              </span>
             </p>
             <div className="flex gap-2">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

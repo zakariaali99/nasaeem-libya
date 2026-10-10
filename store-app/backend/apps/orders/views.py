@@ -588,9 +588,22 @@ class AdminOrderEditView(CsrfProtectedAPIView):
                 raise services.CheckoutError("قيمة غير صحيحة", field=field)
             return value
 
+        shipping_total = None
+        if data.get("shipping_total") not in (None, ""):
+            try:
+                shipping_total = Decimal(str(data["shipping_total"]))
+            except Exception:
+                shipping_total = Decimal("-1")
+            if not shipping_total.is_finite() or not 0 <= shipping_total <= 9999:
+                return Response(
+                    {"message": "سعر التوصيل غير صحيح", "errors": {"shipping_total": ["سعر التوصيل غير صحيح"]}},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
         try:
             services.edit_order(
                 order,
+                shipping_total=shipping_total,
                 items=[row for row in items if isinstance(row, dict)],
                 city_id=text("city_id", 64) or None,
                 region_id=text("region_id", 64) or None,

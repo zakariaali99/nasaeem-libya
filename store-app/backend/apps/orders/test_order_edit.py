@@ -222,3 +222,35 @@ class TestShippingFeesOff:
 
         bad = client.put(edit_url(order), {"items": lines(order), "shipping_total": "-5"}, format="json")
         assert bad.status_code == 400
+
+
+class TestGuestCheckoutNeverSignsInToAnExistingAccount:
+    """Typing someone's phone number at checkout is not proof of being them."""
+
+    def _guest_confirm(self, product, city, phone):
+        guest = APIClient()
+        guest.post(reverse("cart"), {"product_id": str(product.id), "quantity": 1}, format="json")
+        draft = guest.post(reverse("cart-checkout"), {}, format="json").json()["data"]
+        response = guest.post(
+            reverse("checkout-confirm"),
+            {"order_id": draft["id"], "customer_name": "زائر", "customer_phone": phone,
+             "city_id": city.id, "address": "شارع 1", "payment_method": "manual_payment"},
+            format="json",
+        )
+        return guest, response
+
+    def test_the_owners_phone_does_not_open_the_dashboard(self, owner, product, city):
+        guest, response = self._guest_confirm(product, city, owner.phone_number)
+
+        assert response.status_code in (200, 201), response.json()
+        assert guest.get(reverse("auth-me")).status_code in (401, 403)
+        assert guest.get(reverse("order-list")).status_code in (401, 403)
+
+    def test_a_customers_phone_does_not_open_their_account(self, customer, product, city):
+        guest, _ = self._guest_confirm(product, city, customer.phone_number)
+        assert guest.get(reverse("auth-me")).status_code in (401, 403)
+
+    def test_a_new_phone_still_gets_its_own_account(self, product, city):
+        guest, response = self._guest_confirm(product, city, "0926667788")
+        assert response.status_code in (200, 201), response.json()
+        assert guest.get(reverse("auth-me")).status_code == 200

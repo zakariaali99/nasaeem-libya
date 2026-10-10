@@ -289,7 +289,7 @@ class CheckoutConfirmView(CsrfProtectedAPIView):
         user = request.user if (request.user and request.user.is_authenticated) else None
         if user is None and customer_phone:
             import re
-            from apps.core.models import User
+            from apps.core.models import Role, User
             from django.contrib.auth import login
             clean_digits = re.sub(r"[^\d]", "", customer_phone)
             if clean_digits.startswith("218"):
@@ -305,16 +305,20 @@ class CheckoutConfirmView(CsrfProtectedAPIView):
                     phone_number=std_phone,
                     name=customer_name or "عميل نسائم",
                     password="000000",
-                    role=User.ROLE_CUSTOMER,
+                    role=Role.CUSTOMER,
                 )
                 new_account_created = True
-            elif customer_name and not user.name:
-                user.name = customer_name
-                user.save(update_fields=["name", "updated_at"])
 
             order.user = user
             order.save(update_fields=["user", "updated_at"])
-            login(request, user)
+            # Only an account created by THIS request is signed in. A phone
+            # number typed into a form proves nothing: signing a guest in to an
+            # existing account (a customer's — or the owner's) on the strength
+            # of it handed that account to whoever knew the number. The order is
+            # still linked to the account so its owner sees it after a real
+            # login, and nothing on that account is changed from here.
+            if new_account_created:
+                login(request, user)
         elif user is not None and customer_name and not user.name:
             user.name = customer_name
             user.save(update_fields=["name", "updated_at"])

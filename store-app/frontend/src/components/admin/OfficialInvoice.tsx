@@ -161,14 +161,12 @@ export function OfficialInvoice({ data, className = '' }: OfficialInvoiceProps) 
               </div>
             )}
 
-            <div className="p-2.5 border-b border-border print:border-black flex justify-between text-muted-foreground print:text-black">
-              <span>رسوم الشحن والتوصيل:</span>
-              {parseFloat(data.financials.shipping_total || '0') === 0 ? (
-                <span className="font-bold">مجاني (عرض خاص)</span>
-              ) : (
+            {parseFloat(data.financials.shipping_total || '0') > 0 && (
+              <div className="p-2.5 border-b border-border print:border-black flex justify-between text-muted-foreground print:text-black">
+                <span>رسوم الشحن والتوصيل:</span>
                 <span className="font-mono font-bold">{formatPrice(data.financials.shipping_total)}</span>
-              )}
-            </div>
+              </div>
+            )}
 
             <div className="p-3 bg-foreground print:bg-black text-background print:text-white flex justify-between items-center">
               <span className="font-black text-sm">المبلغ الإجمالي الصافي:</span>

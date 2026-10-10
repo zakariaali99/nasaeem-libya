@@ -255,9 +255,11 @@ WHITENOISE_ADD_HEADERS_FUNCTION = whitenoise_add_headers
 # --------------------------------------------------------------------------
 FEATURE_REVIEWS = config("FEATURE_REVIEWS", default=False, cast=bool)
 FEATURE_LOYALTY = config("FEATURE_LOYALTY", default=False, cast=bool)
-# Delivery fees are quoted to the customer by the store when it confirms the
-# order (owner's decision, 2026-10-10), so the system charges none. Set to True
-# to charge the city/region fees from the dashboard again.
+# The whole shipping module — delivery fees and delivery companies — is out of
+# the system (owner's decision, 2026-10-10): the store arranges delivery and
+# its price with the customer directly when it confirms the order. No fee is
+# charged and no courier is attached to an order. Set to True to bring both
+# back (and flip `FEATURES.shipping` in the frontend).
 FEATURE_SHIPPING_FEES = config("FEATURE_SHIPPING_FEES", default=False, cast=bool)
 
 # --------------------------------------------------------------------------

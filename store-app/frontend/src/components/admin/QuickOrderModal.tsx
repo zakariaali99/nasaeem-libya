@@ -28,7 +28,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { LineThumb } from '@/components/ui/line-thumb'
 import { Select } from '@/components/ui/select'
-import { FEATURES, SHIPPING_QUOTE_SHORT } from '@/lib/features'
+import { FEATURES } from '@/lib/features'
 import { formatPrice } from '@/lib/format'
 import { useProducts } from '@/lib/queries/catalog'
 import { useCities, useDeliveryMethods, useRegions } from '@/lib/queries/delivery'
@@ -185,7 +185,7 @@ export function QuickOrderModal({ open, onOpenChange }: QuickOrderModalProps) {
     [cities, shippingCityId],
   )
 
-  const rawShippingFee = !FEATURES.shippingFees
+  const rawShippingFee = !FEATURES.shipping
     ? 0
     : selectedRegion
     ? parseFloat(selectedRegion.delivery_fee)
@@ -194,7 +194,7 @@ export function QuickOrderModal({ open, onOpenChange }: QuickOrderModalProps) {
     : 0
 
   const qualifiesFreeShipping = Boolean(
-    FEATURES.shippingFees &&
+    FEATURES.shipping &&
     promo?.is_active && promo.min_order_amount && subtotal >= parseFloat(promo.min_order_amount),
   )
 
@@ -223,7 +223,7 @@ export function QuickOrderModal({ open, onOpenChange }: QuickOrderModalProps) {
         shipping_city_id: shippingCityId || undefined,
         shipping_region_id: shippingRegionId || undefined,
         shipping_address: shippingAddress,
-        delivery_method_code: deliveryMethodCode,
+        delivery_method_code: FEATURES.shipping ? deliveryMethodCode : '',
         payment_method_code: paymentMethodCode,
         discount_code: discountCode || undefined,
         customer_notes: customerNotes,
@@ -529,7 +529,7 @@ export function QuickOrderModal({ open, onOpenChange }: QuickOrderModalProps) {
                     <option value="">اختر المدينة...</option>
                     {cities.map((city) => (
                       <option key={city.id} value={city.id}>
-                        {city.name}{FEATURES.shippingFees ? ` (${formatPrice(city.delivery_fee)})` : ''}
+                        {city.name}{FEATURES.shipping ? ` (${formatPrice(city.delivery_fee)})` : ''}
                       </option>
                     ))}
                   </Select>
@@ -546,7 +546,7 @@ export function QuickOrderModal({ open, onOpenChange }: QuickOrderModalProps) {
                     <option value="">اختر الحي / المنطقة...</option>
                     {regions.map((reg) => (
                       <option key={reg.id} value={reg.id}>
-                        {reg.name}{FEATURES.shippingFees ? ` (${formatPrice(reg.delivery_fee)})` : ''}
+                        {reg.name}{FEATURES.shipping ? ` (${formatPrice(reg.delivery_fee)})` : ''}
                       </option>
                     ))}
                   </Select>
@@ -571,6 +571,7 @@ export function QuickOrderModal({ open, onOpenChange }: QuickOrderModalProps) {
               </span>
 
               <div className="grid gap-2 sm:grid-cols-2">
+                {FEATURES.shipping && (
                 <Field label="شركة التوصيل" htmlFor="quick-courier">
                   <Select
                     id="quick-courier"
@@ -585,6 +586,7 @@ export function QuickOrderModal({ open, onOpenChange }: QuickOrderModalProps) {
                     )) || <option value="">الافتراضي</option>}
                   </Select>
                 </Field>
+                )}
 
                 <Field label="طريقة الدفع" htmlFor="quick-payment">
                   <Select
@@ -639,16 +641,18 @@ export function QuickOrderModal({ open, onOpenChange }: QuickOrderModalProps) {
               <span className="font-mono font-bold text-foreground">{formatPrice(subtotal)}</span>
             </div>
 
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>رسوم التوصيل والشحن:</span>
-              <span className="font-mono font-bold text-foreground">
-                {qualifiesFreeShipping ? (
-                  <span className="text-success font-bold">مجاني (0.00 د.ل)</span>
-                ) : (
-                  FEATURES.shippingFees ? formatPrice(finalShippingFee) : SHIPPING_QUOTE_SHORT
-                )}
-              </span>
-            </div>
+            {FEATURES.shipping && (
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>رسوم التوصيل والشحن:</span>
+                <span className="font-mono font-bold text-foreground">
+                  {qualifiesFreeShipping ? (
+                    <span className="text-success font-bold">مجاني (0.00 د.ل)</span>
+                  ) : (
+                    formatPrice(finalShippingFee)
+                  )}
+                </span>
+              </div>
+            )}
 
             <div className="border-t border-primary/20 pt-2 flex items-center justify-between">
               <span className="text-sm font-bold text-foreground">الإجمالي النهائي المطلوب تحصيله:</span>

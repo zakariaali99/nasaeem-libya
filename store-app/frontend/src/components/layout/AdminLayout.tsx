@@ -76,7 +76,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     title: 'الشحن والمالية',
     items: [
-      { to: '/admin/cities', label: 'المدن ومناطق التوصيل', icon: MapPin },
+      { to: '/admin/cities', label: 'المدن والمناطق', icon: MapPin },
       { to: '/admin/ledger', label: 'دفتر الأستاذ والمبيعات', icon: Wallet },
     ],
   },

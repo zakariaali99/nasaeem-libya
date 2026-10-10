@@ -175,6 +175,7 @@ export default function AdminOrderDetail() {
             </Button>
           )}
 
+          {FEATURES.shipping && (
           <Button
             asChild
             variant="outline"
@@ -186,6 +187,7 @@ export default function AdminOrderDetail() {
               <span>بوليصة الشحن (4x6 / 80mm)</span>
             </Link>
           </Button>
+          )}
 
           <Button
             asChild
@@ -298,16 +300,12 @@ export default function AdminOrderDetail() {
                   <span className="font-mono">-{formatPrice(order.discount_total)}</span>
                 </div>
               )}
-              <div className="flex justify-between text-muted-foreground">
-                <span>رسوم التوصيل والشحن:</span>
-                {Number(order.shipping_total) > 0 || FEATURES.shippingFees ? (
+              {(Number(order.shipping_total) > 0 || FEATURES.shipping) && (
+                <div className="flex justify-between text-muted-foreground">
+                  <span>رسوم التوصيل والشحن:</span>
                   <span className="font-mono font-semibold text-foreground">{formatPrice(order.shipping_total)}</span>
-                ) : (
-                  <span className="font-semibold text-warning">
-                    لم يُحدَّد بعد — أدخله من «تعديل الطلب» بعد الاتفاق مع العميل
-                  </span>
-                )}
-              </div>
+                </div>
+              )}
               <div className="flex justify-between border-t border-border/80 pt-2 text-sm font-extrabold text-foreground">
                 <span>المبلغ الإجمالي النهائي:</span>
                 <span className="font-mono text-base text-price">{formatPrice(order.total)}</span>
@@ -488,11 +486,11 @@ export default function AdminOrderDetail() {
           <div className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-xs space-y-4">
             <div className="flex items-center gap-2.5 border-b border-border pb-3">
               <MapPin className="size-4 text-primary" />
-              <h3 className="font-bold text-sm text-foreground">عنوان ومكان التوصيل</h3>
+              <h3 className="font-bold text-sm text-foreground">عنوان العميل</h3>
             </div>
 
             <div className="space-y-3 text-xs">
-              {order.delivery_method_name && (
+              {FEATURES.shipping && order.delivery_method_name && (
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">شركة التوصيل:</span>
                   <Badge tone="primary" className="font-bold text-xs">
@@ -501,7 +499,7 @@ export default function AdminOrderDetail() {
                 </div>
               )}
 
-              {order.tracking_number && (
+              {FEATURES.shipping && order.tracking_number && (
                 <div className="rounded-2xl border border-primary/20 bg-primary/5 p-3 space-y-1.5">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-bold text-primary">رقم التتبع والشحنة:</span>
@@ -564,7 +562,7 @@ export default function AdminOrderDetail() {
           </div>
 
           {/* Courier Live Tracking Timeline */}
-          <OrderTrackingTimeline orderNumberOrId={order.order_number || order.id} />
+          {FEATURES.shipping && <OrderTrackingTimeline orderNumberOrId={order.order_number || order.id} />}
 
           {/* Payment Method & Ledger Card */}
           <div className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-xs space-y-4">

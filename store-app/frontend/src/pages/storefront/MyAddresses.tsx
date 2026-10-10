@@ -115,7 +115,7 @@ function AddressForm({ address, onDone }: { address: Address | null; onDone: () 
           <Select {...props} value={regionId} onChange={(e) => setRegionId(e.target.value)} disabled={!cityId} required>
             <option value="">{cityId ? 'اختر المنطقة' : 'اختر المدينة أولاً'}</option>
             {(regionData?.regions ?? []).map((region) => (
-              <option key={region.id} value={region.id}>{region.name}{FEATURES.shippingFees ? ` — ${formatPrice(region.delivery_fee)}` : ''}</option>
+              <option key={region.id} value={region.id}>{region.name}{FEATURES.shipping ? ` — ${formatPrice(region.delivery_fee)}` : ''}</option>
             ))}
           </Select>
         )}

@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/layout/AdminLayout'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { FEATURES } from '@/lib/features'
 import { formatNumber } from '@/lib/format'
 import { useCitiesAdmin, useUpdateCity, useUpdateRegion } from '@/lib/queries/orders'
 import { usePageTitle } from '@/lib/usePageTitle'
@@ -105,12 +106,14 @@ export default function AdminCities() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2.5 ms-auto">
-                  <FeeEditor
-                    label="سعر توصيل المدينة:"
-                    value={city.delivery_fee}
-                    disabled={updateCity.isPending}
-                    onSave={(fee) => updateCity.mutate({ id: city.id, delivery_fee: fee })}
-                  />
+                  {FEATURES.shipping && (
+                    <FeeEditor
+                      label="سعر توصيل المدينة:"
+                      value={city.delivery_fee}
+                      disabled={updateCity.isPending}
+                      onSave={(fee) => updateCity.mutate({ id: city.id, delivery_fee: fee })}
+                    />
+                  )}
 
                   <Button
                     variant="outline"
@@ -147,11 +150,13 @@ export default function AdminCities() {
                               <span className="text-[10px] text-destructive font-medium">معطّلة</span>
                             )}
                           </div>
-                          <FeeEditor
-                            value={region.delivery_fee}
-                            disabled={updateRegion.isPending}
-                            onSave={(fee) => updateRegion.mutate({ id: region.id, delivery_fee: fee })}
-                          />
+                          {FEATURES.shipping && (
+                            <FeeEditor
+                              value={region.delivery_fee}
+                              disabled={updateRegion.isPending}
+                              onSave={(fee) => updateRegion.mutate({ id: region.id, delivery_fee: fee })}
+                            />
+                          )}
                         </div>
                       ))}
                     </div>

@@ -86,7 +86,7 @@ def format_bank_transfer_whatsapp_message(order, store_url: str = "") -> str:
         delivery_line = f"🚚 رسوم التوصيل ({city_name}): {order.shipping_total} د.ل\n"
         total_line = f"💰 *المبلغ الإجمالي المطلوب تحويله: {order.total} د.ل*\n\n"
     else:
-        delivery_line = f"🚚 سعر التوصيل ({city_name}): سنبلغك به عند تأكيد الطلب\n"
+        delivery_line = "🚚 التوصيل: سنتواصل معك للاتفاق عليه وعلى سعره عند تأكيد الطلب\n"
         total_line = f"💰 *قيمة المنتجات: {order.total} د.ل* (غير شاملة التوصيل)\n\n"
 
     msg += (

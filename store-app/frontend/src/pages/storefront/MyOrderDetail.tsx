@@ -6,7 +6,7 @@ import { ErrorState } from '@/components/storefront/ErrorState'
 import { Button } from '@/components/ui/button'
 import { LineThumb } from '@/components/ui/line-thumb'
 import { Skeleton } from '@/components/ui/skeleton'
-import { FEATURES, SHIPPING_QUOTE_SHORT } from '@/lib/features'
+import { FEATURES } from '@/lib/features'
 import { formatPrice } from '@/lib/format'
 import { usePageTitle } from '@/lib/usePageTitle'
 import { useOrder } from '@/lib/queries/orders'
@@ -162,14 +162,12 @@ export default function MyOrderDetail() {
             <span className="font-mono">−{formatPrice(order.discount_total)}</span>
           </div>
         )}
-        <div className="flex justify-between text-muted-foreground">
-          <span>رسوم التوصيل</span>
-          {Number(order.shipping_total) > 0 || FEATURES.shippingFees ? (
+        {Number(order.shipping_total) > 0 || FEATURES.shipping ? (
+          <div className="flex justify-between text-muted-foreground">
+            <span>رسوم التوصيل</span>
             <span className="font-mono">{formatPrice(order.shipping_total)}</span>
-          ) : (
-            <span className="text-xs">{SHIPPING_QUOTE_SHORT}</span>
-          )}
-        </div>
+          </div>
+        ) : null}
         <div className="flex justify-between border-t border-border pt-3 text-base font-bold text-foreground">
           <span>الإجمالي النهائي</span>
           <span className="font-mono text-primary text-lg">{formatPrice(order.total)}</span>

@@ -159,7 +159,7 @@ export default function CheckoutPage() {
         city_id: cityId,
         region_id: regionId || '',
         address,
-        delivery_method_code: method,
+        delivery_method_code: FEATURES.shipping ? method : '',
         payment_method: payment,
         customer_name: customerName || user?.name || '',
         customer_phone: customerPhone || user?.phone_number || '',
@@ -198,14 +198,14 @@ export default function CheckoutPage() {
   }
 
   const isFreeShipping = Boolean(
-    FEATURES.shippingFees &&
+    FEATURES.shipping &&
       promo?.is_active &&
       order &&
       Number(order.subtotal) >= Number(promo.min_order_amount),
   )
   // With delivery quoted by the store on confirmation there is no fee to
   // preview; the server charges none either.
-  const regularShipping = !FEATURES.shippingFees
+  const regularShipping = !FEATURES.shipping
     ? '0.00'
     : selectedRegion
       ? selectedRegion.delivery_fee

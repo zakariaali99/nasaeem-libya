@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/layout/AdminLayout'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { api } from '@/lib/api'
+import { FEATURES } from '@/lib/features'
 import { formatPrice } from '@/lib/format'
 import { useAdminCartPromotion, useUpdateAdminCartPromotion } from '@/lib/queries/orders'
 import { usePageTitle } from '@/lib/usePageTitle'
@@ -262,7 +263,7 @@ export default function AdminDiscounts() {
     <div className="space-y-6 animate-fade-rise">
       <PageHeader
         title="كوبونات وعروض الخصم"
-        description="إدارة عروض الشحن المجاني التلقائي في السلة، وقسائم الخصم النسبية والمبالغ الثابتة."
+        description="إدارة قسائم الخصم النسبية والمبالغ الثابتة."
         action={
           <Button asChild size="sm" className="rounded-xl font-bold shadow-xs gap-1.5 h-10 px-4">
             <Link to="/admin/discounts/new">
@@ -274,7 +275,7 @@ export default function AdminDiscounts() {
       />
 
       {/* Dynamic Cart Promotion & Free Shipping Management Card */}
-      <CartPromotionManagerCard />
+      {FEATURES.shipping && <CartPromotionManagerCard />}
 
       <DataTable
         columns={[

@@ -19,6 +19,7 @@ import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { FEATURES } from '@/lib/features'
 import { formatNumber, formatPrice } from '@/lib/format'
 import { useExecutiveAnalytics } from '@/lib/queries/executiveAnalytics'
 import { usePageTitle } from '@/lib/usePageTitle'
@@ -554,6 +555,7 @@ export default function ExecutiveAnalytics() {
         </div>
 
         {/* Delivery Couriers Breakdown */}
+        {FEATURES.shipping && (
         <div className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-xs space-y-4">
           <div className="flex items-center justify-between border-b border-border/80 pb-3.5">
             <div className="flex items-center gap-2">
@@ -582,6 +584,7 @@ export default function ExecutiveAnalytics() {
             )}
           </div>
         </div>
+        )}
       </div>
 
       {/* VIP High Rollers Cohort Table */}

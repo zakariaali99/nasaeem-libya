@@ -10,6 +10,7 @@ import { LineThumb } from '@/components/ui/line-thumb'
 import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { ApiError } from '@/lib/api'
+import { FEATURES } from '@/lib/features'
 import { formatPrice } from '@/lib/format'
 import { useProducts } from '@/lib/queries/catalog'
 import { useCities, useDeliveryMethods, useRegions } from '@/lib/queries/delivery'
@@ -131,10 +132,10 @@ export function OrderEditDialog({ order, lookup, open, onOpenChange }: OrderEdit
     if (cityId) body.city_id = cityId
     if (regionId) body.region_id = regionId
     if (address.trim()) body.address = address
-    if (methodCode) body.delivery_method_code = methodCode
+    if (FEATURES.shipping && methodCode) body.delivery_method_code = methodCode
     // Sent only when the operator changed it, so an untouched field never
     // overrides a fee the system computed.
-    if (shippingFee.trim() !== '' && Number(shippingFee) !== Number(order.shipping_total)) {
+    if (FEATURES.shipping && shippingFee.trim() !== '' && Number(shippingFee) !== Number(order.shipping_total)) {
       body.shipping_total = shippingFee.trim()
     }
     edit.mutate(body, {
@@ -150,7 +151,7 @@ export function OrderEditDialog({ order, lookup, open, onOpenChange }: OrderEdit
           <div className="pe-10">
             <DialogTitle>تعديل الطلب #{order.order_number}</DialogTitle>
             <DialogDescription>
-              غيّر الكميات أو أضف منتجاً أو احذفه، وعدّل عنوان التوصيل. يُعاد حساب المجموع والتوصيل والمخزون تلقائياً عند الحفظ.
+              غيّر الكميات أو أضف منتجاً أو احذفه، وعدّل عنوان العميل. يُعاد حساب المجموع والمخزون تلقائياً عند الحفظ.
             </DialogDescription>
           </div>
 
@@ -260,31 +261,35 @@ export function OrderEditDialog({ order, lookup, open, onOpenChange }: OrderEdit
                 <Textarea id="edit-address" rows={2} value={address} onChange={(e) => setAddress(e.target.value)} />
               </Field>
             </div>
-            <Field id="edit-method" label="شركة التوصيل">
-              <Select id="edit-method" value={methodCode} onChange={(e) => setMethodCode(e.target.value)}>
-                <option value="">— بدون تغيير —</option>
-                {(methods ?? []).map((m) => (
-                  <option key={m.code} value={m.code}>{m.name}</option>
-                ))}
-              </Select>
-            </Field>
-            <Field
-              id="edit-shipping"
-              label="سعر التوصيل المتفق عليه (د.ل)"
-              hint="يُضاف إلى إجمالي الطلب والفاتورة ومبلغ التحصيل عند المندوب."
-            >
-              <Input
-                id="edit-shipping"
-                type="number"
-                inputMode="decimal"
-                min={0}
-                step="0.5"
-                dir="ltr"
-                value={shippingFee}
-                onChange={(e) => setShippingFee(e.target.value)}
-                className="font-mono"
-              />
-            </Field>
+            {FEATURES.shipping && (
+              <>
+                <Field id="edit-method" label="شركة التوصيل">
+                  <Select id="edit-method" value={methodCode} onChange={(e) => setMethodCode(e.target.value)}>
+                    <option value="">— بدون تغيير —</option>
+                    {(methods ?? []).map((m) => (
+                      <option key={m.code} value={m.code}>{m.name}</option>
+                    ))}
+                  </Select>
+                </Field>
+                <Field
+                  id="edit-shipping"
+                  label="سعر التوصيل المتفق عليه (د.ل)"
+                  hint="يُضاف إلى إجمالي الطلب والفاتورة ومبلغ التحصيل عند المندوب."
+                >
+                  <Input
+                    id="edit-shipping"
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    step="0.5"
+                    dir="ltr"
+                    value={shippingFee}
+                    onChange={(e) => setShippingFee(e.target.value)}
+                    className="font-mono"
+                  />
+                </Field>
+              </>
+            )}
             <Field id="edit-notes" label="ملاحظات العميل">
               <Textarea id="edit-notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
             </Field>
@@ -294,9 +299,9 @@ export function OrderEditDialog({ order, lookup, open, onOpenChange }: OrderEdit
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
             <p className="text-xs text-muted-foreground">
-              المجموع الجديد مع التوصيل (تقديري، قبل الخصم):{' '}
+              المجموع الفرعي الجديد (تقديري):{' '}
               <span className="font-mono text-sm font-extrabold text-foreground">
-                {formatPrice(subtotal + (Number(shippingFee) || 0))}
+                {formatPrice(subtotal + (FEATURES.shipping ? Number(shippingFee) || 0 : 0))}
               </span>
             </p>
             <div className="flex gap-2">

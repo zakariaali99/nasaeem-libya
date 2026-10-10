@@ -21,6 +21,7 @@ import { QuickOrderModal } from '@/components/admin/QuickOrderModal'
 import { StatusBadge } from '@/components/admin/StatusBadge'
 import { PageHeader } from '@/components/layout/AdminLayout'
 import { Button } from '@/components/ui/button'
+import { FEATURES } from '@/lib/features'
 import { formatNumber, formatPrice } from '@/lib/format'
 import { useBulkOrderAction, useMyOrders } from '@/lib/queries/orders'
 import { usePageTitle } from '@/lib/usePageTitle'
@@ -272,17 +273,19 @@ export default function AdminOrders() {
         filterChips={filterChips}
         bulkActions={(selected, clear) => (
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              asChild
-              size="sm"
-              variant="outline"
-              className="h-8 text-xs font-bold rounded-lg border-primary/40 bg-primary/10 text-primary hover:bg-primary/20"
-            >
-              <Link to={`/admin/orders/batch-waybills?ids=${selected.join(',')}`}>
-                <Printer className="size-3.5 me-1" />
-                <span>طباعة البوالص ({selected.length})</span>
-              </Link>
-            </Button>
+            {FEATURES.shipping && (
+              <Button
+                asChild
+                size="sm"
+                variant="outline"
+                className="h-8 text-xs font-bold rounded-lg border-primary/40 bg-primary/10 text-primary hover:bg-primary/20"
+              >
+                <Link to={`/admin/orders/batch-waybills?ids=${selected.join(',')}`}>
+                  <Printer className="size-3.5 me-1" />
+                  <span>طباعة البوالص ({selected.length})</span>
+                </Link>
+              </Button>
+            )}
 
             <Button
               size="sm"

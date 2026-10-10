@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { FEATURES } from '@/lib/features'
 import { lazy, Suspense } from 'react'
 import { RouterProvider, createBrowserRouter } from 'react-router-dom'
 
@@ -157,9 +158,9 @@ const router = createBrowserRouter([
               { path: 'inventory', element: withSuspense(<AdminInventory />) },
               { path: 'inventory/logs', element: withSuspense(<AdminInventoryLogs />) },
               { path: 'orders', element: withSuspense(<AdminOrders />) },
-              { path: 'orders/batch-waybills', element: withSuspense(<AdminBatchWaybills />) },
+              ...(FEATURES.shipping ? [{ path: 'orders/batch-waybills', element: withSuspense(<AdminBatchWaybills />) }] : []),
               { path: 'orders/:orderIdOrNumber', element: withSuspense(<AdminOrderDetail />) },
-              { path: 'orders/:orderIdOrNumber/waybill', element: withSuspense(<AdminOrderWaybill />) },
+              ...(FEATURES.shipping ? [{ path: 'orders/:orderIdOrNumber/waybill', element: withSuspense(<AdminOrderWaybill />) }] : []),
               { path: 'orders/:orderIdOrNumber/invoice', element: withSuspense(<AdminOrderInvoice />) },
               { path: 'users', element: withSuspense(<AdminUsers />) },
               { path: 'users/:userId', element: withSuspense(<AdminUserDetail />) },
@@ -171,9 +172,9 @@ const router = createBrowserRouter([
               { path: 'discounts/new', element: withSuspense(<DiscountForm />) },
               { path: 'discounts/:id', element: withSuspense(<DiscountEditPage />) },
               { path: 'cities', element: withSuspense(<AdminCities />) },
-              { path: 'delivery', element: withSuspense(<AdminDeliveryMethods />) },
-              { path: 'delivery/reconciliation', element: withSuspense(<AdminCODReconciliation />) },
-              { path: 'delivery/:courierCode', element: withSuspense(<DeliveryMethodConfig />) },
+              ...(FEATURES.shipping ? [{ path: 'delivery', element: withSuspense(<AdminDeliveryMethods />) }] : []),
+              ...(FEATURES.shipping ? [{ path: 'delivery/reconciliation', element: withSuspense(<AdminCODReconciliation />) }] : []),
+              ...(FEATURES.shipping ? [{ path: 'delivery/:courierCode', element: withSuspense(<DeliveryMethodConfig />) }] : []),
               { path: 'payment_methods', element: withSuspense(<AdminPaymentMethods />) },
               { path: 'payment_methods/:methodCode', element: withSuspense(<PaymentMethodConfig />) },
               { path: 'ledger', element: withSuspense(<AdminLedger />) },

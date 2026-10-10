@@ -455,11 +455,14 @@ def checkout(
     # A draft has no region yet, so no delivery fee yet. `finalise_order()` adds
     # it, and recomputes the total from the same stored numbers.
     shipping_total, delivery_discount_amount = delivery_fee(region=region, city=city, subtotal=subtotal)
-    method = (
-        DeliveryMethod.objects.filter(code=delivery_method_code, is_active=True).first()
-        if delivery_method_code
-        else DeliveryMethod.objects.filter(is_active=True).order_by("name").first()
-    )
+    # No courier is attached while shipping is out of the system.
+    method = None
+    if settings.FEATURE_SHIPPING_FEES:
+        method = (
+            DeliveryMethod.objects.filter(code=delivery_method_code, is_active=True).first()
+            if delivery_method_code
+            else DeliveryMethod.objects.filter(is_active=True).order_by("name").first()
+        )
 
     gift_wrap_fee = Decimal("15.00") if (is_gift and gift_wrap_type == "ROYAL_VELVET") else Decimal("0.00")
     total = money(subtotal - discount_total + shipping_total + gift_wrap_fee)
@@ -676,7 +679,7 @@ def finalise_order(
             )
         order.payment_method = payment_method
         order.order_number = _retag_order_number(order.order_number, payment_method)
-    if delivery_method_code:
+    if delivery_method_code and settings.FEATURE_SHIPPING_FEES:
         method = DeliveryMethod.objects.filter(
             code=delivery_method_code, is_active=True
         ).first()
@@ -854,7 +857,7 @@ def edit_order(
         order.shipping_address = address.strip()
     if customer_notes is not None:
         order.customer_notes = customer_notes.strip()
-    if delivery_method_code:
+    if delivery_method_code and settings.FEATURE_SHIPPING_FEES:
         method = DeliveryMethod.objects.filter(code=delivery_method_code, is_active=True).first()
         if method is None:
             raise CheckoutError("طريقة التوصيل غير متاحة", field="delivery_method_code")
@@ -1045,7 +1048,7 @@ def quick_create_admin_order(
 
     # 3. Delivery Method resolution
     delivery_method = None
-    if delivery_method_code:
+    if delivery_method_code and settings.FEATURE_SHIPPING_FEES:
         delivery_method = DeliveryMethod.objects.filter(
             code=delivery_method_code, is_active=True
         ).first()

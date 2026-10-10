@@ -9,6 +9,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
+import { FEATURES } from '@/lib/features'
 import { formatPrice } from '@/lib/format'
 import { useCart, useRemoveCartItem, useUpdateCartItem } from '@/lib/queries/cart'
 import { useActiveCartPromotion } from '@/lib/queries/orders'
@@ -28,7 +29,7 @@ export function CartDrawer({ children }: CartDrawerProps) {
   const items = cart?.items ?? []
   const subtotal = Number(cart?.subtotal ?? 0)
 
-  const isPromoActive = Boolean(promo && promo.is_active)
+  const isPromoActive = Boolean(FEATURES.shipping && promo && promo.is_active)
   const threshold = promo ? Number(promo.min_order_amount) : 200
   const remainingForFree = Math.max(0, threshold - subtotal)
   const progressPercent = threshold > 0 ? Math.min(100, (subtotal / threshold) * 100) : 100

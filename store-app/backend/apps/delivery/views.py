@@ -10,6 +10,7 @@ the response says so in Arabic instead of returning a bare `[]` for the client
 to render as an empty `<select>`.
 """
 
+from django.conf import settings
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -31,6 +32,9 @@ class DeliveryMethodListView(APIView):
 
     def get(self, request):
         methods = DeliveryMethod.objects.filter(is_active=True).order_by("name")
+        if not settings.FEATURE_SHIPPING_FEES:
+            # Shipping is out of the system: the storefront offers no courier.
+            methods = methods.none()
         return Response({"data": DeliveryMethodSerializer(methods, many=True).data})
 
 

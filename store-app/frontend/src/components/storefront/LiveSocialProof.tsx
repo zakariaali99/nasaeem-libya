@@ -32,7 +32,7 @@ export function LiveSocialProof({ product }: LiveSocialProofProps) {
   const isLowStock = product.in_stock && stock > 0 && stock <= 5
   // A hard-coded "free delivery over 150" promise nobody approved: shown only
   // if delivery fees are charged at all, and never while they are quoted.
-  const isFreeShippingEligible = FEATURES.shippingFees && parseFloat(product.price || '0') >= 150
+  const isFreeShippingEligible = FEATURES.shipping && parseFloat(product.price || '0') >= 150
 
   return (
     <div className="space-y-2.5">

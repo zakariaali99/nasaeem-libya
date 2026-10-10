@@ -113,10 +113,10 @@ export function HeroCta({ widget, priority = false }: { widget: Widget; priority
           </Button>
 
           <Link
-            to="/collections"
+            to="/products?sort=newest"
             className="inline-flex h-12 items-center gap-2 rounded-2xl border border-secondary-foreground/20 bg-secondary-foreground/5 px-6 text-sm font-bold text-secondary-foreground hover:bg-secondary-foreground/10 hover:border-secondary-foreground/40 transition-all backdrop-blur-sm"
           >
-            <span>أحدث المجموعات والعروض</span>
+            <span>أحدث المنتجات</span>
             <ArrowLeft className="size-4 rtl:rotate-0" />
           </Link>
         </div>

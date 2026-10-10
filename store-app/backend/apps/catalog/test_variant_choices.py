@@ -68,3 +68,22 @@ def test_sized_products_add_no_query_per_product():
         client.get(reverse("product-list"))
 
     assert len(large) == len(small)
+
+
+def test_search_works_on_a_database_without_full_text(monkeypatch, db):
+    """Production runs on SQLite: the search must still answer, name matches first."""
+    from decimal import Decimal
+
+    from django.db import connection
+    from rest_framework.test import APIClient
+
+    from apps.catalog.models import Product
+
+    Product.objects.create(name="زيت عطري", slug="oil", price=Decimal("50"), description="فيه عود خفيف")
+    Product.objects.create(name="عود ملكي", slug="oud", price=Decimal("450"))
+    monkeypatch.setattr(connection, "vendor", "sqlite")
+
+    response = APIClient().get("/api/products/", {"search": "عود"})
+
+    assert response.status_code == 200
+    assert [p["name"] for p in response.json()["data"]] == ["عود ملكي", "زيت عطري"]

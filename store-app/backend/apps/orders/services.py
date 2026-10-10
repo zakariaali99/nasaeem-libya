@@ -160,6 +160,12 @@ def available_stock(product: Product, variant: ProductVariant | None) -> int | N
     return product.stock - product.reserved_stock
 
 
+def has_price(product: Product, variant: ProductVariant | None) -> bool:
+    """False when neither the size nor the product carries a price. Such a
+    line must never be sold: `money(None)` is 0.00, i.e. free."""
+    return (variant is not None and variant.price is not None) or product.price is not None
+
+
 def unit_price(product: Product, variant: ProductVariant | None) -> Decimal:
     """A variant's price may be null, meaning "same as the product"."""
     if variant is not None and variant.price is not None:
@@ -424,6 +430,8 @@ def checkout(
                 f"الكمية المتوفرة من «{product.name}» هي {max(stock, 0)} فقط"
             )
 
+        if not has_price(product, variant):
+            raise CheckoutError(f"سعر «{product.name}» غير محدد حالياً، يرجى حذفه من السلة أو التواصل معنا")
         price = unit_price(product, variant)
         line_total = money(price * line.quantity)
         subtotal += line_total
@@ -789,6 +797,8 @@ def edit_order(
                 raise CheckoutError(f"الحجم المحدد لـ «{product.name}» غير متاح", field="items")
             if variant is None and product.has_variants:
                 raise CheckoutError(f"يرجى اختيار حجم «{product.name}»", field="items")
+            if not has_price(product, variant):
+                raise CheckoutError(f"سعر «{product.name}» غير محدد، حدّده من صفحة المنتج أولاً", field="items")
             price = unit_price(product, variant)
         else:
             price = money(existing.unit_price)
@@ -1087,6 +1097,8 @@ def quick_create_admin_order(
 
         # A variant's price may be null ("same as the product"): `unit_price()`
         # handles that, `Decimal(str(None))` would crash the request.
+        if not has_price(product, variant):
+            raise CheckoutError(f"سعر «{product.name}» غير محدد، حدّده من صفحة المنتج أولاً")
         price = unit_price(product, variant)
         line_total = (price * qty).quantize(TWO_PLACES)
         subtotal += line_total

@@ -2,7 +2,6 @@ import {
   ArrowLeft,
   ChevronDown,
   ChevronLeft,
-  Gift,
   Heart,
   Home,
   LayoutDashboard,
@@ -132,14 +131,6 @@ export function CategoriesDrawer({ children }: CategoriesDrawerProps) {
 
             <DrawerLink to="/" icon={Home} label="الرئيسية" onClick={() => setOpen(false)} />
             <DrawerLink to="/products" icon={Sparkles} label="كل العطور والمنتجات" onClick={() => setOpen(false)} />
-            <DrawerLink
-              to="/collections"
-              icon={Gift}
-              label="المجموعات وأطقم الهدايا"
-              badge="جديد"
-              badgeTone="primary"
-              onClick={() => setOpen(false)}
-            />
             <DrawerLink
               to="/wishlist"
               icon={Heart}

@@ -254,3 +254,14 @@ class TestGuestCheckoutNeverSignsInToAnExistingAccount:
         guest, response = self._guest_confirm(product, city, "0926667788")
         assert response.status_code in (200, 201), response.json()
         assert guest.get(reverse("auth-me")).status_code == 200
+
+
+def test_a_product_without_a_price_cannot_be_put_in_the_cart(db, product):
+    """`money(None)` is 0.00 — an unpriced product must not be sold for free."""
+    from apps.catalog.models import Product
+
+    Product.objects.filter(pk=product.pk).update(price=None)
+
+    response = APIClient().post(reverse("cart"), {"product_id": str(product.id), "quantity": 1}, format="json")
+
+    assert response.status_code == 409

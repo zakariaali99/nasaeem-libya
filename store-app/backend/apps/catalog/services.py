@@ -344,10 +344,22 @@ def search_products(queryset, term):
         return queryset
 
     if connection.vendor != "postgresql":
+        # SQLite (the production host) has no full-text ranking, but callers
+        # order by `relevance` — without the annotation every search was a 500.
+        # A match in the name outranks one in the description.
+        from django.db.models import Case, FloatField, Value, When
+
         return queryset.filter(
             Q(name__icontains=term)
             | Q(description__icontains=term)
             | Q(sku__icontains=term)
+        ).annotate(
+            relevance=Case(
+                When(name__istartswith=term, then=Value(3.0)),
+                When(name__icontains=term, then=Value(2.0)),
+                default=Value(1.0),
+                output_field=FloatField(),
+            )
         )
 
     from django.contrib.postgres.search import (

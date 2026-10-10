@@ -110,6 +110,13 @@ class CartView(CsrfProtectedAPIView):
                 {"message": "يرجى اختيار أحد خيارات المنتج"}, status=status.HTTP_400_BAD_REQUEST
             )
 
+        if not services.has_price(product, variant):
+            # No price on the size or the product: it would be sold for 0.00.
+            return Response(
+                {"message": "سعر هذا المنتج غير محدد حالياً، يرجى التواصل معنا لطلبه"},
+                status=status.HTTP_409_CONFLICT,
+            )
+
         cart = services.get_or_create_cart(request)
         item = cart.items.filter(product=product, variant=variant).first()
         wanted = (item.quantity if item else 0) + payload["quantity"]

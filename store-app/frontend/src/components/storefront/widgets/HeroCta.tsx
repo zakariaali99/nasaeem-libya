@@ -1,4 +1,4 @@
-import { ArrowLeft, ShieldCheck, ShoppingBag, Sparkles, Truck } from 'lucide-react'
+import { ArrowLeft, ShoppingBag, Sparkles } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
@@ -12,130 +12,134 @@ const ALIGN = {
   end: 'items-end text-end',
 } as const
 
+/**
+ * The main banner, in one of two modes the operator picks:
+ *
+ * - `image`: the picture exactly as it was designed — full width, its own
+ *   proportions, no darkening and no text on top. Optionally a link.
+ * - `text`: a title block over an optional background picture, darkened by
+ *   the `overlay` percentage the operator chose.
+ *
+ * Every piece of text is the operator's. An empty field shows nothing: this
+ * component used to fill blanks with built-in slogans, a fixed second button
+ * and three fixed "trust" lines nobody had approved.
+ */
 export function HeroCta({ widget, priority = false }: { widget: Widget; priority?: boolean }) {
   const {
+    heroMode,
     title,
     subtitle,
+    badgeText,
     buttonLabel,
     buttonUrl,
+    secondaryLabel,
+    secondaryUrl,
     alignment,
+    overlay,
+    linkUrl,
     backgroundImageUrl,
     desktopImageUrl = backgroundImageUrl,
     mobileImageUrl,
   } = widget.data
 
-  const displayTitle = title || 'عطور شرقية وعالمية فاخرة'
-  const displaySubtitle =
-    subtitle || 'اكتشف أرقى العطور النيش والعالمية مع ضمان الجودة 100% والتوصيل الفوري لجميع المدن الليبية'
-  const displayButtonLabel = buttonLabel || 'استكشف التشكيلة الحصرية'
-  const displayButtonUrl = buttonUrl || '/products'
+  const desktop = desktopImageUrl || mobileImageUrl
+  const hasImage = Boolean(desktop)
 
-  const hasImage = Boolean(desktopImageUrl || mobileImageUrl)
+  // One URL per breakpoint, matching the preload tags the server emits
+  // (spa._hero_preload_tags), so a phone never downloads the desktop file.
+  const picture = (className: string, style?: React.CSSProperties) => (
+    <picture>
+      <source media="(max-width: 640px)" srcSet={renditionUrl(String(mobileImageUrl || desktop), 'full')} />
+      <img
+        src={String(desktop)}
+        alt={title || ''}
+        loading={priority ? 'eager' : 'lazy'}
+        fetchPriority={priority ? 'high' : undefined}
+        decoding="async"
+        className={className}
+        style={style}
+      />
+    </picture>
+  )
+
+  if (heroMode === 'image') {
+    if (!hasImage) return null
+    const image = picture('block h-auto w-full rounded-3xl')
+    return linkUrl ? (
+      <Link to={linkUrl} className="block rounded-3xl focus-visible:outline-2 focus-visible:outline-ring">
+        {image}
+      </Link>
+    ) : (
+      image
+    )
+  }
+
+  const hasText = Boolean(title || subtitle || badgeText || buttonLabel || secondaryLabel)
+  if (!hasText && !hasImage) return null
+
+  // `overlay` is how dark the picture gets, 0 (untouched) to 90.
+  const darkness = Math.min(Math.max(Number(overlay ?? 45), 0), 90) / 100
 
   return (
-    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white shadow-xl border border-border/40 animate-fade-rise">
+    <div className="relative overflow-hidden rounded-3xl bg-slate-950 text-white shadow-xl animate-fade-rise">
       {hasImage ? (
         <>
-          {/* One URL per breakpoint, matching the preload tags the server
-              emits (spa._hero_preload_tags), so a phone downloads only the
-              1200px rendition and never the desktop original. */}
-          <picture className="absolute inset-0 size-full">
-            <source
-              media="(max-width: 640px)"
-              srcSet={renditionUrl(String(mobileImageUrl || desktopImageUrl), 'full')}
-            />
-            <img
-              src={String(desktopImageUrl || mobileImageUrl)}
-              alt={String(displayTitle)}
-              width={1920}
-              height={800}
-              loading={priority ? 'eager' : 'lazy'}
-              fetchPriority={priority ? 'high' : undefined}
-              decoding="async"
-              className="size-full object-cover opacity-40"
-            />
-          </picture>
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-transparent" aria-hidden="true" />
+          <div className="absolute inset-0">{picture('size-full object-cover')}</div>
+          <div className="absolute inset-0 bg-slate-950" style={{ opacity: darkness }} aria-hidden="true" />
         </>
-      ) : (
-        <>
-          {/* Luxury ambient light spheres */}
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute -start-20 -top-20 size-96 rounded-full bg-primary/25 blur-3xl"
-          />
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute -bottom-24 -end-16 size-96 rounded-full bg-rating/15 blur-3xl"
-          />
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent"
-          />
-        </>
-      )}
+      ) : null}
 
       <div
         className={cn(
-          'relative z-10 flex flex-col gap-6 px-6 py-12 sm:px-12 sm:py-16 max-w-4xl mx-auto',
+          'relative z-10 mx-auto flex min-h-64 max-w-4xl flex-col justify-center gap-6 px-6 py-12 sm:min-h-80 sm:px-12 sm:py-16',
           ALIGN[alignment ?? 'center'],
         )}
       >
-        {/* Luxury Overline Badge */}
-        <div className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-4 py-1.5 backdrop-blur-md">
-          <Sparkles className="size-3.5 text-primary" />
-          <span className="text-xs font-bold tracking-wide text-primary-foreground">
-            دار العطور الفاخرة والأصلية — ليبيا
-          </span>
-        </div>
-
-        {/* Hero Title & Subtitle */}
-        <div className="space-y-3">
-          <h2 className="text-3xl font-black leading-tight tracking-tight sm:text-5xl lg:text-6xl text-background drop-shadow-sm">
-            {displayTitle}
-          </h2>
-          <p className="max-w-2xl text-sm sm:text-lg leading-relaxed text-background/80 font-normal">
-            {displaySubtitle}
-          </p>
-        </div>
-
-        {/* CTA Buttons */}
-        <div className="flex flex-wrap items-center gap-3 pt-2">
-          <Button
-            asChild
-            size="lg"
-            className="rounded-2xl font-extrabold text-sm sm:text-base px-8 h-12 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/25 gap-2 transition-all hover:scale-[1.02]"
-          >
-            <Link to={displayButtonUrl}>
-              <ShoppingBag className="size-5" />
-              <span>{displayButtonLabel}</span>
-            </Link>
-          </Button>
-
-          <Link
-            to="/products?sort=newest"
-            className="inline-flex h-12 items-center gap-2 rounded-2xl border border-secondary-foreground/20 bg-secondary-foreground/5 px-6 text-sm font-bold text-secondary-foreground hover:bg-secondary-foreground/10 hover:border-secondary-foreground/40 transition-all backdrop-blur-sm"
-          >
-            <span>أحدث المنتجات</span>
-            <ArrowLeft className="size-4 rtl:rotate-0" />
-          </Link>
-        </div>
-
-        {/* Embedded Trust Pillars Strip */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4 border-t border-background/10 text-xs">
-          <div className="flex items-center gap-2.5 text-background/70">
-            <ShieldCheck className="size-4 text-success shrink-0" />
-            <span>عطور أصلية ومضمونة 100%</span>
+        {badgeText ? (
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-4 py-1.5 backdrop-blur-md">
+            <Sparkles className="size-3.5" />
+            <span className="text-xs font-bold tracking-wide">{badgeText}</span>
           </div>
-          <div className="flex items-center gap-2.5 text-background/70">
-            <Truck className="size-4 text-info shrink-0" />
-            <span>توصيل لكافة المدن (1–5 أيام)</span>
+        ) : null}
+
+        {title || subtitle ? (
+          <div className="space-y-3">
+            {title ? (
+              <h2 className="text-3xl font-black leading-tight tracking-tight drop-shadow-sm sm:text-5xl lg:text-6xl">
+                {title}
+              </h2>
+            ) : null}
+            {subtitle ? (
+              <p className="max-w-2xl text-sm leading-relaxed text-white/85 sm:text-lg">{subtitle}</p>
+            ) : null}
           </div>
-          <div className="flex items-center gap-2.5 text-background/70">
-            <Sparkles className="size-4 text-rating shrink-0" />
-            <span>أفضل الأسعار بالجملة والقطاعي</span>
+        ) : null}
+
+        {buttonLabel || secondaryLabel ? (
+          <div className="flex flex-wrap items-center gap-3 pt-2">
+            {buttonLabel ? (
+              <Button
+                asChild
+                size="lg"
+                className="h-12 gap-2 rounded-2xl px-8 text-sm font-extrabold shadow-lg sm:text-base"
+              >
+                <Link to={buttonUrl || '/products'}>
+                  <ShoppingBag className="size-5" />
+                  <span>{buttonLabel}</span>
+                </Link>
+              </Button>
+            ) : null}
+            {secondaryLabel ? (
+              <Link
+                to={secondaryUrl || '/products'}
+                className="inline-flex h-12 items-center gap-2 rounded-2xl border border-white/30 bg-white/10 px-6 text-sm font-bold backdrop-blur-sm transition-all hover:bg-white/20"
+              >
+                <span>{secondaryLabel}</span>
+                <ArrowLeft className="size-4" />
+              </Link>
+            ) : null}
           </div>
-        </div>
+        ) : null}
       </div>
     </div>
   )

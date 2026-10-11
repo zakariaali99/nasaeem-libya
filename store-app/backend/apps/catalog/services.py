@@ -214,10 +214,15 @@ def rendition_url(url, name):
     return rendition_urls(url).get(name, url)
 
 
-def store_image(uploaded_file, *, subdir="products"):
+def store_image(uploaded_file, *, subdir="products", full_size=None, quality=78):
     """Saves an upload and writes thumb/medium/full WebP renditions.
 
     Returns the `full` URL, which is what `ProductImage.url` stores.
+
+    `full_size` overrides the width cap of the `full` file only: a homepage
+    banner spans the screen, and the 1200px product cap made it visibly soft.
+    The three file names stay the same, so every caller of `rendition_url`
+    keeps working.
     """
     import io
     import logging
@@ -274,9 +279,11 @@ def store_image(uploaded_file, *, subdir="products"):
     stem = uuid.uuid4().hex
 
     for name, size in RENDITIONS.items():
+        if name == "full" and full_size:
+            size = full_size
         rendition = image.copy()
         rendition.thumbnail((size, size), Image.LANCZOS)
-        rendition.save(directory / f"{stem}-{name}.webp", "WEBP", quality=78, method=6)
+        rendition.save(directory / f"{stem}-{name}.webp", "WEBP", quality=quality, method=6)
 
     return f"{settings.MEDIA_URL}{subdir}/{stem}-full.webp"
 

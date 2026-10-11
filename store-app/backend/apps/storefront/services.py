@@ -12,6 +12,7 @@ Three jobs, kept apart on purpose:
 
 from __future__ import annotations
 
+from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Prefetch, Q
 from django.utils import timezone
@@ -30,20 +31,37 @@ LAYOUT_CACHE_SECONDS = 300
 # --------------------------------------------------------------------------
 
 def resolve_active_layout(now=None) -> StorefrontLayout | None:
-    """A layout is active when `is_global_active` **and** now is inside the date
-    range (when set) **and** today is in `active_days` (when set) **and** the
-    hour is inside the hour window (when set). Most recently updated wins.
+    """Which layout the homepage shows right now.
 
-    When nothing matches, fall back to the global default — a store with a
-    scheduled layout that has expired must not lose its homepage.
+    Among the layouts switched on (`is_global_active`):
+
+    1. a **scheduled** layout whose window contains `now` wins — that is what a
+       schedule is for (an Eid layout taking over for a week);
+    2. otherwise the **unscheduled** one, the store's everyday homepage. The
+       admin API keeps at most one of those switched on, so saving some other
+       layout can never swap the homepage by accident;
+    3. only when neither exists, a scheduled layout outside its window — an
+       expired campaign is a better homepage than none at all.
+
+    Ties (two scheduled layouts overlapping) go to the most recently updated.
     """
     now = now or timezone.localtime()
     candidates = list(StorefrontLayout.objects.filter(is_global_active=True))
-    matching = [layout for layout in candidates if _matches(layout, now)]
-    pool = matching or candidates
+    scheduled = [l for l in candidates if has_schedule(l) and _matches(l, now)]
+    everyday = [l for l in candidates if not has_schedule(l)]
+    pool = scheduled or everyday or candidates
     if not pool:
         return None
     return max(pool, key=lambda layout: layout.updated_at)
+
+
+def has_schedule(layout: StorefrontLayout) -> bool:
+    return bool(
+        layout.active_start_date
+        or layout.active_end_date
+        or layout.active_days
+        or (layout.active_start_hour is not None and layout.active_end_hour is not None)
+    )
 
 
 def _matches(layout: StorefrontLayout, now) -> bool:
@@ -90,6 +108,15 @@ def _ids(value) -> list[str]:
 
 def _layout(value) -> str:
     return "slider" if value == "slider" else "grid"
+
+
+def _int(value, default: int, low: int, high: int) -> int:
+    """A number field must never turn a save into a 500."""
+    try:
+        number = int(float(value))
+    except (TypeError, ValueError):
+        number = default
+    return max(low, min(number, high))
 
 
 def normalise_widget_data(widget_type: str, data: dict | None) -> dict:
@@ -161,7 +188,7 @@ def normalise_widget_data(widget_type: str, data: dict | None) -> dict:
                 # the type. One name survives: `label`.
                 "label": _first(item, "label", "name", "title"),
             })
-        return {"title": data.get("title", "") or "", "items": items}
+        return {"title": data.get("title", "") or "", "items": items, "layout": _layout(data.get("layout"))}
 
     if widget_type == WidgetType.HERO_CTA:
         alignment = data.get("alignment")
@@ -172,10 +199,18 @@ def normalise_widget_data(widget_type: str, data: dict | None) -> dict:
             data, "mobileImageUrl", "mobile_image_url"
         )
         return {
+            # `image`: the picture alone, as designed. `text`: a title block
+            # over an optional, darkened background picture.
+            "heroMode": "image" if data.get("heroMode") == "image" else "text",
             "title": data.get("title", "") or "",
             "subtitle": data.get("subtitle", "") or "",
+            "badgeText": str(data.get("badgeText") or ""),
             "buttonLabel": _first(data, "buttonLabel", "button_label"),
             "buttonUrl": _first(data, "buttonUrl", "button_url"),
+            "secondaryLabel": str(data.get("secondaryLabel") or ""),
+            "secondaryUrl": str(data.get("secondaryUrl") or ""),
+            "linkUrl": _first(data, "linkUrl", "link_url"),
+            "overlay": _int(data.get("overlay", 45), 45, 0, 90),
             "alignment": alignment if alignment in ("start", "center", "end") else "center",
             "desktopImageUrl": desktop_img,
             "mobileImageUrl": mobile_img,
@@ -199,8 +234,8 @@ def normalise_widget_data(widget_type: str, data: dict | None) -> dict:
             "badge": data.get("badge", "") or "ضمان الرضا الكامل 🧪",
             "description": data.get("description", "") or "",
             "price": str(_first(data, "price", default="60 د.ل")),
-            "sampleCount": int(data.get("sampleCount") or data.get("sample_count") or 5),
-            "cashbackPercent": int(data.get("cashbackPercent") or data.get("cashback_percent") or 100),
+            "sampleCount": _int(data.get("sampleCount") or data.get("sample_count") or 5, 5, 1, 50),
+            "cashbackPercent": _int(data.get("cashbackPercent") or data.get("cashback_percent") or 100, 100, 0, 100),
             "linkUrl": _first(data, "linkUrl", "link_url", default="/search?q=عينات"),
             "buttonText": _first(data, "buttonText", "button_text", default="اطلب باقة التجربة الآن"),
             "showInCart": bool(data.get("showInCart", True)),
@@ -208,14 +243,10 @@ def normalise_widget_data(widget_type: str, data: dict | None) -> dict:
         }
 
     if widget_type == WidgetType.TRUST_BADGES:
+        # Only what the operator wrote — no built-in claims are added.
         items = []
-        default_items = [
-            {"icon": "shield-check", "title": "عطور أصلية 100%", "subtitle": "ماركات عالمية وأصلية مضمونة"},
-            {"icon": "truck", "title": "توصيل لجميع مدن ليبيا", "subtitle": "شحن سريع وموثوق لباب بيتك"},
-            {"icon": "credit-card", "title": "دفع آمن ومريح", "subtitle": "سداد، معاملات، بطاقات، أو عند الاستلام"},
-        ]
-        for item in data.get("items") or default_items:
-            if isinstance(item, dict):
+        for item in data.get("items") or []:
+            if isinstance(item, dict) and str(item.get("title") or "").strip():
                 items.append({
                     "icon": str(item.get("icon") or "sparkles"),
                     "title": str(item.get("title") or ""),
@@ -228,7 +259,7 @@ def normalise_widget_data(widget_type: str, data: dict | None) -> dict:
 
     if widget_type == WidgetType.FREE_SHIPPING_BAR:
         return {
-            "threshold": float(data.get("threshold") or 150),
+            "threshold": float(_int(data.get("threshold") or 150, 150, 0, 100000)),
             "messageBefore": str(data.get("messageBefore") or "أضف عطوراً بقيمة {amount} د.ل للحصول على شحن مجاني!"),
             "messageAfter": str(data.get("messageAfter") or "مبروك! مؤهل للشحن المجاني لكافة المدن 🚚"),
         }
@@ -449,7 +480,12 @@ def cached_layout_rows():
     """The resolution + the raw widget rows. Personalised population is NOT
     cached — it varies per visitor, and caching it would show one customer's
     history to another."""
-    cached = cache.get(LAYOUT_CACHE_KEY)
+    # Without a shared cache (production has no Redis) every server process
+    # holds its own copy and a save only clears the one that handled it: the
+    # other processes kept serving the old homepage for five minutes. Two
+    # indexed queries are cheaper than that confusion, so skip the cache.
+    shared = "locmem" not in settings.CACHES["default"]["BACKEND"].lower()
+    cached = cache.get(LAYOUT_CACHE_KEY) if shared else None
     if cached is not None:
         layout_id, widget_ids = cached
         if layout_id is None:
@@ -465,11 +501,12 @@ def cached_layout_rows():
         if layout
         else []
     )
-    cache.set(
-        LAYOUT_CACHE_KEY,
-        (str(layout.id) if layout else None, [str(w.id) for w in widgets]),
-        LAYOUT_CACHE_SECONDS,
-    )
+    if shared:
+        cache.set(
+            LAYOUT_CACHE_KEY,
+            (str(layout.id) if layout else None, [str(w.id) for w in widgets]),
+            LAYOUT_CACHE_SECONDS,
+        )
     return layout, widgets
 
 

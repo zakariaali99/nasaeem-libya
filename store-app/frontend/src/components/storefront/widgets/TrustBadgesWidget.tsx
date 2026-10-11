@@ -1,4 +1,5 @@
-import { CreditCard, ShieldCheck, Sparkles, Truck } from 'lucide-react'
+import { CreditCard, Gift, Phone, ShieldCheck, Sparkles, Star, Tag, Truck } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import type { Widget } from '@/types/api'
 
 const ICON_MAP: Record<string, typeof ShieldCheck> = {
@@ -6,15 +7,20 @@ const ICON_MAP: Record<string, typeof ShieldCheck> = {
   truck: Truck,
   'credit-card': CreditCard,
   sparkles: Sparkles,
+  gift: Gift,
+  star: Star,
+  phone: Phone,
+  tag: Tag,
 }
 
 export function TrustBadgesWidget({ widget }: { widget: Widget }) {
   const { data } = widget
-  const items = (data.items as Array<{ icon?: string; title?: string; subtitle?: string }>) || [
-    { icon: 'shield-check', title: 'عطور أصلية 100%', subtitle: 'ماركات عالمية وأصلية مضمونة' },
-    { icon: 'truck', title: 'توصيل لجميع مدن ليبيا', subtitle: 'شحن سريع وموثوق لباب بيتك' },
-    { icon: 'credit-card', title: 'دفع آمن ومريح', subtitle: 'سداد، معاملات، بطاقات، أو عند الاستلام' },
-  ]
+  // Only what the operator wrote: no built-in promises about authenticity,
+  // delivery or payment methods.
+  const items = ((data.items as Array<{ icon?: string; title?: string; subtitle?: string }>) ?? []).filter(
+    (item) => item.title,
+  )
+  if (items.length === 0) return null
 
   return (
     <div className="rounded-3xl border border-border/70 bg-card/60 p-6 shadow-xs backdrop-blur-xs">
@@ -23,7 +29,7 @@ export function TrustBadgesWidget({ widget }: { widget: Widget }) {
           {data.title}
         </h3>
       )}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+      <div className={cn('grid grid-cols-1 gap-4', items.length >= 4 ? 'sm:grid-cols-2 lg:grid-cols-4' : items.length === 2 ? 'sm:grid-cols-2' : items.length === 1 ? '' : 'sm:grid-cols-3')}>
         {items.map((item, idx) => {
           const Icon = (item.icon && ICON_MAP[item.icon]) || Sparkles
           return (

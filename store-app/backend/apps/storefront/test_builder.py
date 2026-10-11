@@ -104,9 +104,73 @@ class TestLayoutBuilderAPI:
         assert response.status_code == 400
         response = admin_api.patch(
             reverse("admin-layout-detail", args=[layout.id]),
-            {"active_days": [0, 4], "active_start_hour": 9, "active_end_hour": 17},
+            {"active_days": ["Friday", "saturday"], "active_start_hour": 9, "active_end_hour": 17},
             format="json",
         )
         assert response.status_code == 200
         layout.refresh_from_db()
-        assert layout.active_days == [0, 4]
+        # Stored as lowercase English weekday names — the form `_matches` reads.
+        assert layout.active_days == ["friday", "saturday"]
+
+    def test_numeric_days_and_bad_values_are_refused_not_crashed(self, admin_api, layout):
+        url = reverse("admin-layout-detail", args=[layout.id])
+        assert admin_api.patch(url, {"active_days": [0, 4]}, format="json").status_code == 400
+        assert admin_api.patch(url, {"active_start_hour": "abc"}, format="json").status_code == 400
+        assert admin_api.patch(url, {"active_start_date": "not-a-date"}, format="json").status_code == 400
+
+    def test_saving_keeps_widget_ids_and_style(self, admin_api, layout):
+        widget = Widget.objects.create(
+            layout=layout, type=WidgetType.TEXT_BLOCK, data={"content": "أ"},
+            style={"paddingY": "lg"}, targeting={"isGuest": True},
+        )
+        response = admin_api.patch(
+            reverse("admin-layout-detail", args=[layout.id]),
+            {"widgets": [{"id": str(widget.id), "type": "text_block", "data": {"content": "ب"}, "is_active": True}]},
+            format="json",
+        )
+        assert response.status_code == 200
+        saved = Widget.objects.get(layout=layout)
+        assert saved.id == widget.id
+        assert saved.data == {"content": "ب"}
+        assert saved.style == {"paddingY": "lg"}
+        assert saved.targeting == {"isGuest": True}
+
+    def test_switching_on_an_everyday_layout_switches_the_other_one_off(self, admin_api, layout):
+        from apps.storefront.models import StorefrontLayout
+
+        other = StorefrontLayout.objects.create(name="آخر", is_global_active=True)
+        scheduled = StorefrontLayout.objects.create(
+            name="العيد", is_global_active=True, active_days=["friday"]
+        )
+        layout.is_global_active = False
+        layout.save()
+
+        body = admin_api.patch(
+            reverse("admin-layout-detail", args=[layout.id]), {"is_global_active": True}, format="json"
+        ).json()["data"]
+
+        other.refresh_from_db()
+        scheduled.refresh_from_db()
+        assert other.is_global_active is False
+        assert scheduled.is_global_active is True  # scheduled layouts are left alone
+        assert "is_live" in body and body["has_schedule"] is False
+
+    def test_the_builder_gets_the_chosen_products_back(self, admin_api, layout, product):
+        admin_api.patch(
+            reverse("admin-layout-detail", args=[layout.id]),
+            {"widgets": [{"type": "product_list", "data": {"productIds": [str(product.id)]}}]},
+            format="json",
+        )
+        data = admin_api.get(reverse("admin-layout-detail", args=[layout.id])).json()["data"]
+        assert [p["name"] for p in data["widgets"][0]["data"]["products"]] == [product.name]
+
+    def test_a_hero_keeps_only_what_the_operator_wrote(self, admin_api, layout):
+        body = admin_api.patch(
+            reverse("admin-layout-detail", args=[layout.id]),
+            {"widgets": [{"type": "hero_cta", "data": {"heroMode": "image", "desktopImageUrl": "/media/a.webp", "overlay": "x"}}]},
+            format="json",
+        ).json()["data"]
+        hero = body["widgets"][0]["data"]
+        assert hero["heroMode"] == "image"
+        assert (hero["title"], hero["subtitle"], hero["buttonLabel"], hero["badgeText"]) == ("", "", "", "")
+        assert hero["overlay"] == 45

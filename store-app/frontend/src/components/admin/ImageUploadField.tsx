@@ -13,6 +13,9 @@ interface ImageUploadFieldProps {
   value?: string
   onChange: (url: string) => void
   aspectRatio?: 'video' | 'square' | 'banner' | 'auto'
+  /** `banner` uploads keep full-screen resolution; `product` (default) is
+   * squeezed for catalogue thumbnails. */
+  purpose?: 'product' | 'banner'
   className?: string
 }
 
@@ -22,6 +25,7 @@ export function ImageUploadField({
   value,
   onChange,
   aspectRatio = 'auto',
+  purpose = 'product',
   className,
 }: ImageUploadFieldProps) {
   const [uploading, setUploading] = useState(false)
@@ -37,8 +41,8 @@ export function ImageUploadField({
     try {
       // Compress in the browser BEFORE the network: a 5 MB phone photo
       // becomes ~200 KB, so the upload survives Libyan uplink speeds.
-      const compressed = await compressImageFile(file)
-      const result = await uploadImage(compressed)
+      const compressed = await compressImageFile(file, purpose)
+      const result = await uploadImage(compressed, purpose)
       onChange(result.url)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'تعذّر رفع الصورة، يرجى المحاولة مرة أخرى')

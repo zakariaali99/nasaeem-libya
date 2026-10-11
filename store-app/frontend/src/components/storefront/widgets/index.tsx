@@ -34,8 +34,11 @@ export const WIDGET_RENDERERS: Record<WidgetType, Renderer> = {
   announcement_bar: AnnouncementBar,
   discovery_box: DiscoveryBoxWidget,
   trust_badges: TrustBadgesWidget,
-  free_shipping_bar: AnnouncementBar,
-  gift_wrap_upsell: DiscoveryBoxWidget,
+  // Shipping is out of the system and this type never had its own renderer
+  // (it borrowed the announcement bar and ignored its own fields).
+  free_shipping_bar: () => null,
+  // Never had its own renderer either: it drew the samples-box banner.
+  gift_wrap_upsell: () => null,
   spacer: Spacer,
   recently_viewed: ProductListWidget,
   buy_again: ProductListWidget,

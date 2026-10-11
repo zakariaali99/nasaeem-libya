@@ -19,27 +19,68 @@ from rest_framework.views import APIView
 
 from apps.accounts.permissions import IsAdminRole
 
+from django.utils.dateparse import parse_datetime
+
+from . import services
 from .models import StorefrontLayout, Widget, WidgetType
 from .services import normalise_widget_data
 
+WEEKDAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
+
 
 class WidgetReadSerializer(serializers.ModelSerializer):
+    """`data` comes back **populated** (the chosen products, categories and
+    collection attached), exactly as the storefront receives it, so the
+    builder's preview shows the real thing and its pickers know what is already
+    chosen. The extra keys are dropped again by the normaliser on save."""
+
+    data = serializers.SerializerMethodField()
+
     class Meta:
         model = Widget
         fields = ["id", "type", "order", "data", "is_active", "style", "targeting"]
 
+    def get_data(self, widget):
+        from apps.catalog.serializers import (
+            CategorySerializer,
+            CollectionSerializer,
+            ProductListSerializer,
+        )
+
+        return services.populate(
+            widget,
+            user=None,
+            serialize_product=lambda products: ProductListSerializer(products, many=True).data,
+            serialize_category=lambda categories: CategorySerializer(categories, many=True).data,
+            serialize_collection=lambda collection: CollectionSerializer(collection).data,
+        )
+
 
 class LayoutSerializer(serializers.ModelSerializer):
     widgets = WidgetReadSerializer(many=True, read_only=True)
+    is_live = serializers.SerializerMethodField()
+    has_schedule = serializers.SerializerMethodField()
 
     class Meta:
         model = StorefrontLayout
         fields = [
-            "id", "name", "is_global_active",
+            "id", "name", "is_global_active", "is_live", "has_schedule",
             "active_start_date", "active_end_date", "active_days",
             "active_start_hour", "active_end_hour",
             "widgets", "created_at", "updated_at",
         ]
+
+    def get_is_live(self, layout):
+        """True for the one layout the homepage is showing right now — being
+        switched on is not the same thing (a schedule may be outside its window,
+        or a scheduled layout may currently be taking over)."""
+        if "live_id" not in self.context:
+            live = services.resolve_active_layout()
+            self.context["live_id"] = live.id if live else None
+        return layout.id == self.context["live_id"]
+
+    def get_has_schedule(self, layout):
+        return services.has_schedule(layout)
 
 
 class AdminLayoutListView(APIView):
@@ -93,36 +134,62 @@ class AdminLayoutDetailView(APIView):
 
         cleaned_widgets = []
         if widgets_payload is not None:
-            seen_types: set[str] = set()
             for index, raw in enumerate(widgets_payload):
                 if not isinstance(raw, dict) or raw.get("type") not in WidgetType.values:
                     errors.setdefault("widgets", []).append(f"أداة #{index + 1}: نوع غير معروف")
                     continue
-                widget_type = raw["type"]
-                data = normalise_widget_data(widget_type, raw.get("data"))
-                targeting = raw.get("targeting") if isinstance(raw.get("targeting"), dict) else None
-                cleaned_widgets.append({
-                    "id": raw.get("id"),
-                    "type": widget_type,
-                    "data": data,
+                item = {
+                    "id": str(raw["id"]) if raw.get("id") else None,
+                    "type": raw["type"],
+                    "data": normalise_widget_data(raw["type"], raw.get("data")),
                     "is_active": bool(raw.get("is_active", True)),
-                    "targeting": targeting,
-                })
-                seen_types.add(widget_type)
+                }
+                # Style and targeting have no editor yet: a save that does not
+                # mention them must keep what the widget already has, not wipe it.
+                for key in ("style", "targeting"):
+                    if key in raw:
+                        item[key] = raw[key] if isinstance(raw[key], dict) else None
+                cleaned_widgets.append(item)
 
         field_values = {}
         for field in layout_fields:
-            if field in request.data:
-                value = request.data[field]
-                if field == "name" and not str(value).strip():
+            if field not in request.data:
+                continue
+            value = request.data[field]
+            if field == "name":
+                value = str(value or "").strip()
+                if not value:
                     errors["name"] = ["اسم التخطيط مطلوب"]
-                elif field == "active_days":
-                    if not isinstance(value, list):
-                        errors[field] = ["يجب أن تكون قائمة أيام"]
-                elif field.endswith("_hour"):
-                    if value is not None and not (0 <= int(value or 0) <= 23):
+            elif field == "is_global_active":
+                value = bool(value)
+            elif field == "active_days":
+                if not isinstance(value, list) or any(str(day).lower() not in WEEKDAYS for day in value):
+                    errors[field] = ["أيام غير صحيحة"]
+                else:
+                    value = [str(day).lower() for day in value]
+            elif field.endswith("_hour"):
+                if value in ("", None):
+                    value = None
+                else:
+                    try:
+                        value = int(value)
+                    except (TypeError, ValueError):
+                        value = -1
+                    if not 0 <= value <= 23:
                         errors[field] = ["الساعة بين 0 و 23"]
-                field_values[field] = value
+            elif field.endswith("_date"):
+                if value in ("", None):
+                    value = None
+                else:
+                    value = parse_datetime(str(value))
+                    if value is None:
+                        errors[field] = ["تاريخ غير صحيح"]
+            field_values[field] = value
+
+        start = field_values.get("active_start_date", layout.active_start_date)
+        end = field_values.get("active_end_date", layout.active_end_date)
+        if start and end and "active_start_date" not in errors and "active_end_date" not in errors and end <= start:
+            errors["active_end_date"] = ["تاريخ النهاية يجب أن يكون بعد تاريخ البداية"]
 
         if errors:
             return Response({"message": "تحتوي البيانات على قيم غير صحيحة", "errors": errors},
@@ -133,35 +200,43 @@ class AdminLayoutDetailView(APIView):
                 setattr(layout, field, value)
             layout.save()
 
+            # One everyday homepage. Switching on a layout that has no schedule
+            # switches the other unscheduled ones off, so the homepage is never
+            # decided by which layout happened to be saved last. Scheduled
+            # layouts are left alone: they take over only inside their window.
+            if layout.is_global_active and not services.has_schedule(layout):
+                for other in StorefrontLayout.objects.filter(is_global_active=True).exclude(id=layout.id):
+                    if not services.has_schedule(other):
+                        other.is_global_active = False
+                        other.save(update_fields=["is_global_active", "updated_at"])
+
             if widgets_payload is not None:
-                existing = {w.id: w for w in layout.widgets.all()}
+                existing = {str(w.id): w for w in layout.widgets.all()}
                 keep_ids: set[str] = set()
                 for order_index, item in enumerate(cleaned_widgets):
-                    widget_id = item.get("id")
-                    if widget_id and widget_id in existing:
-                        widget = existing[widget_id]
-                        widget.type = item["type"]
-                        widget.data = item["data"]
-                        widget.is_active = item["is_active"]
-                        widget.targeting = item["targeting"]
-                        widget.order = order_index
-                        widget.save()
-                        keep_ids.add(str(widget.id))
-                    else:
-                        created = Widget.objects.create(
-                            layout=layout,
-                            type=item["type"],
-                            data=item["data"],
-                            is_active=item["is_active"],
-                            targeting=item["targeting"],
-                            order=order_index,
-                        )
-                        keep_ids.add(str(created.id))
+                    widget = existing.get(item["id"]) if item["id"] else None
+                    if widget is None:
+                        widget = Widget(layout=layout)
+                    widget.type = item["type"]
+                    widget.data = item["data"]
+                    widget.is_active = item["is_active"]
+                    widget.order = order_index
+                    for key in ("style", "targeting"):
+                        if key in item:
+                            setattr(widget, key, item[key])
+                    widget.save()
+                    keep_ids.add(str(widget.id))
                 layout.widgets.exclude(id__in=keep_ids).delete()
 
-        layout.refresh_from_db()
-        return Response({"data": LayoutSerializer(self.get_object(layout_id)).data,
-                         "message": "تم حفظ التغييرات — الصفحة الرئيسية تعرضها الآن"})
+        layout = self.get_object(layout_id)
+        data = LayoutSerializer(layout).data
+        if data["is_live"]:
+            message = "تم الحفظ — الصفحة الرئيسية تعرض هذا التخطيط الآن"
+        elif layout.is_global_active:
+            message = "تم الحفظ — التخطيط مفعّل لكنه خارج وقت جدولته، أو يحلّ محله تخطيط مجدول آخر الآن"
+        else:
+            message = "تم الحفظ — التخطيط غير معروض على المتجر حتى تفعّله"
+        return Response({"data": data, "message": message})
 
     def delete(self, request, layout_id):
         layout = self.get_object(layout_id)
@@ -197,6 +272,7 @@ class AdminLayoutDuplicateView(APIView):
                     type=widget.type,
                     data=widget.data,
                     is_active=widget.is_active,
+                    style=widget.style,
                     targeting=widget.targeting,
                     order=widget.order,
                 )

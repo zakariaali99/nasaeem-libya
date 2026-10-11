@@ -197,9 +197,11 @@ export const useGenerateVariantMatrix = () =>
     return api.post(`/products/${id}/variants/matrix/`, input)
   })
 
-export async function uploadImage(file: File) {
+export async function uploadImage(file: File, purpose: 'product' | 'banner' = 'product') {
   const body = new FormData()
   body.append('file', file)
+  // `banner` keeps a 1920px, higher-quality `full` file (see ImageUploadView).
+  body.append('purpose', purpose)
   const response = await api.post<{ url: string; renditions: Record<string, string> }>('/images/', body)
   return response.data
 }

@@ -7,9 +7,13 @@ export interface Layout {
   id: string
   name: string
   is_global_active: boolean
+  /** The one layout the homepage is showing right now. */
+  is_live: boolean
+  has_schedule: boolean
   active_start_date: string | null
   active_end_date: string | null
-  active_days: number[]
+  /** Lowercase English weekday names (`friday`), as the server stores them. */
+  active_days: string[]
   active_start_hour: number | null
   active_end_hour: number | null
   widgets: Widget[] & { targeting?: Record<string, unknown> | null }[]
@@ -76,12 +80,25 @@ export function useCreateLayout() {
 export function useSaveLayout(id: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (body: LayoutDraft) =>
-      (await api.patch<Layout>(`/admin/storefront-layouts/${id}/`, body)).data,
-    onSuccess: (data) => {
-      queryClient.setQueryData(customizationKeys.layout(id), data)
+    mutationFn: async (body: LayoutDraft) => {
+      const response = await api.patch<Layout>(`/admin/storefront-layouts/${id}/`, body)
+      // The server words the outcome (live / switched on but not showing /
+      // off), so the caller shows that instead of guessing.
+      return { layout: response.data, message: response.message ?? 'تم الحفظ' }
+    },
+    onSuccess: ({ layout }) => {
+      queryClient.setQueryData(customizationKeys.layout(id), layout)
       invalidate(queryClient)
     },
+  })
+}
+
+export function useDuplicateLayout() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) =>
+      (await api.post<Layout>(`/admin/storefront-layouts/${id}/duplicate/`)).data,
+    onSuccess: () => invalidate(queryClient),
   })
 }
 

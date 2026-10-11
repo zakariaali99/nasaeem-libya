@@ -26,10 +26,11 @@ export function AnnouncementBar({ widget }: { widget: Widget }) {
     }
   })
 
-  if (dismissed) return null
+  // Nothing written, nothing shown — never a built-in announcement.
+  if (dismissed || !message) return null
 
-  const displayMessage = message || 'توصيل إلى جميع المدن الليبية'
-  const displayTitle = title || 'تنبيه حصري'
+  const displayMessage = message
+  const displayTitle = title
 
   const Icon = ICONS[(icon as keyof typeof ICONS) ?? 'megaphone'] ?? Sparkles
 

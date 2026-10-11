@@ -729,7 +729,10 @@ class ImageUploadView(APIView):
             return Response({"message": "حجم الصورة يتجاوز 10 ميغابايت"},
                             status=status.HTTP_400_BAD_REQUEST)
         try:
-            url = services.store_image(uploaded)
+            if request.data.get("purpose") == "banner":
+                url = services.store_image(uploaded, subdir="banners", full_size=1920, quality=86)
+            else:
+                url = services.store_image(uploaded)
         except ValueError as exc:
             return Response({"message": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 

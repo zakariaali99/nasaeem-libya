@@ -282,6 +282,12 @@ export interface WidgetData {
   // photo_link_grid
   items?: PhotoLinkItem[]
   // hero_cta
+  heroMode?: 'image' | 'text'
+  badgeText?: string
+  secondaryLabel?: string
+  secondaryUrl?: string
+  /** How dark the background picture gets, 0–90 (percent). */
+  overlay?: number
   subtitle?: string
   buttonLabel?: string
   buttonUrl?: string

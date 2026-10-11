@@ -1,113 +1,24 @@
 import { ArrowLeft } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
-import { EmptyState } from '@/components/storefront/EmptyState'
 import { ProductGrid } from '@/components/storefront/ProductGrid'
 import { WidgetHeading } from '@/components/storefront/widgets/WidgetShell'
 import { cn } from '@/lib/utils'
-import type { Category, Product, Widget } from '@/types/api'
+import type { Widget } from '@/types/api'
 
-// Realistic luxury mock items displayed during admin preview when backend items are not loaded
-const PREVIEW_PRODUCTS: Product[] = [
-  {
-    id: 'preview-1',
-    name: 'ديور سوفاج إلكسير 60 مل',
-    slug: 'dior-sauvage-elixir',
-    price: '380.00',
-    compare_at_price: '420.00',
-    sku: 'DIO-SAUV-ELX-60',
-    stock: 15,
-    reserved_stock: 0,
-    available_stock: 15,
-    in_stock: true,
-    is_active: true,
-    has_variants: false,
-    track_quantity: true,
-    images: [{ id: 'img-1', url: '/assets/images/perfume_sample.jpg', alt_text: 'ديور سوفاج إلكسير', sort_order: 0, renditions: {} }],
-    categories: [],
-    collections: [],
-    discounts: [],
-    discount_percent: 10,
-  },
-  {
-    id: 'preview-2',
-    name: 'كريد أفينتوس أو دو بارفيوم 100 مل',
-    slug: 'creed-aventus',
-    price: '540.00',
-    compare_at_price: null,
-    sku: 'CRD-AVNT-EDP-100',
-    stock: 8,
-    reserved_stock: 0,
-    available_stock: 8,
-    in_stock: true,
-    is_active: true,
-    has_variants: false,
-    track_quantity: true,
-    images: [{ id: 'img-2', url: '/assets/images/perfume_sample.jpg', alt_text: 'كريد أفينتوس', sort_order: 0, renditions: {} }],
-    categories: [],
-    collections: [],
-    discounts: [],
-    discount_percent: null,
-  },
-  {
-    id: 'preview-3',
-    name: 'توم فورد بلاك أوركيد 100 مل',
-    slug: 'tom-ford-black-orchid',
-    price: '420.00',
-    compare_at_price: '460.00',
-    sku: 'TF-BLCK-ORC-100',
-    stock: 12,
-    reserved_stock: 0,
-    available_stock: 12,
-    in_stock: true,
-    is_active: true,
-    has_variants: false,
-    track_quantity: true,
-    images: [{ id: 'img-3', url: '/assets/images/perfume_sample.jpg', alt_text: 'توم فورد بلاك أوركيد', sort_order: 0, renditions: {} }],
-    categories: [],
-    collections: [],
-    discounts: [],
-    discount_percent: 8,
-  },
-  {
-    id: 'preview-4',
-    name: 'باقة العينات الاستكشافية الملكية (5 عينات)',
-    slug: 'royal-discovery-box',
-    price: '60.00',
-    compare_at_price: '85.00',
-    sku: 'DISC-ROYAL-BOX-5',
-    stock: 50,
-    reserved_stock: 0,
-    available_stock: 50,
-    in_stock: true,
-    is_active: true,
-    has_variants: false,
-    track_quantity: true,
-    images: [{ id: 'img-4', url: '/assets/images/perfume_sample.jpg', alt_text: 'باقة العينات الاستكشافية', sort_order: 0, renditions: {} }],
-    categories: [],
-    collections: [],
-    discounts: [],
-    discount_percent: 29,
-  },
-]
-
-const PREVIEW_CATEGORIES: Category[] = [
-  { id: 'cat-1', name: 'عطور رجالية فاخرة', slug: 'men-perfumes', image_url: '', is_active: true, is_system: false, description: '', parent: null, children: [] },
-  { id: 'cat-2', name: 'عطور نسائية راقية', slug: 'women-perfumes', image_url: '', is_active: true, is_system: false, description: '', parent: null, children: [] },
-  { id: 'cat-3', name: 'عطور نيش حصرية', slug: 'niche-perfumes', image_url: '', is_active: true, is_system: false, description: '', parent: null, children: [] },
-  { id: 'cat-4', name: 'باقات الهدايا الملكية', slug: 'gift-sets', image_url: '', is_active: true, is_system: false, description: '', parent: null, children: [] },
-  { id: 'cat-5', name: 'عطور شرقية وبخور', slug: 'oriental-oud', image_url: '', is_active: true, is_system: false, description: '', parent: null, children: [] },
-  { id: 'cat-6', name: 'عينات استكشافية', slug: 'discovery-samples', image_url: '', is_active: true, is_system: false, description: '', parent: null, children: [] },
-]
+// An empty widget renders nothing. It used to fall back to hard-coded sample
+// products and categories "for the admin preview", but the storefront uses
+// these same renderers — so shoppers were shown perfumes the store does not
+// sell. The builder draws its own placeholder for an empty widget instead.
 
 export function ProductListWidget({ widget }: { widget: Widget }) {
-  const rawProducts = widget.data.products
-  const products = rawProducts && rawProducts.length > 0 ? rawProducts : PREVIEW_PRODUCTS
+  const products = widget.data.products ?? []
+  if (products.length === 0) return null
 
   return (
     <div className="space-y-4">
       <WidgetHeading
-        title={widget.data.title || 'تشكيلة العطور الأكثر طلباً'}
+        title={widget.data.title || 'منتجات مختارة'}
         action={
           <Link
             to="/products"
@@ -118,27 +29,15 @@ export function ProductListWidget({ widget }: { widget: Widget }) {
           </Link>
         }
       />
-      {products.length === 0 ? (
-        <EmptyState
-          title="لا توجد منتجات في هذا القسم"
-          description="قد تكون المنتجات المختارة غير متاحة حالياً."
-        />
-      ) : (
-        <ProductGrid products={products} layout={widget.data.layout ?? 'grid'} />
-      )}
+      <ProductGrid products={products} layout={widget.data.layout ?? 'grid'} />
     </div>
   )
 }
 
 export function CollectionShowcase({ widget }: { widget: Widget }) {
-  const collection = widget.data.collection || {
-    id: 'preview-col',
-    name: widget.data.title || 'مجموعة العطور الحصرية',
-    slug: 'exclusive-collection',
-    description: 'تشكيلة مختارة بعناية من أرقى دور العطور العالمية مع ضمان الأصالة بنسبة 100%.',
-  }
-  const rawProducts = widget.data.products
-  const products = rawProducts && rawProducts.length > 0 ? rawProducts : PREVIEW_PRODUCTS
+  const collection = widget.data.collection
+  const products = widget.data.products ?? []
+  if (!collection || products.length === 0) return null
 
   return (
     <div className="space-y-4 rounded-3xl border border-border/80 bg-muted/20 p-5 sm:p-8">
@@ -163,15 +62,15 @@ export function CollectionShowcase({ widget }: { widget: Widget }) {
 }
 
 export function CategoryListWidget({ widget }: { widget: Widget }) {
-  const rawCategories = widget.data.categories
-  const categories = rawCategories && rawCategories.length > 0 ? rawCategories : PREVIEW_CATEGORIES
+  const categories = widget.data.categories ?? []
+  if (categories.length === 0) return null
 
   const slider = widget.data.layout === 'slider'
 
   return (
     <div className="space-y-4">
       <WidgetHeading
-        title={widget.data.title || 'تسوّق حسب التصنيف والمجموعة'}
+        title={widget.data.title || 'تسوّق حسب التصنيف'}
         action={
           <Link
             to="/products"

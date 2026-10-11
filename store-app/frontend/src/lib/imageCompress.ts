@@ -15,6 +15,15 @@ const MAX_DIMENSION = 1600
 const TARGET_BYTES = 250 * 1024
 const QUALITY_STEPS = [0.85, 0.75, 0.65, 0.5]
 
+/** A banner fills the screen: squeezing it to the product budget (250 KB,
+ * quality down to 0.5) and then letting the server re-encode it is what made
+ * uploaded banners look soft. Banners get a wider cap and a gentler squeeze. */
+export type CompressProfile = 'product' | 'banner'
+const PROFILES = {
+  product: { maxDimension: MAX_DIMENSION, targetBytes: TARGET_BYTES, steps: QUALITY_STEPS },
+  banner: { maxDimension: 2000, targetBytes: 900 * 1024, steps: [0.92, 0.86, 0.8] },
+} as const
+
 async function loadBitmap(file: File): Promise<ImageBitmap | HTMLImageElement> {
   if ('createImageBitmap' in window) {
     return createImageBitmap(file)
@@ -31,10 +40,10 @@ async function loadBitmap(file: File): Promise<ImageBitmap | HTMLImageElement> {
   }
 }
 
-function drawScaled(source: ImageBitmap | HTMLImageElement): HTMLCanvasElement {
+function drawScaled(source: ImageBitmap | HTMLImageElement, maxDimension: number): HTMLCanvasElement {
   const sourceWidth = 'width' in source ? source.width : 0
   const sourceHeight = 'height' in source ? source.height : 0
-  const scale = Math.min(1, MAX_DIMENSION / Math.max(sourceWidth, sourceHeight))
+  const scale = Math.min(1, maxDimension / Math.max(sourceWidth, sourceHeight))
 
   const canvas = document.createElement('canvas')
   canvas.width = Math.round(sourceWidth * scale)
@@ -58,27 +67,28 @@ function canvasToBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob>
 }
 
 /** Compress an image File; returns a webp Blob ready for upload. */
-export async function compressImage(file: File): Promise<Blob> {
+export async function compressImage(file: File, profile: CompressProfile = 'product'): Promise<Blob> {
+  const { maxDimension, targetBytes, steps } = PROFILES[profile]
   // SVG and GIF are vector/animated — re-encoding destroys them. Pass through.
   if (file.type === 'image/svg+xml' || file.type === 'image/gif') return file
-  // Already tiny: the round trip would cost more than it saves.
-  if (file.size <= TARGET_BYTES) return file
+  // Already small enough: the round trip would cost more than it saves.
+  if (file.size <= targetBytes) return file
 
   const bitmap = await loadBitmap(file)
-  const canvas = drawScaled(bitmap)
+  const canvas = drawScaled(bitmap, maxDimension)
   if ('close' in bitmap) bitmap.close()
 
   let lastBlob: Blob = canvas as unknown as Blob
-  for (const quality of QUALITY_STEPS) {
+  for (const quality of steps) {
     lastBlob = await canvasToBlob(canvas, quality)
-    if (lastBlob.size <= TARGET_BYTES) return lastBlob
+    if (lastBlob.size <= targetBytes) return lastBlob
   }
   return lastBlob
 }
 
 /** Same result as compressImage, wrapped as a File so FormData keeps a name. */
-export async function compressImageFile(file: File): Promise<File> {
-  const blob = await compressImage(file)
+export async function compressImageFile(file: File, profile: CompressProfile = 'product'): Promise<File> {
+  const blob = await compressImage(file, profile)
   if (blob === (file as unknown as Blob)) return file
   const extension = blob.type === 'image/webp' ? 'webp' : 'jpg'
   const baseName = file.name.replace(/\.[^.]+$/, '') || 'image'

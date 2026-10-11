@@ -41,9 +41,15 @@ class StoreSettingsSerializer(serializers.ModelSerializer):
             "whatsapp",
             "email",
             "bank_transfer_note",
+            "texts",
             "updated_at",
         ]
         read_only_fields = ["updated_at"]
+
+    def validate_texts(self, value):
+        from apps.core.store_settings import clean_texts
+
+        return clean_texts(value)
 
     def validate_phone(self, value):
         if value:

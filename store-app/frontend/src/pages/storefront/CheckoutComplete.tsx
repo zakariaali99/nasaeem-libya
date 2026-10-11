@@ -9,10 +9,12 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { formatPrice } from '@/lib/format'
 import { useOrder } from '@/lib/queries/delivery'
 import { useStoreSettings } from '@/lib/queries/storeSettings'
+import { useSiteText } from '@/lib/siteText'
 import { usePageTitle } from '@/lib/usePageTitle'
 
 export default function CheckoutCompletePage() {
   usePageTitle('تم استلام طلبك — نسائم ليبيا', 'شكراً لك — تم تسجيل طلبك بنجاح.')
+  const thanks = useSiteText()('order.thanks')
   const [params] = useSearchParams()
   const reference = params.get('order') ?? ''
   const { data: order, isPending } = useOrder(reference || undefined)
@@ -41,9 +43,7 @@ export default function CheckoutCompletePage() {
           <CheckCircle2 className="size-9" aria-hidden="true" />
         </span>
         <h1 className="text-2xl font-bold sm:text-3xl text-foreground">تم استلام طلبك بنجاح</h1>
-        <p className="text-sm text-muted-foreground max-w-md">
-          شكراً لتسوّقك من نسائم ليبيا. يجري الآن مراجعة وتجهيز طلبك بعناية تامة.
-        </p>
+        {thanks && <p className="text-sm text-muted-foreground max-w-md">{thanks}</p>}
         {reference && (
           <div className="rounded-2xl border border-border bg-muted/40 px-4 py-2 text-xs sm:text-sm">
             رقم الطلب: <span className="font-bold font-mono text-primary text-base">#{reference}</span>

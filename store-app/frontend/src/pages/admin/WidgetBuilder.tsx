@@ -18,7 +18,7 @@ import { useCategories, useCollections, useProducts } from '@/lib/queries/catalo
 import { useLayout, useSaveLayout, type Layout, type LayoutDraft } from '@/lib/queries/customization'
 import { usePageTitle } from '@/lib/usePageTitle'
 import { cn } from '@/lib/utils'
-import type { Category, Collection, Product, Widget } from '@/types/api'
+import type { Category, Collection, Product, Widget, WidgetStyle } from '@/types/api'
 
 // --------------------------------------------------------------------------
 // What the operator can add. `free_shipping_bar` and `gift_wrap_upsell` are
@@ -37,7 +37,7 @@ const TYPE_LABELS: Record<string, string> = {
   collection_showcase: 'منتجات مجموعة',
   trust_badges: 'شريط مزايا المتجر',
   text_block: 'نص',
-  discovery_box: 'بانر باقة العينات',
+  discovery_box: 'بانر ترويجي (عرض خاص)',
   spacer: 'مسافة فارغة',
   recently_viewed: 'شوهدت مؤخراً (تلقائي)',
   buy_again: 'اشترِ مرة أخرى (تلقائي)',
@@ -79,7 +79,12 @@ interface DraftWidget {
   type: string
   data: Data
   is_active: boolean
+  /** Colours, spacing, width — see `WidgetShell`. */
+  style: WidgetStyle
+  /** `guest` / `member` / everyone. */
+  audience: 'all' | 'guest' | 'member'
 }
+
 
 let draftCounter = 0
 const newKey = () => `draft-${++draftCounter}`
@@ -122,6 +127,8 @@ function emptyReason(widget: DraftWidget): string | null {
       return list('products').length ? null : 'تظهر منتجات المجموعة هنا بعد الحفظ (أو المجموعة فارغة)'
     case 'trust_badges':
       return list('items').some((item) => (item as Data).title) ? null : 'أضف ميزة واحدة على الأقل'
+    case 'discovery_box':
+      return d.title || d.description || list('features').length ? null : 'اكتب عنوان العرض أو وصفه'
     case 'text_block':
       return String(d.content ?? '').trim() ? null : 'اكتب النص'
     case 'free_shipping_bar':
@@ -179,6 +186,8 @@ function Editor({ layout, notice, setNotice, lastIndex }: EditorProps) {
       type: w.type,
       data: { ...(w.data as Data) },
       is_active: w.is_active,
+      style: { ...(w.style ?? {}) },
+      audience: w.targeting?.isGuest === true ? 'guest' : w.targeting?.isGuest === false ? 'member' : 'all',
     })),
   )
   const [meta, setMetaState] = React.useState({
@@ -234,9 +243,12 @@ function Editor({ layout, notice, setNotice, lastIndex }: EditorProps) {
       type === 'hero_cta' ? { heroMode: 'image', overlay: 45, alignment: 'center' }
       : type === 'announcement_bar' ? { dismissible: true, icon: 'megaphone' }
       : type === 'trust_badges' ? { items: [{ icon: 'shield-check', title: '', subtitle: '' }] }
-      : PERSONALISED.includes(type) ? { limit: 8, layout: 'slider' }
+      // Starting words the operator can see and change — never hidden defaults.
+      : PERSONALISED.includes(type) ? { limit: 8, layout: 'slider', title: TYPE_LABELS[type]!.replace(' (تلقائي)', '') }
+      : type === 'product_list' ? { title: 'منتجات مختارة', actionLabel: 'عرض الكل', actionUrl: '/products' }
+      : type === 'category_list' ? { title: 'تسوّق حسب العلامة', actionLabel: 'كل المنتجات', actionUrl: '/products' }
       : {}
-    const widget: DraftWidget = { key: newKey(), type, data, is_active: true }
+    const widget: DraftWidget = { key: newKey(), type, data, is_active: true, style: {}, audience: 'all' }
     setWidgets([...widgets, widget])
     setSelectedKey(widget.key)
   }
@@ -256,6 +268,10 @@ function Editor({ layout, notice, setNotice, lastIndex }: EditorProps) {
   const patchCurrent = (patch: Data) => {
     if (!current) return
     setWidgets(widgets.map((w) => (w.key === current.key ? { ...w, data: { ...w.data, ...patch } } : w)))
+  }
+  const patchWidget = (patch: Partial<DraftWidget>) => {
+    if (!current) return
+    setWidgets(widgets.map((w) => (w.key === current.key ? { ...w, ...patch } : w)))
   }
   const toggleActive = (key: string) =>
     setWidgets(widgets.map((w) => (w.key === key ? { ...w, is_active: !w.is_active } : w)))
@@ -284,6 +300,8 @@ function Editor({ layout, notice, setNotice, lastIndex }: EditorProps) {
         id: w.id,
         type: w.type,
         is_active: w.is_active,
+        style: w.style,
+        targeting: w.audience === 'all' ? null : { isGuest: w.audience === 'guest' },
         data: Object.fromEntries(Object.entries(w.data).filter(([key]) => !POPULATED_KEYS.includes(key))),
       })),
     }
@@ -422,6 +440,7 @@ function Editor({ layout, notice, setNotice, lastIndex }: EditorProps) {
                 </div>
               </div>
               <WidgetFields type={current.type} data={current.data} patch={patchCurrent} />
+              <AppearanceEditor widget={current} patch={patchWidget} />
             </section>
           ) : (
             <p className="rounded-2xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">
@@ -482,7 +501,7 @@ function Editor({ layout, notice, setNotice, lastIndex }: EditorProps) {
                             data: widget.data as Widget['data'],
                             order: index,
                             is_active: true,
-                            style: null,
+                            style: widget.style,
                             targeting: null,
                           }}
                         />
@@ -529,6 +548,14 @@ function WidgetFields({ type, data, patch }: FieldsProps) {
     </Field>
   )
   const layoutChoice = choice('layout', 'طريقة العرض', LAYOUT_OPTIONS)
+  /** The heading row: title on one side, an optional "see all" link on the other. */
+  const heading = (titleLabel = 'العنوان (اختياري)') => (
+    <div key="heading" className="grid gap-3 sm:grid-cols-3">
+      {text('title', titleLabel)}
+      {text('actionLabel', 'نص الرابط بجانب العنوان (اختياري)', 'مثال: عرض الكل')}
+      {link('actionUrl', 'وجهة الرابط')}
+    </div>
+  )
 
   switch (type) {
     case 'hero_cta': {
@@ -634,7 +661,7 @@ function WidgetFields({ type, data, patch }: FieldsProps) {
     case 'category_list':
       return (
         <>
-          {text('title', 'العنوان (اختياري)')}
+          {heading()}
           {layoutChoice}
           <CategoryPicker
             selected={(data.categories as Category[]) ?? []}
@@ -646,7 +673,7 @@ function WidgetFields({ type, data, patch }: FieldsProps) {
     case 'photo_link_grid':
       return (
         <>
-          {text('title', 'العنوان (اختياري)')}
+          {heading()}
           {layoutChoice}
           <Repeater
             title="الصور"
@@ -670,7 +697,7 @@ function WidgetFields({ type, data, patch }: FieldsProps) {
     case 'product_list':
       return (
         <>
-          {text('title', 'العنوان (اختياري)')}
+          {heading()}
           {layoutChoice}
           <ProductPicker
             selected={(data.products as Product[]) ?? []}
@@ -686,6 +713,8 @@ function WidgetFields({ type, data, patch }: FieldsProps) {
             value={String(data.collectionId ?? '')}
             onChange={(collection) => patch({ collectionId: collection?.id ?? '', collection: collection ?? null, products: [] })}
           />
+          {heading('العنوان (فارغ = اسم المجموعة)')}
+          {text('description', 'الوصف تحت العنوان (فارغ = وصف المجموعة)')}
           {layoutChoice}
         </>
       )
@@ -734,26 +763,28 @@ function WidgetFields({ type, data, patch }: FieldsProps) {
     case 'discovery_box':
       return (
         <>
-          <Alert tone="info">
-            هذا البانر يعرض وعوداً للعميل (استرداد القيمة، كوبون، مدة). راجع كل النصوص والأرقام قبل عرضه.
-          </Alert>
-          {text('title', 'العنوان')}
-          {text('badge', 'الشارة')}
-          <div className="grid gap-3 sm:grid-cols-3">
-            {text('price', 'السعر (مثال: 60 د.ل)')}
-            <NumberInput label="عدد العينات" value={data.sampleCount} onChange={(v) => patch({ sampleCount: v })} />
-            <NumberInput label="نسبة الاسترداد %" value={data.cashbackPercent} onChange={(v) => patch({ cashbackPercent: v })} />
-          </div>
+          <Alert tone="info">كل ما يظهر في هذا البانر هو ما تكتبه هنا. الحقل الفارغ لا يظهر.</Alert>
           <div className="grid gap-3 sm:grid-cols-2">
-            {text('buttonText', 'نص الزر')}
-            {link('linkUrl', 'رابط الزر')}
+            {text('title', 'العنوان')}
+            {text('badge', 'شارة صغيرة بجانب العنوان (اختياري)')}
           </div>
-          <Field label="الوصف" id="f-description" hint="إن تُرك فارغاً يُولَّد نص تلقائي من الأرقام أعلاه">
+          <Field label="الوصف (اختياري)" id="f-description">
             {(props) => (
               <textarea {...props} rows={3} className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
                 value={String(data.description ?? '')} onChange={(e) => patch({ description: e.target.value })} />
             )}
           </Field>
+          <Field label="نقاط مختصرة (اختياري)" id="f-features" hint="كل سطر يظهر كنقطة بعلامة ✓ — حتى 6 نقاط">
+            {(props) => (
+              <textarea {...props} rows={3} className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
+                value={((data.features as string[]) ?? []).join('\n')}
+                onChange={(e) => patch({ features: e.target.value.split('\n') })} />
+            )}
+          </Field>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {text('buttonText', 'نص الزر (اختياري)')}
+            {link('linkUrl', 'رابط الزر')}
+          </div>
           <Check label="إظهاره أيضاً في صفحة السلة" checked={data.showInCart !== false} onChange={(v) => patch({ showInCart: v })} />
           <Check label="إظهاره أيضاً في صفحة المنتج" checked={data.showInProductDetail !== false} onChange={(v) => patch({ showInProductDetail: v })} />
         </>
@@ -768,7 +799,7 @@ function WidgetFields({ type, data, patch }: FieldsProps) {
         return (
           <>
             <Alert tone="info">يملأ النظام هذه القائمة تلقائياً لكل عميل، وللزائر الجديد تُعرض أحدث المنتجات المتوفرة.</Alert>
-            {text('title', 'العنوان')}
+            {heading('العنوان')}
             <div className="grid gap-3 sm:grid-cols-2">
               <NumberInput label="عدد المنتجات (1–24)" value={data.limit} onChange={(v) => patch({ limit: v })} />
               {layoutChoice}
@@ -778,6 +809,75 @@ function WidgetFields({ type, data, patch }: FieldsProps) {
       }
       return null
   }
+}
+
+// --------------------------------------------------------------------------
+// Appearance and audience — the same for every widget type
+// --------------------------------------------------------------------------
+
+function AppearanceEditor({ widget, patch }: { widget: DraftWidget; patch: (patch: Partial<DraftWidget>) => void }) {
+  const style = widget.style
+  const setStyle = (change: Partial<WidgetStyle>) => {
+    const next = { ...style, ...change }
+    for (const key of Object.keys(next) as (keyof WidgetStyle)[]) if (!next[key]) delete next[key]
+    patch({ style: next })
+  }
+  const customised = Object.keys(style).length > 0 || widget.audience !== 'all'
+  const colour = (key: 'backgroundColor' | 'textColor', label: string) => (
+    <div className="space-y-1">
+      <span className="block text-sm font-medium">{label}</span>
+      <div className="flex items-center gap-2">
+        <input
+          type="color"
+          aria-label={label}
+          value={style[key] || (key === 'backgroundColor' ? '#ffffff' : '#111111')}
+          onChange={(e) => setStyle({ [key]: e.target.value })}
+          className="h-10 w-14 cursor-pointer rounded-lg border border-border bg-background p-1"
+        />
+        {style[key] ? (
+          <Button type="button" size="sm" variant="outline" onClick={() => setStyle({ [key]: undefined })}>
+            إزالة اللون
+          </Button>
+        ) : (
+          <span className="text-xs text-muted-foreground">لون المتجر الافتراضي</span>
+        )}
+      </div>
+    </div>
+  )
+  const option = (key: 'paddingY' | 'paddingX' | 'width' | 'borderRadius', label: string, options: [string, string][], fallback: string) => (
+    <Field label={label} id={`s-${key}`}>
+      {(props) => (
+        <Select {...props} value={style[key] ?? fallback}
+          onChange={(e) => setStyle({ [key]: e.target.value === fallback ? undefined : e.target.value } as Partial<WidgetStyle>)}>
+          {options.map(([value, text]) => <option key={value} value={value}>{text}</option>)}
+        </Select>
+      )}
+    </Field>
+  )
+  return (
+    <details className="rounded-xl border border-border bg-muted/20 p-3" open={customised}>
+      <summary className="cursor-pointer text-sm font-bold">
+        المظهر ومن يرى هذه الأداة {customised && <span className="text-xs font-normal text-primary">(معدّل)</span>}
+      </summary>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        {colour('backgroundColor', 'لون الخلفية')}
+        {colour('textColor', 'لون النص')}
+        {option('paddingY', 'المسافة أعلى وأسفل', [['none', 'بدون'], ['sm', 'صغيرة'], ['md', 'متوسطة'], ['lg', 'كبيرة']], 'md')}
+        {option('paddingX', 'المسافة الجانبية', [['none', 'بدون'], ['sm', 'صغيرة'], ['md', 'متوسطة'], ['lg', 'كبيرة']], 'none')}
+        {option('width', 'العرض', [['container', 'بعرض المحتوى'], ['full', 'بعرض الشاشة كاملاً']], 'container')}
+        {option('borderRadius', 'زوايا الخلفية', [['none', 'حادة'], ['md', 'مستديرة قليلاً'], ['lg', 'مستديرة']], 'none')}
+        <Field label="من يرى هذه الأداة" id="s-audience">
+          {(props) => (
+            <Select {...props} value={widget.audience} onChange={(e) => patch({ audience: e.target.value as DraftWidget['audience'] })}>
+              <option value="all">الجميع</option>
+              <option value="guest">الزوار فقط (غير المسجلين)</option>
+              <option value="member">العملاء المسجلون فقط</option>
+            </Select>
+          )}
+        </Field>
+      </div>
+    </details>
+  )
 }
 
 // --------------------------------------------------------------------------

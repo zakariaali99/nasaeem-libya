@@ -21,12 +21,14 @@ import {
   useUpdateCartItem,
 } from '@/lib/queries/cart'
 import { useStorefrontLayout } from '@/lib/queries/storefront'
+import { useSiteText } from '@/lib/siteText'
 import { usePageTitle } from '@/lib/usePageTitle'
 import { FEATURES } from '@/lib/features'
 import type { CartLine } from '@/types/api'
 
 export default function CartPage() {
   usePageTitle('سلة المشتريات — نسائم ليبيا', 'راجع المنتجات والعطور المختارة قبل إتمام الدفع.')
+  const secureNote = useSiteText()('cart.secure')
 
   const navigate = useNavigate()
   const { data: cart, isPending, isError, error, refetch } = useCart()
@@ -149,10 +151,12 @@ export default function CartPage() {
             </Button>
 
             <div className="border-t border-border/80 pt-3 text-center space-y-1">
-              <div className="flex items-center justify-center gap-1 text-[11px] font-semibold text-muted-foreground">
-                <ShieldCheck className="size-3.5 text-emerald-500" />
-                <span>دفع آمن 100% ومشفر</span>
-              </div>
+              {secureNote && (
+                <div className="flex items-center justify-center gap-1 text-[11px] font-semibold text-muted-foreground">
+                  <ShieldCheck className="size-3.5 text-emerald-500" />
+                  <span>{secureNote}</span>
+                </div>
+              )}
             </div>
           </div>
         </aside>
@@ -164,9 +168,7 @@ export default function CartPage() {
             title={discoveryWidget.data.title}
             badge={discoveryWidget.data.badge}
             description={discoveryWidget.data.description}
-            price={discoveryWidget.data.price}
-            sampleCount={discoveryWidget.data.sampleCount}
-            cashbackPercent={discoveryWidget.data.cashbackPercent}
+            features={discoveryWidget.data.features}
             linkUrl={discoveryWidget.data.linkUrl}
             buttonText={discoveryWidget.data.buttonText}
           />

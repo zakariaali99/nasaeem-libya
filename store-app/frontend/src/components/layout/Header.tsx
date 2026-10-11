@@ -20,9 +20,11 @@ import { useMe } from '@/lib/queries/auth'
 import { useCart } from '@/lib/queries/cart'
 import { useWishlistIds } from '@/lib/queries/wishlist'
 import { cn } from '@/lib/utils'
+import { useSiteText } from '@/lib/siteText'
 import { isAdminRole } from '@/types/api'
 
 export function Header() {
+  const tagline = useSiteText()('header.tagline')
   const [elevated, setElevated] = useState(false)
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
   const [searchModalOpen, setSearchModalOpen] = useState(false)
@@ -91,9 +93,9 @@ export function Header() {
                   <span className="font-display text-lg sm:text-xl font-extrabold tracking-wide text-foreground leading-none">
                     نسائم ليبيا
                   </span>
-                  <span className="text-[10px] text-muted-foreground font-semibold tracking-wider">
-                    عطور فاخرة وأصلية
-                  </span>
+                  {tagline && (
+                    <span className="text-[10px] text-muted-foreground font-semibold tracking-wider">{tagline}</span>
+                  )}
                 </div>
               </Link>
 

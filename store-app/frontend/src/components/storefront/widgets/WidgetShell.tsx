@@ -1,4 +1,6 @@
+import { ArrowLeft } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 
 import { cn } from '@/lib/utils'
 import type { WidgetStyle } from '@/types/api'
@@ -52,13 +54,33 @@ export function WidgetShell({
   )
 }
 
-/** The heading every titled widget shares, so they cannot drift apart. */
-export function WidgetHeading({ title, action }: { title?: string; action?: ReactNode }) {
-  if (!title) return null
+/** The heading every titled widget shares, so they cannot drift apart.
+ *
+ * Both the title and the "see all" link are the operator's words: a widget
+ * with neither has no heading row at all. The title carries no colour class,
+ * so the widget's own text colour (set in the builder) reaches it. */
+export function WidgetHeading({
+  title,
+  actionLabel,
+  actionUrl,
+}: {
+  title?: string
+  actionLabel?: string
+  actionUrl?: string
+}) {
+  if (!title && !actionLabel) return null
   return (
     <div className="mb-4 flex items-center justify-between gap-4">
-      <h2 className="text-xl font-bold text-foreground sm:text-2xl">{title}</h2>
-      {action}
+      {title ? <h2 className="text-xl font-bold sm:text-2xl">{title}</h2> : <span />}
+      {actionLabel ? (
+        <Link
+          to={actionUrl || '/products'}
+          className="inline-flex min-h-11 shrink-0 items-center gap-1 px-2 text-xs font-bold text-primary transition-all hover:gap-1.5 sm:text-sm"
+        >
+          <span>{actionLabel}</span>
+          <ArrowLeft className="size-4" />
+        </Link>
+      ) : null}
     </div>
   )
 }

@@ -174,3 +174,25 @@ class TestLayoutBuilderAPI:
         assert hero["heroMode"] == "image"
         assert (hero["title"], hero["subtitle"], hero["buttonLabel"], hero["badgeText"]) == ("", "", "", "")
         assert hero["overlay"] == 45
+
+    def test_style_targeting_and_static_text_are_saved_as_written(self, admin_api, layout):
+        body = admin_api.patch(
+            reverse("admin-layout-detail", args=[layout.id]),
+            {"widgets": [
+                {"type": "category_list",
+                 "data": {"title": "علاماتنا", "actionLabel": "كل العلامات", "actionUrl": "/products"},
+                 "style": {"backgroundColor": "#fff8e7", "textColor": "red; position:fixed", "paddingY": "lg", "width": "huge"},
+                 "targeting": {"isGuest": True, "junk": 1}},
+                {"type": "discovery_box", "data": {"title": "عرض", "features": ["أ", "", "ب"]}},
+            ]},
+            format="json",
+        ).json()["data"]
+
+        first, promo = body["widgets"]
+        assert (first["data"]["actionLabel"], first["data"]["actionUrl"]) == ("كل العلامات", "/products")
+        # Only whitelisted, well-formed style values survive.
+        assert first["style"] == {"backgroundColor": "#fff8e7", "paddingY": "lg"}
+        assert first["targeting"] == {"isGuest": True}
+        # The promo banner keeps only the operator's words — no built-in promises.
+        assert promo["data"]["features"] == ["أ", "ب"]
+        assert (promo["data"]["badge"], promo["data"]["description"], promo["data"]["buttonText"]) == ("", "", "")

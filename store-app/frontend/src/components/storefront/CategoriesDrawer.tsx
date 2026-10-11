@@ -37,6 +37,7 @@ import { useCategories } from '@/lib/queries/catalog'
 import { useStoreSettings } from '@/lib/queries/storeSettings'
 import { useWishlistIds } from '@/lib/queries/wishlist'
 import { cn } from '@/lib/utils'
+import { useSiteText } from '@/lib/siteText'
 import { isAdminRole } from '@/types/api'
 
 interface CategoriesDrawerProps {
@@ -44,6 +45,7 @@ interface CategoriesDrawerProps {
 }
 
 export function CategoriesDrawer({ children }: CategoriesDrawerProps) {
+  const drawerNote = useSiteText()('drawer.note')
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [brandsOpen, setBrandsOpen] = useState(true)
@@ -249,10 +251,12 @@ export function CategoriesDrawer({ children }: CategoriesDrawerProps) {
               </a>
             ) : null}
 
-            <div className="flex items-center gap-2 text-[11px] text-muted-foreground px-3 py-1">
-              <Truck className="size-3.5 text-primary shrink-0" />
-              <span>توصيل سريع لكافة المدن الليبية (1–5 أيام)</span>
-            </div>
+            {drawerNote && (
+              <div className="flex items-center gap-2 text-[11px] text-muted-foreground px-3 py-1">
+                <Truck className="size-3.5 text-primary shrink-0" />
+                <span>{drawerNote}</span>
+              </div>
+            )}
           </div>
         </div>
 

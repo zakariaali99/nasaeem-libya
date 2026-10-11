@@ -144,11 +144,12 @@ class AdminLayoutDetailView(APIView):
                     "data": normalise_widget_data(raw["type"], raw.get("data")),
                     "is_active": bool(raw.get("is_active", True)),
                 }
-                # Style and targeting have no editor yet: a save that does not
-                # mention them must keep what the widget already has, not wipe it.
-                for key in ("style", "targeting"):
-                    if key in raw:
-                        item[key] = raw[key] if isinstance(raw[key], dict) else None
+                # A save that does not mention style or targeting keeps what the
+                # widget already has; one that does replaces it (validated).
+                if "style" in raw:
+                    item["style"] = services.normalise_style(raw["style"])
+                if "targeting" in raw:
+                    item["targeting"] = services.normalise_targeting(raw["targeting"])
                 cleaned_widgets.append(item)
 
         field_values = {}

@@ -8,12 +8,34 @@ CACHE_KEY = "store:settings:v1"
 CACHE_TIMEOUT = 24 * 3600  # 24 hours
 
 
+def _shared_cache() -> bool:
+    """A per-process cache (production has no Redis) is only cleared in the
+    process that saved, so the others kept the old phone number or wording for
+    a day. One primary-key read is cheaper than that."""
+    from django.conf import settings as django_settings
+
+    return "locmem" not in django_settings.CACHES["default"]["BACKEND"].lower()
+
+
 def get_store_settings() -> StoreSettings:
-    settings = cache.get(CACHE_KEY)
+    shared = _shared_cache()
+    settings = cache.get(CACHE_KEY) if shared else None
     if settings is None:
         settings, _ = StoreSettings.objects.get_or_create(pk=1)
-        cache.set(CACHE_KEY, settings, CACHE_TIMEOUT)
+        if shared:
+            cache.set(CACHE_KEY, settings, CACHE_TIMEOUT)
     return settings
+
+
+def clean_texts(value) -> dict:
+    """`{key: text}` with short string keys and bounded string values."""
+    if not isinstance(value, dict):
+        return {}
+    clean = {}
+    for key, text in list(value.items())[:200]:
+        if isinstance(key, str) and 0 < len(key) <= 60 and isinstance(text, str):
+            clean[key] = text.strip()[:600]
+    return clean
 
 
 def get_public_store_settings() -> dict:
@@ -41,6 +63,7 @@ def get_public_store_settings() -> dict:
         "whatsapp": settings.whatsapp,
         "email": settings.email,
         "bank_transfer_note": settings.bank_transfer_note,
+        "texts": settings.texts or {},
         "bank_accounts": bank_accounts,
     }
 

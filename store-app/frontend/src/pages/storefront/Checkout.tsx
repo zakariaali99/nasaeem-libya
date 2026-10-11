@@ -28,6 +28,7 @@ import { useCities, useDeliveryMethods, useOrder, useRegions } from '@/lib/queri
 import { useActiveCartPromotion } from '@/lib/queries/orders'
 import { useMe } from '@/lib/queries/auth'
 import { LuxuryGiftingSection, type GiftingState } from '@/components/storefront/LuxuryGiftingSection'
+import { useSiteText } from '@/lib/siteText'
 import { usePageTitle } from '@/lib/usePageTitle'
 import { cn } from '@/lib/utils'
 
@@ -35,6 +36,7 @@ export default function CheckoutPage() {
   const { orderId = '' } = useParams()
   const navigate = useNavigate()
   usePageTitle('إتمام الطلب والدفع — نسائم ليبيا', 'أدخل عنوان التوصيل واختر طريقة الدفع.')
+  const guaranteeNote = useSiteText()('checkout.guarantee')
 
   const { data: user } = useMe()
   const { data: order, isPending, isError, error, refetch } = useOrder(orderId)
@@ -527,10 +529,12 @@ export default function CheckoutPage() {
             </Button>
 
             <div className="border-t border-border/80 pt-3 text-center space-y-1">
-              <div className="flex items-center justify-center gap-1 text-[11px] font-semibold text-muted-foreground">
-                <ShieldCheck className="size-3.5 text-emerald-500" />
-                <span>ضمان نسائم ليبيا الذهبي للأصالة والجودة</span>
-              </div>
+              {guaranteeNote && (
+                <div className="flex items-center justify-center gap-1 text-[11px] font-semibold text-muted-foreground">
+                  <ShieldCheck className="size-3.5 text-emerald-500" />
+                  <span>{guaranteeNote}</span>
+                </div>
+              )}
             </div>
           </div>
         </aside>

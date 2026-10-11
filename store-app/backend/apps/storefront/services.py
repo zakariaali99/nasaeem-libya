@@ -110,6 +110,52 @@ def _layout(value) -> str:
     return "slider" if value == "slider" else "grid"
 
 
+def _action(data: dict) -> dict:
+    """The optional "see all" link beside a widget's heading. Both the words
+    and the destination are the operator's; nothing is shown when left empty."""
+    return {
+        "actionLabel": str(data.get("actionLabel") or ""),
+        "actionUrl": str(data.get("actionUrl") or ""),
+    }
+
+
+HEX_COLOUR = __import__("re").compile(r"^#[0-9a-fA-F]{3,8}$")
+STYLE_CHOICES = {
+    "paddingY": ("none", "sm", "md", "lg"),
+    "paddingX": ("none", "sm", "md", "lg"),
+    "width": ("full", "container"),
+    "borderRadius": ("none", "md", "lg"),
+}
+
+
+def normalise_style(style) -> dict | None:
+    """Whitelisted presentation knobs. Colours are hex only: the value becomes
+    an inline style on a public page, so nothing free-form is stored."""
+    if not isinstance(style, dict):
+        return None
+    clean = {}
+    for key in ("backgroundColor", "textColor"):
+        value = str(style.get(key) or "")
+        if HEX_COLOUR.match(value):
+            clean[key] = value
+    for key, allowed in STYLE_CHOICES.items():
+        if style.get(key) in allowed:
+            clean[key] = style[key]
+    return clean or None
+
+
+def normalise_targeting(targeting) -> dict | None:
+    """`{isGuest: bool}` (who sees the widget) and an optional `region` id."""
+    if not isinstance(targeting, dict):
+        return None
+    clean = {}
+    if isinstance(targeting.get("isGuest"), bool):
+        clean["isGuest"] = targeting["isGuest"]
+    if targeting.get("region"):
+        clean["region"] = str(targeting["region"])
+    return clean or None
+
+
 def _int(value, default: int, low: int, high: int) -> int:
     """A number field must never turn a save into a 500."""
     try:
@@ -158,12 +204,17 @@ def normalise_widget_data(widget_type: str, data: dict | None) -> dict:
             "title": data.get("title", "") or "",
             "productIds": _ids(_first(data, "productIds", "product_ids", default=[])),
             "layout": _layout(data.get("layout")),
+            **_action(data),
         }
 
     if widget_type == WidgetType.COLLECTION_SHOWCASE:
         return {
             "collectionId": str(_first(data, "collectionId", "collection_id")),
             "layout": _layout(data.get("layout")),
+            # Empty title/description fall back to the collection's own.
+            "title": str(data.get("title") or ""),
+            "description": str(data.get("description") or ""),
+            **_action(data),
         }
 
     if widget_type == WidgetType.CATEGORY_LIST:
@@ -171,6 +222,7 @@ def normalise_widget_data(widget_type: str, data: dict | None) -> dict:
             "title": data.get("title", "") or "",
             "categoryIds": _ids(_first(data, "categoryIds", "category_ids", default=[])),
             "layout": _layout(data.get("layout")),
+            **_action(data),
         }
 
     if widget_type == WidgetType.PHOTO_LINK_GRID:
@@ -188,7 +240,12 @@ def normalise_widget_data(widget_type: str, data: dict | None) -> dict:
                 # the type. One name survives: `label`.
                 "label": _first(item, "label", "name", "title"),
             })
-        return {"title": data.get("title", "") or "", "items": items, "layout": _layout(data.get("layout"))}
+        return {
+            "title": data.get("title", "") or "",
+            "items": items,
+            "layout": _layout(data.get("layout")),
+            **_action(data),
+        }
 
     if widget_type == WidgetType.HERO_CTA:
         alignment = data.get("alignment")
@@ -229,15 +286,19 @@ def normalise_widget_data(widget_type: str, data: dict | None) -> dict:
         }
 
     if widget_type == WidgetType.DISCOVERY_BOX:
+        # A promotional banner whose every word is the operator's. It used to
+        # ship with built-in promises (100% cashback, a 14-day coupon, fast
+        # delivery) and generate its description from two numbers.
+        features = [
+            str(line).strip() for line in (data.get("features") or []) if str(line).strip()
+        ][:6]
         return {
-            "title": data.get("title", "") or "باقة عينات التجربة واسترداد القيمة 100%",
-            "badge": data.get("badge", "") or "ضمان الرضا الكامل 🧪",
-            "description": data.get("description", "") or "",
-            "price": str(_first(data, "price", default="60 د.ل")),
-            "sampleCount": _int(data.get("sampleCount") or data.get("sample_count") or 5, 5, 1, 50),
-            "cashbackPercent": _int(data.get("cashbackPercent") or data.get("cashback_percent") or 100, 100, 0, 100),
-            "linkUrl": _first(data, "linkUrl", "link_url", default="/search?q=عينات"),
-            "buttonText": _first(data, "buttonText", "button_text", default="اطلب باقة التجربة الآن"),
+            "title": str(data.get("title") or ""),
+            "badge": str(data.get("badge") or ""),
+            "description": str(data.get("description") or ""),
+            "features": features,
+            "linkUrl": _first(data, "linkUrl", "link_url"),
+            "buttonText": _first(data, "buttonText", "button_text"),
             "showInCart": bool(data.get("showInCart", True)),
             "showInProductDetail": bool(data.get("showInProductDetail", True)),
         }
@@ -285,6 +346,7 @@ def normalise_widget_data(widget_type: str, data: dict | None) -> dict:
             "title": data.get("title", "") or "",
             "limit": max(1, min(limit, 24)),
             "layout": _layout(data.get("layout")),
+            **_action(data),
         }
 
     return data

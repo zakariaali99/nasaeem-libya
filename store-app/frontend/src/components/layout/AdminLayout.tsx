@@ -26,6 +26,7 @@ import {
   Wallet,
   X,
   Zap,
+  Type,
 } from 'lucide-react'
 import * as React from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
@@ -85,6 +86,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: '/admin/settings', label: 'إعدادات المتجر', icon: Settings, roles: ['admin', 'owner'] },
       { to: '/admin/customization', label: 'محرر الواجهة والقوالب', icon: Blocks },
+      { to: '/admin/texts', label: 'نصوص المتجر', icon: Type, roles: ['admin', 'owner'] },
       { to: '/admin/staff', label: 'فريق العمل والموظفون', icon: UserCog, roles: ['admin', 'owner'] },
       { to: '/admin/backup', label: 'النسخ الاحتياطي للنظام', icon: Archive, roles: ['admin', 'owner'] },
     ],

@@ -235,3 +235,25 @@ def test_placeholder_contacts_are_cleared_by_migration():
     assert settings.whatsapp == ""
     assert settings.phone == "0923456789"  # a real number is left alone
     assert not BankAccount.objects.exists()
+
+
+def test_store_texts_are_saved_cleaned_and_public(db):
+    from django.urls import reverse
+    from rest_framework.test import APIClient
+
+    from apps.core.models import Role, User
+
+    owner = User.objects.create_superuser(phone_number="0917770001", password="OwnerPass9x", role=Role.OWNER)
+    client = APIClient()
+    client.force_authenticate(user=owner)
+
+    response = client.put(
+        "/api/admin/store-settings/",
+        {"texts": {"footer.about": "  متجر عطور  ", "trust.1.title": "", "bad": 5, "x" * 80: "long key"}},
+        format="json",
+    )
+    assert response.status_code == 200, response.json()
+
+    public = APIClient().get("/api/store-settings/").json()["data"]
+    # Trimmed; an empty string is kept (it hides the line); junk is dropped.
+    assert public["texts"] == {"footer.about": "متجر عطور", "trust.1.title": ""}

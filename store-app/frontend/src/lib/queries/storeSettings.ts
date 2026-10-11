@@ -24,6 +24,8 @@ export interface StoreSettingsData {
   whatsapp: string
   email: string
   bank_transfer_note: string
+  /** Overrides for the storefront's fixed wording — see `lib/siteText.ts`. */
+  texts?: Record<string, string>
   bank_accounts?: BankAccountItem[]
   updated_at?: string
 }

@@ -21,7 +21,3 @@ export const FEATURES = {
   loyalty: false,
   shipping: false,
 } as const
-
-/** What the customer reads where the delivery price used to be. */
-export const SHIPPING_QUOTE_NOTE =
-  'الإجمالي لا يشمل التوصيل: سنتواصل معك مباشرة لتأكيد الطلب والاتفاق على التوصيل وسعره.'

@@ -7,6 +7,7 @@ import { WidgetRenderer } from '@/components/storefront/widgets'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useStorefrontLayout } from '@/lib/queries/storefront'
+import { useSiteText } from '@/lib/siteText'
 import { usePageTitle } from '@/lib/usePageTitle'
 
 /**
@@ -15,6 +16,7 @@ import { usePageTitle } from '@/lib/usePageTitle'
  */
 export default function HomePage() {
   usePageTitle('', 'نسائم ليبيا — عطور وزيوت وأطقم هدايا، توصيل إلى جميع مدن ليبيا.')
+  const t = useSiteText()
   const { data, isPending, isError, error, refetch } = useStorefrontLayout()
 
   if (isPending) return <HomeSkeleton />
@@ -37,8 +39,8 @@ export default function HomePage() {
         <h1 className="sr-only">نسائم ليبيا</h1>
         <EmptyState
           icon={<Store className="size-8" aria-hidden="true" />}
-          title="الصفحة الرئيسية قيد الإعداد"
-          description="لم يتم تجهيز واجهة المتجر بعد، لكن كل المنتجات متاحة للتصفّح الآن."
+          title={t('home.empty.title') || 'نسائم ليبيا'}
+          description={t('home.empty.text')}
           action={
             <Button asChild size="lg">
               <Link to="/products">تصفّح كل المنتجات</Link>

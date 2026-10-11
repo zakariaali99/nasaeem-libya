@@ -10,9 +10,7 @@ export function DiscoveryBoxWidget({ widget }: { widget: Widget }) {
         title={data.title}
         badge={data.badge}
         description={data.description}
-        price={data.price}
-        sampleCount={data.sampleCount}
-        cashbackPercent={data.cashbackPercent}
+        features={data.features}
         linkUrl={data.linkUrl}
         buttonText={data.buttonText}
       />

@@ -1,5 +1,6 @@
-import { FEATURES, SHIPPING_QUOTE_NOTE } from '@/lib/features'
+import { FEATURES } from '@/lib/features'
 import { formatPrice } from '@/lib/format'
+import { useSiteText } from '@/lib/siteText'
 
 export interface OrderSummaryProps {
   subtotal: string
@@ -22,6 +23,7 @@ export function OrderSummary({
   shippingNote,
   isFreeShipping,
 }: OrderSummaryProps) {
+  const shippingQuoteNote = useSiteText()('shipping.note')
   const hasDiscount = Number(discountTotal) > 0
   const hasShipping = Number(shippingTotal) > 0
   // Shipping is out of the system: no delivery row, and a note that the
@@ -55,8 +57,8 @@ export function OrderSummary({
         </dt>
         <dd className="text-lg font-bold tabular-nums text-price">{formatPrice(total)}</dd>
       </div>
-      {quotedLater ? (
-        <p className="rounded-md bg-muted/60 p-2.5 text-xs leading-relaxed text-muted-foreground">{SHIPPING_QUOTE_NOTE}</p>
+      {quotedLater && shippingQuoteNote ? (
+        <p className="rounded-md bg-muted/60 p-2.5 text-xs leading-relaxed text-muted-foreground">{shippingQuoteNote}</p>
       ) : null}
     </dl>
   )

@@ -346,9 +346,7 @@ function ProductView({
             title={discoveryWidget.data.title}
             badge={discoveryWidget.data.badge}
             description={discoveryWidget.data.description}
-            price={discoveryWidget.data.price}
-            sampleCount={discoveryWidget.data.sampleCount}
-            cashbackPercent={discoveryWidget.data.cashbackPercent}
+            features={discoveryWidget.data.features}
             linkUrl={discoveryWidget.data.linkUrl}
             buttonText={discoveryWidget.data.buttonText}
           />

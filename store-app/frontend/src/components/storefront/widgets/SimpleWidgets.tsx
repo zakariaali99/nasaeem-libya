@@ -1,4 +1,3 @@
-import { ArrowLeft } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import { WidgetHeading } from '@/components/storefront/widgets/WidgetShell'
@@ -62,20 +61,7 @@ export function PhotoLinkGrid({ widget }: { widget: Widget }) {
 
   return (
     <div className="space-y-4">
-      {widget.data.title ? (
-        <WidgetHeading
-          title={widget.data.title}
-          action={
-            <Link
-              to="/products"
-              className="inline-flex min-h-11 items-center gap-1 text-xs sm:text-sm font-bold text-primary hover:gap-1.5 transition-all px-2"
-            >
-              <span>عرض الكل</span>
-              <ArrowLeft className="size-4 rtl:rotate-0" />
-            </Link>
-          }
-        />
-      ) : null}
+      <WidgetHeading title={widget.data.title} actionLabel={widget.data.actionLabel} actionUrl={widget.data.actionUrl} />
       <ul
         className={cn(
           slider

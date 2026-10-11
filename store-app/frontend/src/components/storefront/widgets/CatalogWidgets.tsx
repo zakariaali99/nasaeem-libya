@@ -1,4 +1,3 @@
-import { ArrowLeft } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import { ProductGrid } from '@/components/storefront/ProductGrid'
@@ -17,18 +16,7 @@ export function ProductListWidget({ widget }: { widget: Widget }) {
 
   return (
     <div className="space-y-4">
-      <WidgetHeading
-        title={widget.data.title || 'منتجات مختارة'}
-        action={
-          <Link
-            to="/products"
-            className="inline-flex min-h-11 items-center gap-1 text-xs sm:text-sm font-bold text-primary hover:gap-1.5 transition-all px-2"
-          >
-            <span>عرض التشكيلة كاملة</span>
-            <ArrowLeft className="size-4 rtl:rotate-0" />
-          </Link>
-        }
-      />
+      <WidgetHeading title={widget.data.title} actionLabel={widget.data.actionLabel} actionUrl={widget.data.actionUrl} />
       <ProductGrid products={products} layout={widget.data.layout ?? 'grid'} />
     </div>
   )
@@ -43,18 +31,13 @@ export function CollectionShowcase({ widget }: { widget: Widget }) {
     <div className="space-y-4 rounded-3xl border border-border/80 bg-muted/20 p-5 sm:p-8">
       <WidgetHeading
         title={widget.data.title || collection.name}
-        action={
-          <Link
-            to={`/collections/${encodeURIComponent(collection.slug)}`}
-            className="inline-flex min-h-11 items-center gap-1 rounded-xl border border-primary/30 bg-primary/10 px-3.5 py-1.5 text-xs font-bold text-primary hover:bg-primary/20 transition-all"
-          >
-            <span>استكشف المجموعة</span>
-            <ArrowLeft className="size-3.5 rtl:rotate-0" />
-          </Link>
-        }
+        actionLabel={widget.data.actionLabel}
+        actionUrl={widget.data.actionUrl || `/collections/${encodeURIComponent(collection.slug)}`}
       />
-      {collection.description ? (
-        <p className="text-xs sm:text-sm leading-relaxed text-muted-foreground max-w-2xl">{collection.description}</p>
+      {widget.data.description || collection.description ? (
+        <p className="text-xs sm:text-sm leading-relaxed text-muted-foreground max-w-2xl">
+          {widget.data.description || collection.description}
+        </p>
       ) : null}
       <ProductGrid products={products} layout={widget.data.layout ?? 'grid'} />
     </div>
@@ -69,18 +52,7 @@ export function CategoryListWidget({ widget }: { widget: Widget }) {
 
   return (
     <div className="space-y-4">
-      <WidgetHeading
-        title={widget.data.title || 'تسوّق حسب التصنيف'}
-        action={
-          <Link
-            to="/products"
-            className="inline-flex min-h-11 items-center gap-1 text-xs sm:text-sm font-bold text-primary hover:gap-1.5 transition-all px-2"
-          >
-            <span>جميع الأقسام</span>
-            <ArrowLeft className="size-4 rtl:rotate-0" />
-          </Link>
-        }
-      />
+      <WidgetHeading title={widget.data.title} actionLabel={widget.data.actionLabel} actionUrl={widget.data.actionUrl} />
       <ul
         className={cn(
           slider

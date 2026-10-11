@@ -267,6 +267,11 @@ export interface WidgetData {
   imageUrl?: string
   altText?: string
   linkUrl?: string
+  // the optional "see all" link beside a widget heading
+  actionLabel?: string
+  actionUrl?: string
+  // promo banner (discovery_box): bullet lines
+  features?: string[]
   // product_list / personalised / collection_showcase
   title?: string
   productIds?: string[]

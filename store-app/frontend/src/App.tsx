@@ -84,6 +84,7 @@ const AdminExecutiveAnalytics = lazy(() => import('@/pages/admin/analytics/Execu
 const AdminStaff = lazy(() => import('@/pages/admin/AdminStaff'))
 const AdminBackups = lazy(() => import('@/pages/admin/AdminBackups'))
 const AdminStoreSettings = lazy(() => import('@/pages/admin/StoreSettings'))
+const AdminSiteTexts = lazy(() => import('@/pages/admin/SiteTexts'))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -166,6 +167,7 @@ const router = createBrowserRouter([
               { path: 'users/:userId', element: withSuspense(<AdminUserDetail />) },
               { path: 'staff', element: withSuspense(<AdminStaff />) },
               { path: 'settings', element: withSuspense(<AdminStoreSettings />) },
+              { path: 'texts', element: withSuspense(<AdminSiteTexts />) },
               { path: 'backup', element: withSuspense(<AdminBackups />) },
               { path: 'backups', element: withSuspense(<AdminBackups />) },
               { path: 'discounts', element: withSuspense(<AdminDiscounts />) },

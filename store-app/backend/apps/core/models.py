@@ -271,6 +271,10 @@ class StoreSettings(models.Model):
     email = models.EmailField("البريد الإلكتروني", blank=True)
     # Extra transfer note
     bank_transfer_note = models.TextField("ملاحظة التحويل المصرفي", blank=True)
+    # The storefront's fixed wording (footer, trust lines, product-page
+    # badges…), keyed by the ids in the frontend's `lib/siteText.ts`. A key
+    # that is absent uses the built-in wording; an empty string hides the line.
+    texts = models.JSONField("نصوص المتجر", default=dict, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

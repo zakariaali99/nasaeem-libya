@@ -24,7 +24,8 @@ export function ImageWidget({ widget, priority = false }: { widget: Widget; prio
   if (!imageUrl) return null
 
   // The picture as the operator made it: full width, its own proportions, no
-  // frame, no padding and no cropping.
+  // frame, no padding and no cropping. Edge to edge has square corners.
+  const rounded = widget.style?.width === 'full' ? '' : 'rounded-3xl'
   const image = (
     <img
       src={imageUrl}
@@ -32,14 +33,14 @@ export function ImageWidget({ widget, priority = false }: { widget: Widget; prio
       loading={priority ? 'eager' : 'lazy'}
       fetchPriority={priority ? 'high' : undefined}
       decoding="async"
-      className="block h-auto w-full rounded-3xl"
+      className={cn('block h-auto w-full', rounded)}
     />
   )
 
   return linkUrl ? (
     <Link
       to={linkUrl}
-      className="block focus-visible:outline-2 focus-visible:outline-ring rounded-3xl overflow-hidden"
+      className={cn('block overflow-hidden focus-visible:outline-2 focus-visible:outline-ring', rounded)}
     >
       {image}
     </Link>

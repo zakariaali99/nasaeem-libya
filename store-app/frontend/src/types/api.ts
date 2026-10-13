@@ -239,6 +239,8 @@ export interface WidgetStyle {
 
 export interface CarouselSlide {
   imageUrl: string
+  /** A taller picture for phones; the main one is used when empty. */
+  mobileImageUrl?: string
   linkUrl: string
   title: string
   subtitle: string
@@ -260,7 +262,8 @@ export interface TrustBadgeItem {
 export interface WidgetData {
   // carousel
   slides?: CarouselSlide[]
-  carouselStyle?: 'hero' | 'normal'
+  carouselStyle?: 'hero' | 'normal' | 'auto'
+  imageFit?: 'cover' | 'contain'
   // text_block
   content?: string
   // image

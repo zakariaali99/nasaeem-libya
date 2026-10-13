@@ -14,7 +14,14 @@ export interface CarouselProps {
 
 export function Carousel({ widget, priority = false }: CarouselProps) {
   const slides = widget.data.slides ?? []
-  const hero = widget.data.carouselStyle !== 'normal'
+  const shape = widget.data.carouselStyle ?? 'hero'
+  // `auto`: the frame takes the first slide's own proportions, so the picture
+  // shows whole, edge to edge. The other shapes are a fixed frame the pictures
+  // fill (`cover`) or sit inside (`contain`).
+  const auto = shape === 'auto'
+  const fit = widget.data.imageFit === 'contain' ? 'object-contain' : 'object-cover'
+  // Edge to edge means no rounded corners and no tinted frame behind the picture.
+  const fullBleed = widget.style?.width === 'full'
   const [index, setIndex] = useState(0)
 
   useEffect(() => {
@@ -32,25 +39,36 @@ export function Carousel({ widget, priority = false }: CarouselProps) {
   const go = (delta: number) => setIndex((i) => (i + delta + slides.length) % slides.length)
 
   return (
-    <div className="relative overflow-hidden rounded-lg bg-muted">
-      <div className={cn('relative w-full', hero ? 'aspect-[16/9] sm:aspect-[21/9]' : 'aspect-[16/9]')}>
+    <div className={cn('relative overflow-hidden', !fullBleed && 'rounded-lg', !auto && fit === 'object-contain' && 'bg-muted')}>
+      <div
+        className={cn(
+          'relative w-full',
+          shape === 'hero' && 'aspect-[16/9] sm:aspect-[21/9]',
+          shape === 'normal' && 'aspect-[16/9]',
+        )}
+      >
         {slides.map((slide, slideIndex) => {
           const isFirst = slideIndex === 0
           const isEager = priority && isFirst
+          // In `auto` the first slide stays in the flow and gives the frame its
+          // height; the rest are laid over it.
+          const sizer = auto && isFirst
           const content = (
             <>
-              <picture className="size-full">
+              <picture className={sizer ? 'block' : 'block size-full'}>
                 {/* Matches the server's preload tags for the first slide. */}
-                <source media="(max-width: 640px)" srcSet={renditionUrl(slide.imageUrl, 'full')} />
+                <source media="(max-width: 640px)" srcSet={renditionUrl(slide.mobileImageUrl || slide.imageUrl, 'full')} />
                 <img
                   src={slide.imageUrl}
                   alt={slide.title || ''}
-                  width={1200}
-                  height={675}
                   loading={isEager ? 'eager' : 'lazy'}
                   fetchPriority={isEager ? 'high' : undefined}
                   decoding="async"
-                  className="size-full object-contain"
+                  className={
+                    sizer
+                      ? 'block h-auto max-h-[85dvh] w-full object-cover'
+                      : cn('block size-full', auto ? 'object-cover' : fit)
+                  }
                 />
               </picture>
               {slide.title || slide.subtitle ? (
@@ -66,7 +84,8 @@ export function Carousel({ widget, priority = false }: CarouselProps) {
             <div
               key={`${slide.imageUrl}-${slideIndex}`}
               className={cn(
-                'absolute inset-0 transition-opacity duration-300 ease-out',
+                sizer ? 'relative' : 'absolute inset-0',
+                'transition-opacity duration-300 ease-out',
                 slideIndex === index ? 'opacity-100' : 'pointer-events-none opacity-0',
               )}
               aria-hidden={slideIndex === index ? undefined : true}

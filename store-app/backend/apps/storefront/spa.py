@@ -252,7 +252,8 @@ def _hero_preload_tags(widgets) -> list[str]:
             mobile = data.get("mobileImageUrl") or desktop
         elif widget.get("type") == "carousel":
             slides = data.get("slides") or []
-            desktop = mobile = slides[0].get("imageUrl") if slides else None
+            desktop = slides[0].get("imageUrl") if slides else None
+            mobile = (slides[0].get("mobileImageUrl") if slides else None) or desktop
         else:
             continue
         if not desktop:

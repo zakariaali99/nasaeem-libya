@@ -43,6 +43,8 @@ export function HeroCta({ widget, priority = false }: { widget: Widget; priority
   } = widget.data
 
   const desktop = desktopImageUrl || mobileImageUrl
+  // Edge to edge has square corners; inside the page width it is a card.
+  const rounded = widget.style?.width === 'full' ? '' : 'rounded-3xl'
   const hasImage = Boolean(desktop)
 
   // One URL per breakpoint, matching the preload tags the server emits
@@ -64,9 +66,9 @@ export function HeroCta({ widget, priority = false }: { widget: Widget; priority
 
   if (heroMode === 'image') {
     if (!hasImage) return null
-    const image = picture('block h-auto w-full rounded-3xl')
+    const image = picture(cn('block h-auto w-full', rounded))
     return linkUrl ? (
-      <Link to={linkUrl} className="block rounded-3xl focus-visible:outline-2 focus-visible:outline-ring">
+      <Link to={linkUrl} className={cn('block focus-visible:outline-2 focus-visible:outline-ring', rounded)}>
         {image}
       </Link>
     ) : (
@@ -81,7 +83,7 @@ export function HeroCta({ widget, priority = false }: { widget: Widget; priority
   const darkness = Math.min(Math.max(Number(overlay ?? 45), 0), 90) / 100
 
   return (
-    <div className="relative overflow-hidden rounded-3xl bg-slate-950 text-white shadow-xl animate-fade-rise">
+    <div className={cn('relative overflow-hidden bg-slate-950 text-white animate-fade-rise', rounded && `${rounded} shadow-xl`)}>
       {hasImage ? (
         <>
           <div className="absolute inset-0">{picture('size-full object-cover')}</div>

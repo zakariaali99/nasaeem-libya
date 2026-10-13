@@ -179,6 +179,7 @@ def normalise_widget_data(widget_type: str, data: dict | None) -> dict:
                 continue
             slides.append({
                 "imageUrl": image,
+                "mobileImageUrl": _first(slide, "mobileImageUrl", "mobile_image_url"),
                 "linkUrl": _first(slide, "linkUrl", "link_url", "href"),
                 "title": slide.get("title", "") or "",
                 "subtitle": slide.get("subtitle", "") or "",
@@ -186,7 +187,10 @@ def normalise_widget_data(widget_type: str, data: dict | None) -> dict:
         style = data.get("carouselStyle")
         return {
             "slides": slides,
-            "carouselStyle": "normal" if style == "normal" else "hero",
+            "carouselStyle": style if style in ("normal", "auto") else "hero",
+            # `cover` fills the frame edge to edge; `contain` shows the whole
+            # picture and leaves bars where its shape differs from the frame.
+            "imageFit": "contain" if data.get("imageFit") == "contain" else "cover",
         }
 
     if widget_type == WidgetType.TEXT_BLOCK:

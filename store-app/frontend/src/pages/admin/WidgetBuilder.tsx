@@ -608,17 +608,38 @@ function WidgetFields({ type, data, patch }: FieldsProps) {
       return (
         <>
           {choice('carouselStyle', 'شكل السلايدر', [
-            { value: 'hero', label: 'عريض (بانر)' }, { value: 'normal', label: 'عادي 16:9' },
+            { value: 'hero', label: 'بانر عريض (21:9 على الحاسوب، 16:9 على الهاتف)' },
+            { value: 'normal', label: 'عادي 16:9' },
+            { value: 'auto', label: 'بأبعاد الصورة الأولى — تظهر كاملة بلا قص' },
           ])}
+          {data.carouselStyle === 'auto' ? (
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              الإطار يأخذ شكل الصورة الأولى، فاجعل كل الشرائح بالمقاس نفسه. الصورة المربعة تملأ شاشة الهاتف، لكنها على الحاسوب تصير عالية جداً فيُقصّ منها ما زاد عن ارتفاع الشاشة.
+            </p>
+          ) : (
+            <>
+              {choice('imageFit', 'الصورة داخل الإطار', [
+                { value: 'cover', label: 'تملأ الإطار كاملاً (يُقصّ الزائد من الأطراف)' },
+                { value: 'contain', label: 'تظهر كاملة (يبقى فراغ على الجانبين إن اختلف شكلها عن الإطار)' },
+              ])}
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                لتملأ الصورة الإطار بلا قص: {data.carouselStyle === 'normal' ? '1920×1080' : '1920×820 للحاسوب، و1080×608 للهاتف'}.
+              </p>
+            </>
+          )}
           <Repeater
             title="الشرائح"
             addLabel="إضافة شريحة"
             items={(data.slides as Data[]) ?? []}
-            blank={{ imageUrl: '', title: '', subtitle: '', linkUrl: '' }}
+            blank={{ imageUrl: '', mobileImageUrl: '', title: '', subtitle: '', linkUrl: '' }}
             onChange={(slides) => patch({ slides })}
             render={(slide, update) => (
               <>
-                <ImageUploadField label="صورة الشريحة" purpose="banner" value={String(slide.imageUrl ?? '')} onChange={(url) => update({ imageUrl: url })} />
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <ImageUploadField label="صورة الشريحة" purpose="banner" aspectRatio="auto" value={String(slide.imageUrl ?? '')} onChange={(url) => update({ imageUrl: url })} />
+                  <ImageUploadField label="صورة الهاتف (اختياري)" purpose="banner" aspectRatio="auto"
+                    hint="إن تُركت فارغة تُستخدم صورة الشريحة" value={String(slide.mobileImageUrl ?? '')} onChange={(url) => update({ mobileImageUrl: url })} />
+                </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <TextInput label="عنوان على الصورة (اختياري)" value={String(slide.title ?? '')} onChange={(v) => update({ title: v })} />
                   <TextInput label="نص فرعي (اختياري)" value={String(slide.subtitle ?? '')} onChange={(v) => update({ subtitle: v })} />
@@ -815,6 +836,9 @@ function WidgetFields({ type, data, patch }: FieldsProps) {
 // Appearance and audience — the same for every widget type
 // --------------------------------------------------------------------------
 
+/** Picture widgets, where "edge to edge with no gaps" is one click. */
+const EDGE_TO_EDGE: string[] = ['carousel', 'image', 'hero_cta']
+
 function AppearanceEditor({ widget, patch }: { widget: DraftWidget; patch: (patch: Partial<DraftWidget>) => void }) {
   const style = widget.style
   const setStyle = (change: Partial<WidgetStyle>) => {
@@ -823,6 +847,7 @@ function AppearanceEditor({ widget, patch }: { widget: DraftWidget; patch: (patc
     patch({ style: next })
   }
   const customised = Object.keys(style).length > 0 || widget.audience !== 'all'
+  const edgeToEdge = style.width === 'full' && style.paddingY === 'none' && !style.paddingX && !style.borderRadius
   const colour = (key: 'backgroundColor' | 'textColor', label: string) => (
     <div className="space-y-1">
       <span className="block text-sm font-medium">{label}</span>
@@ -859,6 +884,15 @@ function AppearanceEditor({ widget, patch }: { widget: DraftWidget; patch: (patc
       <summary className="cursor-pointer text-sm font-bold">
         المظهر ومن يرى هذه الأداة {customised && <span className="text-xs font-normal text-primary">(معدّل)</span>}
       </summary>
+      {EDGE_TO_EDGE.includes(widget.type) ? (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <Button type="button" size="sm" variant={edgeToEdge ? 'default' : 'outline'} disabled={edgeToEdge}
+            onClick={() => setStyle({ width: 'full', paddingY: 'none', paddingX: undefined, borderRadius: undefined })}>
+            {edgeToEdge ? 'بعرض الشاشة بلا فراغات ✓' : 'اجعلها بعرض الشاشة بلا فراغات'}
+          </Button>
+          <span className="text-xs text-muted-foreground">تلتصق الصورة بحواف الشاشة وبما فوقها وتحتها.</span>
+        </div>
+      ) : null}
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         {colour('backgroundColor', 'لون الخلفية')}
         {colour('textColor', 'لون النص')}

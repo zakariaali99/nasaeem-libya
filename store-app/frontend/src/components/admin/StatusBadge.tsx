@@ -22,6 +22,9 @@ const LABELS: Record<string, string> = {
   returned: 'مرتجع',
   waiting_for_verification: 'بانتظار التحقق',
   failed: 'فشل',
+  unpaid: 'غير مدفوع',
+  paid: 'مدفوع',
+  partially_paid: 'مدفوع جزئياً',
 }
 
 const TONES: Record<string, 'success' | 'warning' | 'primary' | 'danger' | 'neutral'> = {
@@ -35,6 +38,9 @@ const TONES: Record<string, 'success' | 'warning' | 'primary' | 'danger' | 'neut
   returned: 'danger',
   waiting_for_verification: 'warning',
   failed: 'danger',
+  unpaid: 'warning',
+  paid: 'success',
+  partially_paid: 'warning',
 }
 
 const ICONS: Record<string, React.ElementType> = {

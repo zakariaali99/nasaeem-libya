@@ -12,9 +12,9 @@ export interface PredictiveSearchData {
 
 export interface FragranceFinderRecommendation {
   product: Product
-  match_score: number
-  reason: string
   vibe_label: string
+  /** False for a filler suggestion: nothing matched the chosen scent family. */
+  exact: boolean
 }
 
 export interface FragranceFinderPayload {
@@ -33,7 +33,9 @@ export function usePredictiveSearch(query: string) {
       )
       return res.data
     },
-    enabled: true,
+    // Nothing to look up until two letters are typed; asking with an empty
+    // query fired a request on every page load for every visitor.
+    enabled: query.trim().length >= 2,
     staleTime: 30000,
   })
 }

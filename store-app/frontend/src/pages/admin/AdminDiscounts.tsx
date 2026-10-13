@@ -319,12 +319,20 @@ export default function AdminDiscounts() {
           {
             key: 'is_active',
             header: 'الحالة',
-            cell: (d: Discount) =>
-              d.is_active ? (
-                <Badge tone="success" className="text-xs">ساري ومفعّل</Badge>
-              ) : (
-                <Badge tone="neutral" className="text-xs">معطّل</Badge>
-              ),
+            // "Active" is not the whole story: a code past its end date, not
+            // yet started, or used up is refused at the cart while this column
+            // went on calling it valid.
+            cell: (d: Discount) => {
+              const now = Date.now()
+              if (!d.is_active) return <Badge tone="neutral" className="text-xs">معطّل</Badge>
+              if (d.end_date && new Date(d.end_date).getTime() < now)
+                return <Badge tone="danger" className="text-xs">منتهي الصلاحية</Badge>
+              if (d.start_date && new Date(d.start_date).getTime() > now)
+                return <Badge tone="warning" className="text-xs">لم يبدأ بعد</Badge>
+              if (d.usage_limit && d.usage_count >= d.usage_limit)
+                return <Badge tone="danger" className="text-xs">استُنفد</Badge>
+              return <Badge tone="success" className="text-xs">ساري ومفعّل</Badge>
+            },
           },
           {
             key: 'actions',

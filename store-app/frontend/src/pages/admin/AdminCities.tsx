@@ -43,7 +43,7 @@ export default function AdminCities() {
     <div className="space-y-6 animate-fade-rise">
       <PageHeader
         title="المدن ومناطق التوصيل"
-        description="إدارة تسعير الشحن والتوصيل المحلي، تحديد تكلفة الشحن للمدن والمناطق في ليبيا."
+        description="المدن والمناطق التي يختار منها العميل عند إتمام الطلب. سعر التوصيل يُتفق عليه مع العميل عند تأكيد الطلب."
       />
 
       {/* KPI Metric Summary Ribbon */}
@@ -59,7 +59,7 @@ export default function AdminCities() {
 
         <div className="rounded-2xl border border-border bg-card p-4 shadow-2xs space-y-1">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>المدن المتاحة للشحن</span>
+            <span>المدن المفعّلة</span>
             <CheckCircle2 className="size-4 text-emerald-500" />
           </div>
           <p className="font-mono text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400">{formatNumber(activeCities)}</p>

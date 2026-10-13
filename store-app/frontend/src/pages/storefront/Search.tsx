@@ -31,7 +31,6 @@ export default function SearchPage() {
         <div className="mx-auto w-full max-w-3xl px-4 py-6 space-y-4">
           <SearchBox autoFocus={!term} />
           <NotesBrowserBar
-            currentQuery={term}
             onOpenFinder={() => setQuizOpen(true)}
           />
         </div>

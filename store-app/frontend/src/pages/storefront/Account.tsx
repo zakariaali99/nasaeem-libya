@@ -1,6 +1,6 @@
-import { CheckCircle2, Eye, EyeOff, KeyRound, Lock, User } from 'lucide-react'
+import { CheckCircle2, ChevronLeft, Eye, EyeOff, Heart, KeyRound, Lock, MapPin, Package, User } from 'lucide-react'
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
 import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -64,7 +64,7 @@ export default function AccountPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-2xl space-y-8 p-4 sm:p-6 animate-fade-rise">
+    <div className="mx-auto w-full max-w-2xl space-y-8 p-4 sm:p-6 animate-fade-rise">
       <div className="flex items-center justify-between border-b border-border/80 pb-4">
         <div className="flex items-center gap-3">
           <div className="flex size-11 items-center justify-center rounded-2xl bg-primary/10 text-primary border border-primary/20">
@@ -89,6 +89,31 @@ export default function AccountPage() {
           تسجيل الخروج
         </Button>
       </div>
+
+      {/* Where a customer actually wants to go from here. On a phone this page
+          is the only way in: the bottom bar's «حسابي» lands here. */}
+      <nav aria-label="روابط حسابي" className="grid gap-3 sm:grid-cols-3">
+        {[
+          { to: '/me/orders', label: 'طلباتي', hint: 'تابع طلباتك', Icon: Package },
+          { to: '/me/addresses', label: 'عناويني', hint: 'عناوين التوصيل المحفوظة', Icon: MapPin },
+          { to: '/wishlist', label: 'المفضلة', hint: 'ما حفظته لوقت لاحق', Icon: Heart },
+        ].map(({ to, label, hint, Icon }) => (
+          <Link
+            key={to}
+            to={to}
+            className="flex min-h-16 items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-xs transition-colors hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-2 focus-visible:outline-ring"
+          >
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Icon className="size-5" aria-hidden="true" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-bold text-foreground">{label}</span>
+              <span className="block truncate text-xs text-muted-foreground">{hint}</span>
+            </span>
+            <ChevronLeft className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          </Link>
+        ))}
+      </nav>
 
       {/* Basic Profile Data */}
       <section className="space-y-3">
@@ -131,7 +156,7 @@ export default function AccountPage() {
         {passError && <Alert tone="error">{passError}</Alert>}
 
         <form onSubmit={handlePasswordChange} className="space-y-4">
-          <Field label="كلمة المرور الحالية" htmlFor="current_pass" hint="إذا تم إنشاء حسابك تلقائياً عند الشراء، فكلمة مرورك هي 000000">
+          <Field label="كلمة المرور الحالية" htmlFor="current_pass" hint="إن فُتح حسابك عند الشراء فهي الأرقام الستة التي ظهرت لك بعد تأكيد الطلب">
             <div className="relative">
               <Input
                 id="current_pass"
@@ -189,6 +214,6 @@ export default function AccountPage() {
           </Button>
         </form>
       </section>
-    </main>
+    </div>
   )
 }

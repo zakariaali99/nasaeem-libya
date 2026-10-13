@@ -71,9 +71,11 @@ export function ProductListing({
   const products = data?.items ?? []
   const meta = data?.meta
 
+  // Only what the customer chose counts: on a category page the category is
+  // the page itself, and counting it showed a "1" badge with nothing to clear.
   const activeFilters = [
-    params.category,
-    params.collection,
+    showFacets ? get('category') : '',
+    showFacets ? get('collection') : '',
     params.min_price,
     params.max_price,
     params.in_stock,

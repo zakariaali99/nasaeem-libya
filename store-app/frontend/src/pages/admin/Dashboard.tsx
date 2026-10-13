@@ -175,7 +175,7 @@ export default function Dashboard() {
       </div>
 
       {/* Primary KPI Grid (4 columns) */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {/* Total Revenue */}
         <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-2xs">
           <div className="flex items-center justify-between">
@@ -185,7 +185,7 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-2xl font-extrabold font-mono text-price truncate">{formatPrice(data.revenue_total)}</p>
+            <p className="text-xl font-extrabold font-mono text-price sm:text-2xl">{formatPrice(data.revenue_total)}</p>
           </div>
           <div className="mt-3 flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
             <TrendingUp className="size-3.5" />
@@ -250,11 +250,10 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-2xl font-extrabold font-mono text-primary truncate">{formatPrice(data.month_revenue)}</p>
+            <p className="text-xl font-extrabold font-mono text-primary sm:text-2xl">{formatPrice(data.month_revenue)}</p>
           </div>
-          <div className="mt-3 flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
-            <TrendingUp className="size-3.5" />
-            <span>مبيعات تراكمية ممتازة</span>
+          <div className="mt-3 text-xs text-muted-foreground">
+            <span>الطلبات المؤكدة منذ أول الشهر</span>
           </div>
         </div>
       </div>

@@ -86,7 +86,9 @@ export default function CartPage() {
         <div className="space-y-1">
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">سلة المشتريات</h1>
           <p className="text-xs sm:text-sm text-muted-foreground">
-            لديك <span className="font-bold text-foreground font-mono">{cart.items.length}</span> أصناف في سلتك
+            {cart.items.length === 1 ? 'في سلتك صنف واحد' : cart.items.length === 2 ? 'في سلتك صنفان' : (
+              <>في سلتك <span className="font-bold text-foreground font-mono">{cart.items.length}</span> {cart.items.length <= 10 ? 'أصناف' : 'صنفاً'}</>
+            )}
           </p>
         </div>
         <Link
@@ -276,6 +278,9 @@ function DiscountForm({
           value={code}
           onChange={(event) => setCode(event.target.value)}
           placeholder="أدخل كود الخصم…"
+          aria-label="كود الخصم"
+          autoComplete="off"
+          autoCapitalize="characters"
           className="h-10 rounded-xl font-mono uppercase text-xs"
         />
         <Button

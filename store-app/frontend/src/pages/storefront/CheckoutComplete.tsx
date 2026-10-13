@@ -1,4 +1,4 @@
-import { Building2, Check, CheckCircle2, Copy, MessageSquare } from 'lucide-react'
+import { Building2, Check, CheckCircle2, Copy, KeyRound, MessageSquare } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 
@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button'
 import { LineThumb } from '@/components/ui/line-thumb'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatPrice } from '@/lib/format'
-import { useOrder } from '@/lib/queries/delivery'
+import { useMe } from '@/lib/queries/auth'
+import { useCheckoutOrder } from '@/lib/queries/cart'
 import { useStoreSettings } from '@/lib/queries/storeSettings'
 import { useSiteText } from '@/lib/siteText'
 import { usePageTitle } from '@/lib/usePageTitle'
@@ -17,7 +18,10 @@ export default function CheckoutCompletePage() {
   const thanks = useSiteText()('order.thanks')
   const [params] = useSearchParams()
   const reference = params.get('order') ?? ''
-  const { data: order, isPending } = useOrder(reference || undefined)
+  const orderId = params.get('id') ?? ''
+  const { data: user } = useMe()
+  const { data: order, isPending } = useCheckoutOrder(orderId || undefined)
+  const [tempPassword, setTempPassword] = useState<string | null>(null)
   const { data: storeSettings } = useStoreSettings()
   const [whatsappLink, setWhatsappLink] = useState<string | null>(null)
   const [copiedField, setCopiedField] = useState<string | null>(null)
@@ -31,8 +35,10 @@ export default function CheckoutCompletePage() {
   useEffect(() => {
     try {
       setWhatsappLink(reference ? sessionStorage.getItem(`whatsapp_link:${reference}`) : null)
+      setTempPassword(reference ? sessionStorage.getItem(`temp_password:${reference}`) : null)
     } catch {
       setWhatsappLink(null)
+      setTempPassword(null)
     }
   }, [reference])
 
@@ -46,10 +52,31 @@ export default function CheckoutCompletePage() {
         {thanks && <p className="text-sm text-muted-foreground max-w-md">{thanks}</p>}
         {reference && (
           <div className="rounded-2xl border border-border bg-muted/40 px-4 py-2 text-xs sm:text-sm">
-            رقم الطلب: <span className="font-bold font-mono text-primary text-base">#{reference}</span>
+            رقم الطلب: <bdi className="font-bold font-mono text-primary text-base">#{reference}</bdi>
           </div>
         )}
       </div>
+
+      {/* The account opened by this purchase — its password is shown here once. */}
+      {tempPassword && user ? (
+        <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 sm:p-5 space-y-2">
+          <div className="flex items-center gap-2 text-sm font-bold text-foreground">
+            <KeyRound className="size-4 text-primary" aria-hidden="true" />
+            <span>فتحنا لك حساباً لمتابعة طلبك</span>
+          </div>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            الدخول برقم هاتفك <bdi className="font-mono font-bold text-foreground">{user.phone_number}</bdi> وكلمة
+            المرور التالية. احفظها الآن، فلن تظهر مرة أخرى، ويمكنك تغييرها من صفحة «حسابي».
+          </p>
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-2">
+            <bdi className="font-mono text-lg font-black tracking-widest text-foreground">{tempPassword}</bdi>
+            <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => copyToClipboard(tempPassword, 'pass')}>
+              {copiedField === 'pass' ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+              {copiedField === 'pass' ? 'تم النسخ' : 'نسخ'}
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       {/* WhatsApp Quick Action Button */}
       {whatsappLink && (
@@ -106,7 +133,8 @@ export default function CheckoutCompletePage() {
                       <button
                         type="button"
                         onClick={() => copyToClipboard(acc.account_number, `acc-${acc.id}`)}
-                        className="text-muted-foreground hover:text-primary p-1 rounded-md transition-colors"
+                        className="inline-flex size-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-primary"
+                        aria-label="نسخ رقم الحساب"
                         title="نسخ رقم الحساب"
                       >
                         {copiedField === `acc-${acc.id}` ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5" />}
@@ -121,7 +149,8 @@ export default function CheckoutCompletePage() {
                         <button
                           type="button"
                           onClick={() => copyToClipboard(acc.iban!, `iban-${acc.id}`)}
-                          className="text-muted-foreground hover:text-primary p-1 rounded-md transition-colors"
+                          className="inline-flex size-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-primary"
+                          aria-label="نسخ رقم الآيبان"
                           title="نسخ رقم الآيبان"
                         >
                           {copiedField === `iban-${acc.id}` ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5" />}
@@ -140,13 +169,10 @@ export default function CheckoutCompletePage() {
             </p>
           )}
 
-          <p className="text-[11px] text-muted-foreground pt-1">
-            💬 تم إرسال هذه البيانات بالإضافة إلى الفاتورة التفصيلية إلى هاتفك عبر واتساب تلقائياً.
-          </p>
         </div>
       )}
 
-      {isPending && reference ? (
+      {isPending && orderId ? (
         <Skeleton className="h-48 w-full rounded-2xl" />
       ) : order ? (
         <div className="space-y-4">
@@ -174,17 +200,25 @@ export default function CheckoutCompletePage() {
           />
           {order.shipping_address ? (
             <p className="rounded-2xl border border-border bg-muted/40 p-4 text-xs">
-              <span className="font-bold text-foreground">عنوان التوصيل:</span> {order.city_name} ·{' '}
-              {order.region_name} — {order.shipping_address}
+              <span className="font-bold text-foreground">عنوان التوصيل:</span>{' '}
+              {[order.city_name, order.region_name].filter(Boolean).join(' · ')}
+              {order.city_name || order.region_name ? ' — ' : ''}
+              {order.shipping_address}
             </p>
           ) : null}
         </div>
       ) : null}
 
       <div className="flex flex-wrap justify-center gap-3 pt-2">
-        <Button asChild size="lg" className="rounded-xl">
-          <Link to="/me/orders">متابعة طلباتي</Link>
-        </Button>
+        {user ? (
+          <Button asChild size="lg" className="rounded-xl">
+            <Link to="/me/orders">متابعة طلباتي</Link>
+          </Button>
+        ) : (
+          <Button asChild size="lg" className="rounded-xl">
+            <Link to="/login?next=%2Fme%2Forders">سجّل الدخول لمتابعة طلبك</Link>
+          </Button>
+        )}
         <Button asChild variant="outline" size="lg" className="rounded-xl">
           <Link to="/products">مواصلة التسوّق</Link>
         </Button>

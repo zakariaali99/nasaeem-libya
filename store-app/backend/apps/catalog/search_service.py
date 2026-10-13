@@ -40,15 +40,9 @@ TRANSLITERATION_MAP = {
     "rose": ["ورد", "زهري"],
 }
 
-TRENDING_SEARCH_KEYWORDS = [
-    "عود ملكي فاخر",
-    "عطور سهرات ومناسبات",
-    "مسك أبيض بيور",
-    "عطور صيفية منعشة",
-    "أرماف كلوب دي نوي",
-    "عطور رجالية فواحة",
-    "بخور وعنبر شرقي",
-]
+# No search log exists, so there is nothing to call "most searched". The list
+# used to be seven invented phrases, most of which returned no products.
+TRENDING_SEARCH_KEYWORDS: list[str] = []
 
 
 def normalize_arabic_text(text: str) -> str:
@@ -174,6 +168,7 @@ def find_fragrance_recommendations(gender: str = "ALL", vibe: str = "ORIENTAL", 
         )
 
     matched = list(queryset.filter(vibe_filter).distinct()[:3])
+    exact = len(matched)
 
     # Fallback to general active products if less than 3 matched
     if len(matched) < 3:
@@ -181,28 +176,15 @@ def find_fragrance_recommendations(gender: str = "ALL", vibe: str = "ORIENTAL", 
         fallback = list(queryset.exclude(id__in=existing_ids)[: 3 - len(matched)])
         matched.extend(fallback)
 
-    # Generate tailored reason for each recommendation
-    reasons = {
-        "ORIENTAL": "تم اختياره لك لأنه يتميز بتوليفة شرقية ملكية غنية بنوتات العود والعنبر المعتق مع ثبات يدوم طويلاً ليعكس فخامة حضورك.",
-        "FRESH": "تم اختياره لك لأنه يمنحك افتتاحية صيفية منعشة من الحمضيات والبرغموت مع إحساس بالانتعاش والحيوية طوال اليوم.",
-        "WARM": "تم اختياره لك لأنه يجمع بين دفء الفانيليا ونعومة المسك الأبيض ليمنحك جاذبية هادئة وراقية تأسر الحواس.",
-        "WOODY": "تم اختياره لك لأنه يعبر عن الأناقة والوقار من خلال نوتات الأخشاب والجلود الفاخرة المناسبة للقاءات الرسمية.",
-    }
-
-    justification = reasons.get(vibe.upper(), "عطر مميز يلائم ذوقك الرفيع وثباته عالي جداً يناسب كافة أوقاتك.")
-
     from .serializers import ProductListSerializer
 
     serialized_products = ProductListSerializer(matched, many=True).data
 
-    results = []
-    base_scores = [97, 93, 89]
-    for idx, item in enumerate(serialized_products):
-        results.append({
-            "product": item,
-            "match_score": base_scores[idx] if idx < len(base_scores) else 88,
-            "reason": justification,
-            "vibe_label": vibe,
-        })
+    # No score and no "why it suits you": both used to be fixed strings (97%,
+    # 93%, 89% and one sentence per scent family), whatever was matched.
+    results = [
+        {"product": item, "vibe_label": vibe, "exact": index < exact}
+        for index, item in enumerate(serialized_products)
+    ]
 
     return results

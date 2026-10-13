@@ -10,7 +10,6 @@ import {
   Percent,
   RefreshCw,
   ShoppingBag,
-  Sparkles,
   TrendingUp,
   Truck,
 } from 'lucide-react'
@@ -132,7 +131,7 @@ export default function ExecutiveAnalytics() {
             </h1>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            مؤشرات الأرباح اللحظية، الأداء الجغرافي للمدن الليبية، والماركات العطرية الأعلى طلباً — {activeTimeframeLabel}
+            المبيعات المؤكدة، توزيعها على المدن، والأصناف الأعلى طلباً — {activeTimeframeLabel}
           </p>
         </div>
 
@@ -217,7 +216,7 @@ export default function ExecutiveAnalytics() {
       )}
 
       {/* Top Financial & Operational Metric Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         {/* Total Revenue */}
         <div className="rounded-3xl border border-border bg-card p-4 sm:p-5 shadow-2xs space-y-1.5">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -233,18 +232,9 @@ export default function ExecutiveAnalytics() {
           </div>
         </div>
 
-        {/* Estimated Net Profit */}
-        <div className="rounded-3xl border border-border bg-card p-4 sm:p-5 shadow-2xs space-y-1.5">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>صافي الأرباح التقديرية</span>
-            <Sparkles className="size-4 text-primary" />
-          </div>
-          <p className="font-mono text-xl sm:text-2xl font-black text-price">
-            {formatPrice(data.estimated_profit)}
-          </p>
-          <p className="text-[11px] text-muted-foreground">متوسط هامش أرباح ~55%</p>
-        </div>
-
+        {/* No profit card: the catalogue records no cost price, so there is
+            nothing to compute a profit from. The figure that stood here was
+            55% of sales, for every product and every period. */}
         {/* Average Order Value (AOV) */}
         <div className="rounded-3xl border border-border bg-card p-4 sm:p-5 shadow-2xs space-y-1.5">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -266,9 +256,7 @@ export default function ExecutiveAnalytics() {
           <p className="font-mono text-xl sm:text-2xl font-black text-primary">
             %{data.repeat_purchase_rate}
           </p>
-          <p className="text-[11px] text-muted-foreground">
-            دورة تكرار الطلب: ~{data.avg_days_between_orders} يوماً
-          </p>
+          <p className="text-[11px] text-muted-foreground">عملاء اشتروا أكثر من مرة</p>
         </div>
       </div>
 
@@ -493,8 +481,7 @@ export default function ExecutiveAnalytics() {
                   <tr className="border-b border-border text-muted-foreground text-start">
                     <th className="pb-3 text-start font-bold">العطر / الصنف</th>
                     <th className="pb-3 text-center font-bold">المبيعات</th>
-                    <th className="pb-3 text-center font-bold">هامش الربح</th>
-                    <th className="pb-3 text-end font-bold">صافي الدخل</th>
+                    <th className="pb-3 text-end font-bold">قيمة المبيعات</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -502,15 +489,10 @@ export default function ExecutiveAnalytics() {
                     <tr key={`${brand.brand_name}-${idx}`} className="hover:bg-muted/20 transition-colors">
                       <td className="py-3.5 font-bold text-foreground truncate max-w-44">{brand.brand_name}</td>
                       <td className="py-3.5 text-center font-mono text-muted-foreground">
-                        {brand.units_sold} قطعة ({formatPrice(brand.revenue)})
-                      </td>
-                      <td className="py-3.5 text-center font-mono">
-                        <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 font-bold text-emerald-600 dark:text-emerald-400">
-                          %{brand.margin_percent}
-                        </span>
+                        {formatNumber(brand.units_sold)} قطعة
                       </td>
                       <td className="py-3.5 text-end font-mono font-bold text-price">
-                        {formatPrice(brand.net_profit)}
+                        {formatPrice(brand.revenue)}
                       </td>
                     </tr>
                   ))}
@@ -593,7 +575,7 @@ export default function ExecutiveAnalytics() {
           <div className="flex items-center gap-2">
             <Crown className="size-5 text-primary" />
             <h2 className="font-bold text-sm sm:text-base text-foreground">
-              كبار العملاء الأكثر إنفاقاً (VIP High Rollers)
+              العملاء الأكثر إنفاقاً
             </h2>
           </div>
           <Button asChild variant="outline" size="sm" className="min-h-9 rounded-xl text-xs font-bold">
@@ -609,9 +591,12 @@ export default function ExecutiveAnalytics() {
             >
               <div className="flex items-center justify-between">
                 <span className="font-bold text-xs text-foreground truncate">{user.name}</span>
-                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-extrabold text-primary">
-                  {user.vip_tier === 'DIAMOND' ? '💎 ماسي' : user.vip_tier === 'GOLD' ? '🥇 ذهبي' : '🥈 فضي'}
-                </span>
+                {/* Loyalty tiers are on hold (lib/features.ts). */}
+                {FEATURES.loyalty && (
+                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-extrabold text-primary">
+                    {user.vip_tier === 'DIAMOND' ? '💎 ماسي' : user.vip_tier === 'GOLD' ? '🥇 ذهبي' : '🥈 فضي'}
+                  </span>
+                )}
               </div>
               <p className="font-mono text-xs text-muted-foreground" dir="ltr">{user.phone_number}</p>
               <div className="flex items-center justify-between pt-2 border-t border-border/60 text-xs font-mono">

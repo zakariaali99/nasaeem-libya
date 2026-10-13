@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { api } from '@/lib/api'
+import { authKeys } from '@/lib/queries/auth'
 import type { CartState, Order } from '@/types/api'
 
 export const cartKeys = {
@@ -176,23 +177,57 @@ export function useCreateOrder() {
 
 export interface CheckoutConfirmResult {
   order: Order
-  whatsapp_link?: string
-  whatsapp_invoice_message?: string
-  account_whatsapp_message?: string
-  new_account_created?: boolean
+  whatsapp_link: string
+  new_account_created: boolean
+  /** Shown once, on the thank-you page, when the purchase opened an account. */
+  temp_password: string
 }
 
 export function useConfirmCheckout() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (input: Record<string, string>) => {
-      const res = (await api.post<any>('/checkout/', input)).data
-      return res as CheckoutConfirmResult & Order
+    mutationFn: async (input: Record<string, string>): Promise<CheckoutConfirmResult> => {
+      // The WhatsApp link and the new account's password sit beside `data`
+      // in the response, not inside it; taking `.data` alone dropped them, and
+      // the WhatsApp button on the thank-you page never appeared.
+      const envelope = (await api.post<Order>('/checkout/', input)) as unknown as {
+        data: Order
+        whatsapp_link?: string
+        new_account_created?: boolean
+        temp_password?: string
+      }
+      return {
+        order: envelope.data,
+        whatsapp_link: envelope.whatsapp_link ?? '',
+        new_account_created: Boolean(envelope.new_account_created),
+        temp_password: envelope.temp_password ?? '',
+      }
     },
-    onSuccess: () => {
+    onSuccess: async (result) => {
+      // The thank-you page reads this same entry: without the update it showed
+      // the draft as it was before confirmation, with no address on it.
+      queryClient.setQueryData(['checkout-order', result.order.id], result.order)
       queryClient.invalidateQueries({ queryKey: ['orders'] })
-      queryClient.invalidateQueries({ queryKey: ['me'] })
+      queryClient.invalidateQueries({ queryKey: ['addresses'] })
+      // A guest has just been given an account and signed in to it. Wait for
+      // the app to learn that before moving on, so the next page greets a
+      // signed-in customer instead of offering a login.
+      await queryClient.invalidateQueries({ queryKey: authKeys.me })
     },
+  })
+}
+
+/**
+ * The order behind `/checkout/:orderId` and the thank-you page.
+ *
+ * Read through the checkout endpoint, which answers the session that created
+ * the order — a guest has no account to be looked up by.
+ */
+export function useCheckoutOrder(orderId: string | undefined) {
+  return useQuery({
+    queryKey: ['checkout-order', orderId ?? ''],
+    queryFn: async () => (await api.get<Order>(`/checkout/${encodeURIComponent(orderId!)}/`)).data,
+    enabled: Boolean(orderId),
   })
 }
 

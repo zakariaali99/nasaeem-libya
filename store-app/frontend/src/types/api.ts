@@ -475,7 +475,9 @@ export interface Order {
 
 export interface Address {
   id: string
-  region: string
+  city: string | null
+  /** Optional: most cities have no regions defined. */
+  region: string | null
   region_name: string
   city_name: string
   address: string

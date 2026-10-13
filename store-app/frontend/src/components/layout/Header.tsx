@@ -116,11 +116,11 @@ export function Header() {
                   type="button"
                   onClick={() => setQuizOpen(true)}
                   className="inline-flex items-center gap-1 sm:gap-1.5 rounded-xl border border-primary/40 bg-primary/10 px-2.5 sm:px-3 py-1.5 text-xs font-black text-primary hover:bg-primary/20 transition-all shadow-2xs min-h-11"
-                  title="مرشد العطور الذكي"
+                  aria-label="مرشد العطور: ساعدني في اختيار عطر"
+                  title="مرشد العطور"
                 >
-                  <Compass className="size-3.5" />
-                  <span className="hidden xs:inline">مرشد العطور</span>
-                  <span>🪄</span>
+                  <Compass className="size-4" aria-hidden="true" />
+                  <span className="hidden sm:inline">مرشد العطور</span>
                 </button>
 
                 {/* Admin quick switch if logged in as staff */}

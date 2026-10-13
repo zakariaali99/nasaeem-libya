@@ -441,12 +441,15 @@ def _personalised_products(widget_type, limit, *, user, recent_ids=()):
         # Browsing history is held client-side (localStorage) and posted back as
         # `?recent=`: there is no view-tracking table, because the analytics
         # tables that powered this in the reference are out of scope.
-        chosen = _ordered_by_ids(list(recent_ids)[:limit])
-        return chosen or popular_products(limit)
+        # Nothing viewed yet → nothing to show. Filling the row with popular
+        # products put the same eight items under four different headings.
+        return _ordered_by_ids(list(recent_ids)[:limit])
 
-    if widget_type == WidgetType.BUY_AGAIN and user and user.is_authenticated:
+    if widget_type == WidgetType.BUY_AGAIN:
+        if not (user and user.is_authenticated):
+            return []
         bought = (
-            OrderItem.objects.filter(order__user=user)
+            OrderItem.objects.filter(order__user=user, order__finalised_at__isnull=False)
             .order_by("-created_at")
             .values_list("product_id", flat=True)
         )
@@ -457,8 +460,7 @@ def _personalised_products(widget_type, limit, *, user, recent_ids=()):
                 ordered.append(str(product_id))
             if len(ordered) >= limit:
                 break
-        chosen = _ordered_by_ids(ordered)
-        return chosen or popular_products(limit)
+        return _ordered_by_ids(ordered)
 
     if widget_type == WidgetType.RECOMMENDED_FOR_YOU and user and user.is_authenticated:
         # Products from the categories this customer has actually bought from.

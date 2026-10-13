@@ -1,3 +1,4 @@
+import { FEATURES } from '@/lib/features'
 import {
   Banknote,
   Building2,
@@ -68,7 +69,8 @@ export default function AdminLedgerPage() {
               <span>تشغيل المطابقة الآلية للبوابات</span>
             </Button>
 
-            <Button
+{FEATURES.shipping && (
+                        <Button
               onClick={() => setSettleModalOpen(true)}
               size="sm"
               className="h-9 px-3.5 text-xs font-bold gap-2 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs"
@@ -76,6 +78,7 @@ export default function AdminLedgerPage() {
               <Banknote className="size-4" />
               <span>تسوية نقدية مندوب</span>
             </Button>
+            )}
           </div>
         }
       />

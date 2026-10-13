@@ -237,9 +237,16 @@ class UserAddress(models.Model):
     user = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name="addresses", verbose_name="المستخدم"
     )
+    # The city is what every address has; most cities have no regions defined,
+    # and requiring one made an address impossible to save for them.
+    city = models.ForeignKey(
+        City, on_delete=models.PROTECT, related_name="addresses", verbose_name="المدينة",
+        null=True, blank=True,
+    )
     # PROTECT: deleting a region must never silently orphan a customer's address.
     region = models.ForeignKey(
-        Region, on_delete=models.PROTECT, related_name="addresses", verbose_name="المنطقة"
+        Region, on_delete=models.PROTECT, related_name="addresses", verbose_name="المنطقة",
+        null=True, blank=True,
     )
     address = models.TextField("العنوان")
     is_default = models.BooleanField("العنوان الافتراضي", default=False)
@@ -252,7 +259,8 @@ class UserAddress(models.Model):
         ordering = ["-is_default", "-created_at"]
 
     def __str__(self):
-        return f"{self.user.phone_number} — {self.region.name}"
+        place = self.region.name if self.region_id else (self.city.name if self.city_id else "")
+        return f"{self.user.phone_number} — {place}"
 
 
 class StoreSettings(models.Model):

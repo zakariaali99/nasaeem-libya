@@ -302,7 +302,7 @@ class AddressListCreateView(CsrfProtectedAPIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        addresses = request.user.addresses.select_related("region__city").all()
+        addresses = request.user.addresses.select_related("city", "region__city").all()
         return Response({"data": AddressSerializer(addresses, many=True).data})
 
     def post(self, request):

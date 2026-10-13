@@ -54,12 +54,13 @@ class TestPredictiveSearchAndDiscovery:
             is_active=True,
         )
 
-    def test_empty_query_returns_trending_keywords(self):
+    def test_empty_query_invents_no_trending_keywords(self):
+        # There is no search log, so nothing can honestly be called "most searched".
         response = self.client.get("/api/search/predictive/")
         assert response.status_code == 200
         data = response.json()["data"]
-        assert len(data["trending_keywords"]) > 0
-        assert "عود ملكي فاخر" in data["trending_keywords"]
+        assert data["trending_keywords"] == []
+        assert data["products"] == []
 
     def test_predictive_search_finds_arabic_and_english_matches(self):
         # Search by Arabic
@@ -90,6 +91,7 @@ class TestPredictiveSearchAndDiscovery:
         assert response.status_code == 200
         recommendations = response.json()["data"]
         assert len(recommendations) >= 1
-        assert "reason" in recommendations[0]
-        assert "match_score" in recommendations[0]
-        assert recommendations[0]["match_score"] >= 90
+        # No invented match percentage and no canned "why it suits you".
+        assert "match_score" not in recommendations[0]
+        assert "reason" not in recommendations[0]
+        assert isinstance(recommendations[0]["exact"], bool)

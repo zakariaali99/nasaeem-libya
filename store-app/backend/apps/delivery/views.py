@@ -97,15 +97,16 @@ class GeoView(APIView):
         if not request.user.is_authenticated:
             return Response({"data": {"region": None, "city": None}})
         address = (
-            request.user.addresses.select_related("region__city")
+            request.user.addresses.select_related("city", "region__city")
             .order_by("-is_default", "-created_at")
             .first()
         )
         if address is None:
             return Response({"data": {"region": None, "city": None}})
+        city = address.city or (address.region.city if address.region_id else None)
         return Response({"data": {
-            "region": RegionSerializer(address.region).data,
-            "city": CitySerializer(address.region.city).data,
+            "region": RegionSerializer(address.region).data if address.region_id else None,
+            "city": CitySerializer(city).data if city else None,
         }})
 
 

@@ -5,10 +5,10 @@ import {
   MapPin,
   MessageSquare,
   ShieldCheck,
-  Truck,
   User,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { ErrorState } from '@/components/storefront/ErrorState'
@@ -23,9 +23,9 @@ import { Textarea } from '@/components/ui/textarea'
 import { ApiError } from '@/lib/api'
 import { FEATURES } from '@/lib/features'
 import { formatPrice } from '@/lib/format'
-import { useConfirmCheckout } from '@/lib/queries/cart'
-import { useCities, useDeliveryMethods, useOrder, useRegions } from '@/lib/queries/delivery'
-import { useActiveCartPromotion } from '@/lib/queries/orders'
+import { useCheckoutOrder, useConfirmCheckout } from '@/lib/queries/cart'
+import { useCities, useDeliveryMethods, useRegions } from '@/lib/queries/delivery'
+import { useActiveCartPromotion, useAddresses } from '@/lib/queries/orders'
 import { useMe } from '@/lib/queries/auth'
 import { LuxuryGiftingSection, type GiftingState } from '@/components/storefront/LuxuryGiftingSection'
 import { useSiteText } from '@/lib/siteText'
@@ -39,7 +39,11 @@ export default function CheckoutPage() {
   const guaranteeNote = useSiteText()('checkout.guarantee')
 
   const { data: user } = useMe()
-  const { data: order, isPending, isError, error, refetch } = useOrder(orderId)
+  const { data: order, isPending, isError, error, refetch } = useCheckoutOrder(orderId)
+  const { data: savedAddresses } = useAddresses(Boolean(user))
+  const formRef = useRef<HTMLFormElement>(null)
+  // The region of a saved address, applied once that city's regions have loaded.
+  const pendingRegion = useRef('')
   const { data: promo } = useActiveCartPromotion()
   const confirm = useConfirmCheckout()
 
@@ -85,12 +89,25 @@ export default function CheckoutPage() {
   }, [methods, method])
 
   useEffect(() => {
-    setRegionId('')
+    setRegionId(pendingRegion.current)
+    pendingRegion.current = ''
   }, [cityId])
+
+  const applySavedAddress = (saved: { city: string | null; region: string | null; address: string }) => {
+    pendingRegion.current = saved.region ?? ''
+    if (saved.city === cityId) setRegionId(saved.region ?? '')
+    setCityId(saved.city ?? '')
+    setAddress(saved.address)
+  }
 
   const selectedCity = useMemo(
     () => cities.find((city) => city.id === cityId),
     [cities, cityId],
+  )
+  // Alphabetical, so a city is where the customer looks for it.
+  const sortedCities = useMemo(
+    () => [...cities].sort((a, b) => a.name.localeCompare(b.name, 'ar')),
+    [cities],
   )
 
   const selectedRegion = useMemo(
@@ -117,12 +134,14 @@ export default function CheckoutPage() {
     return (
       <div className="mx-auto w-full max-w-lg px-4 py-16 text-center space-y-4">
         <Alert tone="info">
-          هذا الطلب مكتمل أو قيد المعالجة بالفعل.
+          {order.status === 'cancelled'
+            ? 'انتهت مهلة هذه السلة قبل تأكيدها. أضف المنتجات إلى السلة من جديد.'
+            : 'هذا الطلب مؤكَّد بالفعل.'}
           <Link
-            to={`/orders/${encodeURIComponent(order.order_number)}`}
+            to={order.status === 'cancelled' ? '/products' : user ? `/me/orders/${order.id}` : '/'}
             className="block mt-2 font-bold text-primary hover:underline"
           >
-            عرض تفاصيل الطلب
+            {order.status === 'cancelled' ? 'تصفّح المنتجات' : user ? 'عرض تفاصيل الطلب' : 'العودة إلى المتجر'}
           </Link>
         </Alert>
       </div>
@@ -139,8 +158,12 @@ export default function CheckoutPage() {
     if (!customerName.trim() && !user?.name) {
       errs.customer_name = ['الاسم الثلاثي مطلوب لإتمام الطلب']
     }
-    if (!customerPhone.trim() && !user?.phone_number) {
+    const phoneDigits = (customerPhone.trim() || user?.phone_number || '').replace(/[^\d]/g, '')
+    if (!phoneDigits) {
       errs.customer_phone = ['رقم الهاتف مطلوب للتواصل والتسليم']
+    } else if (!/^(?:218|0)?9[1-5]\d{7}$/.test(phoneDigits)) {
+      // The number becomes the account: a mistyped one cannot be called back.
+      errs.customer_phone = ['اكتب رقماً ليبياً صحيحاً من 10 أرقام، مثل 0912345678']
     }
     if (!cityId) {
       errs.city_id = ['يرجى اختيار مدينة التوصيل']
@@ -152,6 +175,14 @@ export default function CheckoutPage() {
     if (Object.keys(errs).length > 0) {
       setFieldErrors(errs)
       setFormError('يرجى استكمال البيانات المطلوبة قبل إتمام الطلب.')
+      // Take the customer to the first field that needs them: the confirm
+      // button sits a full screen below it on a phone.
+      const first = ['customer_name', 'customer_phone', 'city_id', 'address'].find((key) => errs[key])
+      const target = formRef.current?.querySelector<HTMLElement>(
+        `#${first === 'city_id' ? 'city' : first}`,
+      )
+      target?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      target?.focus({ preventScroll: true })
       return
     }
 
@@ -174,21 +205,21 @@ export default function CheckoutPage() {
         hide_invoice_prices: String(gifting.hide_invoice_prices),
       })
 
-      const confirmedOrder = (result as any).order || result
-      const whatsappLink = (result as any).whatsapp_link
-      const orderNumber = confirmedOrder.order_number || order.order_number
+      const orderNumber = result.order.order_number || order.order_number
 
-      // Not opened automatically: the confirmation page offers it as a button
-      // the customer may or may not use.
-      if (whatsappLink) {
-        try {
-          sessionStorage.setItem(`whatsapp_link:${orderNumber}`, whatsappLink)
-        } catch {
-          // storage unavailable (private mode) — the page simply shows no button
-        }
+      // Not opened automatically: the confirmation page offers WhatsApp as a
+      // button the customer may or may not use. The new account's password is
+      // handed over the same way and shown once.
+      try {
+        if (result.whatsapp_link) sessionStorage.setItem(`whatsapp_link:${orderNumber}`, result.whatsapp_link)
+        if (result.temp_password) sessionStorage.setItem(`temp_password:${orderNumber}`, result.temp_password)
+      } catch {
+        // storage unavailable (private mode) — the page simply shows neither
       }
 
-      navigate(`/checkout/complete?order=${encodeURIComponent(orderNumber)}`)
+      navigate(
+        `/checkout/complete?order=${encodeURIComponent(orderNumber)}&id=${encodeURIComponent(result.order.id)}`,
+      )
     } catch (failure) {
       if (failure instanceof ApiError) {
         setFieldErrors(failure.errors ?? {})
@@ -243,11 +274,11 @@ export default function CheckoutPage() {
       <div className="space-y-1">
         <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">إتمام الطلب وتحديد التوصيل</h1>
         <p className="text-xs sm:text-sm text-muted-foreground">
-          رقم الطلب المؤقت: <span className="font-mono font-bold text-foreground">#{order.order_number}</span>
+          رقم الطلب المؤقت: <bdi className="font-mono font-bold text-foreground">#{order.order_number}</bdi>
         </p>
       </div>
 
-      <form className="grid gap-8 lg:grid-cols-[1fr_24rem] xl:grid-cols-[1fr_26rem] items-start" onSubmit={submit} noValidate>
+      <form ref={formRef} className="grid gap-8 lg:grid-cols-[1fr_24rem] xl:grid-cols-[1fr_26rem] items-start" onSubmit={submit} noValidate>
         <div className="space-y-6">
           {/* Customer Identification (Name & Libyan Phone) */}
           <section className="space-y-4 rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-xs">
@@ -259,8 +290,8 @@ export default function CheckoutPage() {
                 <h2 className="text-base sm:text-lg font-bold text-foreground">بيانات العميل المستلم</h2>
               </div>
               {!user && (
-                <span className="text-[11px] font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-full">
-                  شراء مباشر وسريع
+                <span className="shrink-0 whitespace-nowrap text-[11px] font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-full">
+                  بدون تسجيل
                 </span>
               )}
             </div>
@@ -272,7 +303,9 @@ export default function CheckoutPage() {
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
                   placeholder="مثال: أحمد عبد الله المحمودي"
-                  className="h-11 rounded-xl text-xs font-bold"
+                  autoComplete="name"
+                  aria-invalid={Boolean(fieldErrors.customer_name)}
+                  className="h-11 rounded-xl text-sm font-bold placeholder:font-normal placeholder:text-muted-foreground/70"
                   required
                 />
               </Field>
@@ -282,9 +315,13 @@ export default function CheckoutPage() {
                   id="customer_phone"
                   value={customerPhone}
                   onChange={(e) => setCustomerPhone(e.target.value)}
-                  placeholder="0912345678 أو 0921234567"
+                  placeholder="0912345678"
+                  type="tel"
+                  inputMode="numeric"
+                  autoComplete="tel"
                   dir="ltr"
-                  className="h-11 rounded-xl text-xs font-mono font-bold"
+                  aria-invalid={Boolean(fieldErrors.customer_phone)}
+                  className="h-11 rounded-xl text-sm font-mono font-bold placeholder:font-normal placeholder:text-muted-foreground/70"
                   required
                 />
               </Field>
@@ -292,7 +329,7 @@ export default function CheckoutPage() {
 
             {!user && (
               <p className="text-[11px] text-muted-foreground bg-muted/40 p-2.5 rounded-xl">
-                💡 سيتم إنشاء حساب لك تلقائياً بكلمة مرور مؤقتة (000000) وتزويدك بالفاتورة التفصيلية عبر واتساب، ويمكنك تغيير كلمة المرور متى شئت.
+                لا تحتاج إلى تسجيل: نفتح لك حساباً برقم هاتفك لتتابع طلبك، وتظهر لك كلمة المرور بعد تأكيد الطلب. إن كان لك حساب بهذا الرقم فسيُضاف الطلب إليه.
               </p>
             )}
           </section>
@@ -315,6 +352,33 @@ export default function CheckoutPage() {
                   'لا توجد مدن توصيل مُعرّفة في المتجر حالياً، يرجى التواصل معنا لإتمام الطلب'}
               </Alert>
             ) : (
+              <>
+              {(savedAddresses ?? []).length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-xs font-bold text-foreground">عناوينك المحفوظة</p>
+                  <div className="flex flex-wrap gap-2">
+                    {(savedAddresses ?? []).map((saved) => (
+                      <button
+                        key={saved.id}
+                        type="button"
+                        onClick={() => applySavedAddress(saved)}
+                        className={cn(
+                          'min-h-11 max-w-full rounded-xl border px-3 py-2 text-start text-xs transition-colors',
+                          saved.city === cityId && saved.address === address
+                            ? 'border-primary bg-primary/10 text-foreground'
+                            : 'border-border bg-background hover:bg-muted/40',
+                        )}
+                      >
+                        <span className="block font-bold">
+                          {saved.city_name}
+                          {saved.region_name ? ` — ${saved.region_name}` : ''}
+                        </span>
+                        <span className="block truncate text-muted-foreground">{saved.address}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="المدينة *" htmlFor="city" error={fieldErrors.city_id?.[0]}>
                   <Select
@@ -325,7 +389,7 @@ export default function CheckoutPage() {
                     required
                   >
                     <option value="">اختر المدينة</option>
-                    {cities.map((city) => (
+                    {sortedCities.map((city) => (
                       <option key={city.id} value={city.id}>
                         {city.name}
                       </option>
@@ -351,20 +415,9 @@ export default function CheckoutPage() {
                       ))}
                     </Select>
                   </Field>
-                ) : (
-                  <div className="flex flex-col justify-center">
-                    <span className="text-xs font-bold text-foreground mb-1.5">نطاق التوصيل</span>
-                    <div className="flex items-center gap-2 rounded-xl bg-primary/5 border border-primary/20 px-3.5 py-2.5 text-xs text-primary font-bold min-h-11">
-                      <Truck className="size-4 shrink-0" />
-                      <span>
-                        {selectedCity
-                          ? `توصيل سريع لكافة أحياء ${selectedCity.name}`
-                          : 'اختر المدينة لتحديد التوصيل'}
-                      </span>
-                    </div>
-                  </div>
-                )}
+                ) : null}
               </div>
+              </>
             )}
 
             <Field label="العنوان بالتفصيل *" htmlFor="address" error={fieldErrors.address?.[0]}>
@@ -428,7 +481,7 @@ export default function CheckoutPage() {
                     <span className="font-bold text-sm text-foreground">الدفع عند الاستلام</span>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    الدفع نقداً للمندوب عند استلام العطر ومعاينته والتأكد من جودته.
+                    تدفع نقداً عند استلام طلبك.
                   </p>
                 </div>
               </label>
@@ -456,7 +509,7 @@ export default function CheckoutPage() {
                     <span className="font-bold text-sm text-foreground">تحويل مصرفي مباشر</span>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    تحويل قيمة العطر عبر تطبيق مصرفك (الجمهورية، التجاري الوطني، شمال أفريقيا، النوران، إلخ).
+                    تحوّل قيمة الطلب إلى حساب المتجر من تطبيق مصرفك.
                   </p>
                 </div>
               </label>
@@ -466,10 +519,10 @@ export default function CheckoutPage() {
                 <div className="rounded-2xl border border-primary/30 bg-primary/10 p-4 space-y-2 animate-fade-rise">
                   <div className="flex items-center gap-2 text-primary font-bold text-xs sm:text-sm">
                     <MessageSquare className="size-4 shrink-0" />
-                    <span>إشعار التحويل المصرفي التلقائي عبر واتساب</span>
+                    <span>كيف يتم التحويل؟</span>
                   </div>
                   <p className="text-xs text-foreground/90 leading-relaxed font-medium">
-                    سيتم التواصل معك تلقائياً عبر واتساب لتزويدك ببيانات الحساب المصرفي ورقم الآيبان (IBAN) للتحويل، وإرسال الفاتورة التفصيلية بعد إتمام الطلب مباشرة.
+                    بعد تأكيد الطلب تظهر لك بيانات حساب المتجر، وإن لم تكن مسجّلة بعد فسنتواصل معك لتزويدك بها. حوّل المبلغ ثم أرسل لنا صورة الإشعار.
                   </p>
                 </div>
               )}
@@ -540,8 +593,12 @@ export default function CheckoutPage() {
         </aside>
       </form>
 
-      {/* Mobile Sticky Checkout Bar */}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 p-3 px-4 backdrop-blur-md shadow-2xl lg:hidden pb-safe">
+      {/* Mobile sticky confirm bar. Rendered on <body>: inside this page's
+          entrance animation a `fixed` element is positioned against the page,
+          not the screen, so the bar sat at the very bottom of the form and
+          behind the navigation instead of staying in view. */}
+      {createPortal(
+      <div className="fixed inset-x-0 bottom-14 z-30 border-t border-border bg-card/95 p-3 px-4 backdrop-blur-md shadow-lg lg:hidden">
         <div className="flex items-center justify-between gap-3 max-w-lg mx-auto">
           <div>
             <span className="text-[10px] text-muted-foreground block font-medium">الإجمالي النهائي:</span>
@@ -559,7 +616,9 @@ export default function CheckoutPage() {
             <span>تأكيد الطلب</span>
           </Button>
         </div>
-      </div>
+      </div>,
+        document.body,
+      )}
       <div className="h-16 lg:hidden" aria-hidden="true" />
     </div>
   )

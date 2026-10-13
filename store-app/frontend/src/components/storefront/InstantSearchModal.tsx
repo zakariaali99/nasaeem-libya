@@ -1,11 +1,9 @@
 import {
   ArrowLeft,
-  Flame,
   FolderTree,
   Loader2,
   Package,
   Search,
-  Sparkles,
   X,
 } from 'lucide-react'
 import * as React from 'react'
@@ -13,6 +11,7 @@ import { Link, useNavigate } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import { formatPrice } from '@/lib/format'
+import { useCategories } from '@/lib/queries/catalog'
 import { usePredictiveSearch } from '@/lib/queries/search'
 
 interface InstantSearchModalProps {
@@ -25,7 +24,8 @@ export function InstantSearchModal({ open, onClose }: InstantSearchModalProps) {
   const inputRef = React.useRef<HTMLInputElement>(null)
   const navigate = useNavigate()
 
-  const { data: searchResults, isPending } = usePredictiveSearch(query)
+  const { data: searchResults, isFetching: isPending } = usePredictiveSearch(query)
+  const { data: allCategories } = useCategories()
 
   React.useEffect(() => {
     if (open) {
@@ -61,12 +61,7 @@ export function InstantSearchModal({ open, onClose }: InstantSearchModalProps) {
     navigate(`/search?q=${encodeURIComponent(q.trim())}`)
   }
 
-  const trending = searchResults?.trending_keywords || [
-    'عود ملكي فاخر',
-    'عطور سهرات ومناسبات',
-    'مسك أبيض بيور',
-    'عطور صيفية منعشة',
-  ]
+  const brands = (allCategories ?? []).filter((category) => category.is_active !== false).slice(0, 10)
   const products = searchResults?.products || []
   const categories = searchResults?.matched_categories || []
   const collections = searchResults?.matched_collections || []
@@ -90,7 +85,8 @@ export function InstantSearchModal({ open, onClose }: InstantSearchModalProps) {
             onKeyDown={(e) => {
               if (e.key === 'Enter') handleFullSearch(query)
             }}
-            placeholder="ابحث عن اسم العطر، الماركة، النوتة (مثل: عود، ديور، مسك)..."
+            placeholder="ابحث باسم العطر أو الماركة…"
+            aria-label="ابحث في المتجر"
             className="flex-1 bg-transparent text-sm sm:text-base font-medium text-foreground placeholder:text-muted-foreground outline-hidden"
           />
           {isPending && <Loader2 className="size-4 animate-spin text-primary shrink-0" />}
@@ -115,27 +111,25 @@ export function InstantSearchModal({ open, onClose }: InstantSearchModalProps) {
 
         {/* Search Content Body */}
         <div className="flex-1 overflow-y-auto p-5 space-y-6">
-          {/* Trending Suggestions */}
-          {!query && (
+          {/* Before anything is typed: the store's own categories. This block
+              used to list "most searched" phrases that were typed into the
+              code and mostly led to an empty results page. */}
+          {!query && brands.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-xs font-bold text-foreground">
-                <Flame className="size-4 text-primary" />
-                <span>الكلمات الأكثر بحثاً ورواجاً:</span>
+                <FolderTree className="size-4 text-primary" aria-hidden="true" />
+                <span>تصفّح حسب القسم:</span>
               </div>
               <div className="flex flex-wrap gap-2">
-                {trending.map((kw) => (
-                  <button
-                    key={kw}
-                    type="button"
-                    onClick={() => {
-                      setQuery(kw)
-                      handleFullSearch(kw)
-                    }}
+                {brands.map((category) => (
+                  <Link
+                    key={category.id}
+                    to={`/categories/${encodeURIComponent(category.slug)}`}
+                    onClick={onClose}
                     className="flex min-h-11 items-center gap-1.5 rounded-xl border border-border bg-muted/30 px-3.5 py-2 text-xs font-bold text-foreground hover:border-primary hover:bg-primary/5 transition-colors shadow-2xs"
                   >
-                    <Sparkles className="size-3.5 text-primary" />
-                    <span>{kw}</span>
-                  </button>
+                    {category.name}
+                  </Link>
                 ))}
               </div>
             </div>
@@ -194,7 +188,7 @@ export function InstantSearchModal({ open, onClose }: InstantSearchModalProps) {
                 <div className="text-center py-8 space-y-2">
                   <Package className="size-8 text-muted-foreground/50 mx-auto" />
                   <p className="text-sm font-bold text-foreground">لم يتم العثور على عطور تطابق "{query}"</p>
-                  <p className="text-xs text-muted-foreground">جرب البحث بكلمات أخرى مثل "عود" أو "سوفاج" أو "أرماف"</p>
+                  <p className="text-xs text-muted-foreground">جرّب كلمة أقصر، أو اكتب اسم الماركة.</p>
                 </div>
               )}
 

@@ -39,7 +39,9 @@ export function WidgetShell({
     <section
       data-widget-type={type}
       className={cn(
-        'w-full',
+        // A widget with nothing to show renders nothing; without this its
+        // padding still left an empty band on the page.
+        'w-full has-[>div:empty]:hidden',
         PADDING_Y[s.paddingY ?? 'md'],
         PADDING_X[s.paddingX ?? 'none'],
         RADIUS[s.borderRadius ?? 'none'],

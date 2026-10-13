@@ -164,6 +164,9 @@ function ProductView({
     )
   }
 
+  const scrollToOptions = () =>
+    document.getElementById('product-options')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+
   const canAdd = inStock && !needsChoice && !addToCart.isPending
   const addLabel = needsChoice
     ? `اختر ${groups.map((group) => group.name).join(' و')}`
@@ -238,6 +241,7 @@ function ProductView({
           />
 
           {variants.length > 0 ? (
+            <div id="product-options" className="scroll-mt-24">
             <VariantSelector
               variants={variants}
               selection={selection}
@@ -245,6 +249,7 @@ function ProductView({
               picked={multiPick ? pickedValueIds : undefined}
               onTogglePick={multiPick ? togglePick : undefined}
             />
+            </div>
           ) : null}
 
           {severalPicked ? (
@@ -370,19 +375,31 @@ function ProductView({
           <div className="min-w-0">
             <Price price={price} compareAtPrice={compareAt} size="sm" />
             <span className="block text-[10px] text-muted-foreground truncate font-medium">
-              {inStock ? 'متوفر للتوصيل الفوري' : 'غير متوفر حالياً'}
+              {added ? 'تمت الإضافة إلى السلة ✓' : inStock ? 'متوفر' : 'غير متوفر حالياً'}
             </span>
           </div>
-          <Button
-            size="sm"
-            onClick={addLine}
-            disabled={!canAdd}
-            loading={addToCart.isPending}
-            className="rounded-xl font-bold h-11 px-5 gap-1.5 shadow-sm text-xs"
-          >
-            <ShoppingBag className="size-4" aria-hidden="true" />
-            <span>{needsChoice ? 'حدد الخيارات' : addLabel}</span>
-          </Button>
+          {added ? (
+            <Button asChild size="sm" className="rounded-xl font-bold h-11 px-5 gap-1.5 shadow-sm text-xs">
+              <Link to="/cart">
+                <ShoppingBag className="size-4" aria-hidden="true" />
+                <span>عرض السلة</span>
+              </Link>
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              // With no size chosen the button used to sit disabled and say
+              // "choose the options" — while the options were off-screen. Now
+              // it takes the customer to them.
+              onClick={needsChoice ? scrollToOptions : addLine}
+              disabled={needsChoice ? false : !canAdd}
+              loading={addToCart.isPending}
+              className="rounded-xl font-bold h-11 px-5 gap-1.5 shadow-sm text-xs"
+            >
+              <ShoppingBag className="size-4" aria-hidden="true" />
+              <span>{addLabel}</span>
+            </Button>
+          )}
         </div>
       </div>
       <div className="h-16 lg:hidden" aria-hidden="true" />

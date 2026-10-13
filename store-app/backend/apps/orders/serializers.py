@@ -361,7 +361,7 @@ class DashboardStatsSerializer(serializers.Serializer):
             parsed_start = today - timedelta(days=13)
 
         by_status = dict(
-            Order.objects.values_list("status").annotate(c=Count("id"))
+            Order.objects.placed().values_list("status").annotate(c=Count("id"))
         )
         revenue = (
             Order.objects.filter(status__in=[OrderStatus.PROCESSING, OrderStatus.COMPLETED])
@@ -408,7 +408,7 @@ class DashboardStatsSerializer(serializers.Serializer):
             "processing_orders": by_status.get(OrderStatus.PROCESSING, 0),
             "completed_orders": by_status.get(OrderStatus.COMPLETED, 0),
             "cancelled_orders": by_status.get(OrderStatus.CANCELLED, 0),
-            "today_orders": Order.objects.exclude(status=OrderStatus.CANCELLED).filter(created_at__date=today).count(),
+            "today_orders": Order.objects.placed().exclude(status=OrderStatus.CANCELLED).filter(created_at__date=today).count(),
             "month_revenue": str(
                 (Order.objects.filter(
                     status__in=[OrderStatus.PROCESSING, OrderStatus.COMPLETED],
@@ -491,7 +491,7 @@ class ExecutiveAnalyticsSerializer(serializers.Serializer):
         confirmed_orders = Order.objects.filter(
             status__in=[OrderStatus.PROCESSING, OrderStatus.COMPLETED]
         )
-        all_window_orders = Order.objects.all()
+        all_window_orders = Order.objects.placed()
 
         if parsed_start:
             confirmed_orders = confirmed_orders.filter(

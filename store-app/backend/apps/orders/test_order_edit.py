@@ -265,3 +265,73 @@ def test_a_product_without_a_price_cannot_be_put_in_the_cart(db, product):
     response = APIClient().post(reverse("cart"), {"product_id": str(product.id), "quantity": 1}, format="json")
 
     assert response.status_code == 409
+
+
+# --------------------------------------------------------------------------
+# Checkout: who an order belongs to, and who may read it
+# --------------------------------------------------------------------------
+
+@pytest.mark.django_db
+class TestCheckoutOwnership:
+    def _draft(self, client, product):
+        assert client.post("/api/cart/", {"product_id": str(product.id), "quantity": 1}, format="json").status_code in (200, 201)
+        response = client.post("/api/cart/checkout/", {}, format="json")
+        assert response.status_code == 201, response.content
+        return response.json()["data"]["id"]
+
+    def _confirm(self, client, order_id, city, **extra):
+        return client.post(
+            "/api/checkout/",
+            {"order_id": order_id, "city_id": str(city.id), "address": "شارع الاختبار", "payment_method": "manual_payment", **extra},
+            format="json",
+        )
+
+    def test_basket_started_before_login_belongs_to_the_customer(self, product, city):
+        from rest_framework.test import APIClient
+        from apps.core.models import Role, User
+        from apps.orders.models import Order
+
+        client = APIClient()
+        order_id = self._draft(client, product)
+        customer = User.objects.create_user(phone_number="0921110001", name="سالم", password="pass-12345", role=Role.CUSTOMER)
+        client.force_login(customer)
+        assert self._confirm(client, order_id, city).status_code == 200
+        order = Order.objects.get(pk=order_id)
+        assert order.user_id == customer.id
+        assert order_id in [row["id"] for row in client.get("/api/orders/").json()["data"]]
+
+    def test_guest_gets_a_password_of_their_own(self, product, city):
+        from rest_framework.test import APIClient
+        from apps.core.models import User
+
+        client = APIClient()
+        order_id = self._draft(client, product)
+        response = self._confirm(client, order_id, city, customer_name="زائر", customer_phone="0923330009")
+        assert response.status_code == 200, response.content
+        body = response.json()
+        assert body["new_account_created"] is True
+        assert len(body["temp_password"]) == 6 and body["temp_password"].isdigit()
+        user = User.objects.get(phone_number="0923330009")
+        assert user.check_password(body["temp_password"])
+        # the same session can read its order back for the thank-you page
+        assert client.get(f"/api/checkout/{order_id}/").status_code == 200
+
+    def test_a_stranger_cannot_read_an_order_that_has_no_owner(self, product, city):
+        from rest_framework.test import APIClient
+
+        guest = APIClient()
+        order_id = self._draft(guest, product)
+        stranger = APIClient()
+        assert stranger.get(f"/api/checkout/{order_id}/").status_code == 404
+        assert guest.get(f"/api/checkout/{order_id}/").status_code == 200
+
+    def test_unfinished_baskets_are_not_listed_as_orders(self, product, city, owner_api):
+        from rest_framework.test import APIClient
+
+        guest = APIClient()
+        order_id = self._draft(guest, product)
+        listed = [row["id"] for row in owner_api.get("/api/orders/").json()["data"]]
+        assert order_id not in listed
+        assert self._confirm(guest, order_id, city, customer_name="زائر", customer_phone="0923330010").status_code == 200
+        listed = [row["id"] for row in owner_api.get("/api/orders/").json()["data"]]
+        assert order_id in listed

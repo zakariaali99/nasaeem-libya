@@ -157,12 +157,15 @@ export function useDashboardStats(
   })
 }
 
-export function useAddresses() {
+export function useAddresses(enabled = true) {
   return useQuery({
     queryKey: ['addresses'],
     queryFn: async () => (await api.get<Address[]>('/me/addresses/')).data,
+    enabled,
   })
-}export function useSaveAddress(id?: string) {
+}
+
+export function useSaveAddress(id?: string) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (body: Record<string, unknown>) =>

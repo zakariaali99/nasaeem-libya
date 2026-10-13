@@ -5,7 +5,6 @@ import {
   Compass,
   Gift,
   Heart,
-  Package,
   RotateCcw,
   ShoppingBag,
   Sparkles,
@@ -18,6 +17,7 @@ import * as React from 'react'
 import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
+import { LineThumb } from '@/components/ui/line-thumb'
 import { formatPrice } from '@/lib/format'
 import { useAddToCart } from '@/lib/queries/cart'
 import {
@@ -38,6 +38,7 @@ export function FragranceFinderQuizModal({ open, onClose }: FragranceFinderQuizM
   const [occasion, setOccasion] = React.useState('EVENING')
   const [budget, setBudget] = React.useState('ALL')
   const [results, setResults] = React.useState<FragranceFinderRecommendation[]>([])
+  const [addedIds, setAddedIds] = React.useState<string[]>([])
 
   const finderMutation = useFragranceFinder()
   const addToCart = useAddToCart()
@@ -83,7 +84,7 @@ export function FragranceFinderQuizModal({ open, onClose }: FragranceFinderQuizM
               <Compass className="size-4" />
             </span>
             <div>
-              <h3 className="text-base font-black text-foreground">مرشد العطور الذكي (Fragrance Finder)</h3>
+              <h3 className="text-base font-black text-foreground">مرشد العطور</h3>
               <p className="text-xs text-muted-foreground">اكتشف العطر المثالي لشخصيتك ومناسبتك في 3 خطوات</p>
             </div>
           </div>
@@ -302,7 +303,9 @@ export function FragranceFinderQuizModal({ open, onClose }: FragranceFinderQuizM
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="size-5 text-primary" />
-                <h4 className="text-sm font-black text-foreground">أفضل 3 عطور مطابقة لاختياراتك</h4>
+                <h4 className="text-sm font-black text-foreground">
+                  {results.some((rec) => rec.exact) ? 'اقتراحات قريبة من اختيارك' : 'لم نجد تطابقاً — جرّب هذه'}
+                </h4>
               </div>
               <button
                 type="button"
@@ -320,37 +323,19 @@ export function FragranceFinderQuizModal({ open, onClose }: FragranceFinderQuizM
             <div className="space-y-4">
               {results.map((rec) => {
                 const p = rec.product
-                const img = p.images?.[0]?.renditions?.thumb || p.images?.[0]?.url
                 return (
                   <div
                     key={p.id}
                     className="rounded-2xl border border-primary/25 bg-card p-4 space-y-3 shadow-xs"
                   >
                     <div className="flex items-start gap-3.5">
-                      {img ? (
-                        <img
-                          src={img}
-                          alt={p.name}
-                          width={64}
-                          height={64}
-                          loading="lazy"
-                          decoding="async"
-                          className="size-16 rounded-xl object-cover border border-border shrink-0"
-                        />
-                      ) : (
-                        <div className="size-16 rounded-xl bg-muted flex items-center justify-center text-muted-foreground shrink-0 border border-border">
-                          <Package className="size-8" />
-                        </div>
-                      )}
+                      <LineThumb image={p.images?.[0]} alt={p.name} size={64} />
 
                       <div className="min-w-0 flex-1 space-y-1">
                         <div className="flex items-center justify-between gap-2">
                           <h5 className="text-xs sm:text-sm font-black text-foreground truncate">
                             {p.name}
                           </h5>
-                          <span className="rounded-lg bg-emerald-500/10 px-2 py-0.5 font-mono text-[11px] font-black text-emerald-600 dark:text-emerald-400 shrink-0">
-                            تطابق {rec.match_score}%
-                          </span>
                         </div>
 
                         <div className="flex items-center gap-2">
@@ -366,14 +351,8 @@ export function FragranceFinderQuizModal({ open, onClose }: FragranceFinderQuizM
                       </div>
                     </div>
 
-                    {/* Reason Justification */}
-                    <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs leading-relaxed text-foreground">
-                      <strong className="text-primary font-bold">لماذا يناسبك: </strong>
-                      <span>{rec.reason}</span>
-                    </div>
-
                     {/* Actions */}
-                    <div className="flex items-center gap-2 pt-1">
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
                       {p.has_variants && (p.variant_choices?.length ?? 0) !== 1 ? (
                         // A sized product needs a size, which is chosen on its page.
                         <Button size="sm" asChild className="flex-1 min-h-11 rounded-xl font-bold text-xs gap-1.5">
@@ -388,13 +367,16 @@ export function FragranceFinderQuizModal({ open, onClose }: FragranceFinderQuizM
                           onClick={() => {
                             // A single size is added as that size.
                             const sole = p.variant_choices?.length === 1 ? p.variant_choices[0] : undefined
-                            addToCart.mutate({ product_id: p.id, variant_id: sole?.id ?? null, quantity: 1 })
+                            addToCart.mutate(
+                              { product_id: p.id, variant_id: sole?.id ?? null, quantity: 1 },
+                              { onSuccess: () => setAddedIds((ids) => [...ids, p.id]) },
+                            )
                           }}
-                          disabled={addToCart.isPending}
+                          disabled={addToCart.isPending || !p.in_stock}
                           className="flex-1 min-h-11 rounded-xl font-bold text-xs gap-1.5"
                         >
                           <ShoppingBag className="size-3.5" />
-                          <span>إضافة سريعة للسلة</span>
+                          <span>{!p.in_stock ? 'غير متوفر حالياً' : addedIds.includes(p.id) ? 'أُضيف إلى السلة ✓' : 'أضف للسلة'}</span>
                         </Button>
                       )}
                       <Button

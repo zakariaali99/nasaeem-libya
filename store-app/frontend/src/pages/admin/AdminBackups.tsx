@@ -107,7 +107,7 @@ export default function AdminBackups() {
               className="h-10 rounded-xl font-bold shadow-xs gap-1.5 px-4"
             >
               <Plus className="size-4" />
-              <span>إنشاء نسخة احتياطية شاملة الآن</span>
+              <span>إنشاء نسخة احتياطية</span>
             </Button>
           </div>
         }
@@ -363,7 +363,7 @@ export default function AdminBackups() {
             </div>
             <h3 className="font-bold text-foreground text-sm">لا توجد نسخ احتياطية محفوظة حتى الآن</h3>
             <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-              اضغط على زر «إنشاء نسخة احتياطية شاملة الآن» لحفظ نسخة آمنة من المتجر.
+              اضغط على زر «إنشاء نسخة احتياطية» لحفظ نسخة آمنة من المتجر.
             </p>
           </div>
         ) : (

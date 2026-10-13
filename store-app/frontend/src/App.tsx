@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { ApiError } from '@/lib/api'
 import { FEATURES } from '@/lib/features'
 import { lazy, Suspense } from 'react'
 import { RouterProvider, createBrowserRouter } from 'react-router-dom'
@@ -88,7 +89,14 @@ const AdminSiteTexts = lazy(() => import('@/pages/admin/SiteTexts'))
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: false },
+    queries: {
+      staleTime: 30_000,
+      // One retry for a dropped connection or a 5xx. A 4xx is an answer, not a
+      // failure: retrying a 404 only kept "loading…" on screen for longer.
+      retry: (failures, error) =>
+        failures < 1 && !(error instanceof ApiError && error.status >= 400 && error.status < 500),
+      refetchOnWindowFocus: false,
+    },
   },
 })
 
@@ -125,6 +133,12 @@ const router = createBrowserRouter([
           { path: '/cart', element: withSuspense(<CartPage />) },
           { path: '/developers/api', element: withSuspense(<ApiDocsPage />) },
           { path: '/checkout/redirect', element: withSuspense(<CheckoutRedirectPage />) },
+          // A visitor buys without an account: the checkout form takes a name
+          // and a phone number, and the server opens the account. Behind
+          // RequireAuth these two pages sent every guest to the login screen
+          // after their basket had already been turned into an order.
+          { path: '/checkout/complete', element: withSuspense(<CheckoutCompletePage />) },
+          { path: '/checkout/:orderId', element: withSuspense(<CheckoutPage />) },
           {
             element: <RequireAuth />,
             children: [
@@ -132,8 +146,6 @@ const router = createBrowserRouter([
               { path: '/me/orders', element: withSuspense(<MyOrdersPage />) },
               { path: '/me/orders/:orderId', element: withSuspense(<MyOrderDetailPage />) },
               { path: '/me/addresses', element: withSuspense(<MyAddressesPage />) },
-              { path: '/checkout/complete', element: withSuspense(<CheckoutCompletePage />) },
-              { path: '/checkout/:orderId', element: withSuspense(<CheckoutPage />) },
             ],
           },
         ],

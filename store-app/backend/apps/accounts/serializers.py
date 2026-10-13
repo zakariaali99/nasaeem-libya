@@ -133,15 +133,43 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
 
 
 class AddressSerializer(serializers.ModelSerializer):
-    region_name = serializers.CharField(source="region.name", read_only=True)
-    city_name = serializers.CharField(source="region.city.name", read_only=True)
+    region_name = serializers.SerializerMethodField()
+    city_name = serializers.SerializerMethodField()
 
     class Meta:
         from apps.core.models import UserAddress
 
         model = UserAddress
         fields = [
-            "id", "region", "region_name", "city_name", "address",
+            "id", "city", "region", "region_name", "city_name", "address",
             "is_default", "created_at", "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+    def _city(self, obj):
+        return obj.city or (obj.region.city if obj.region_id else None)
+
+    def get_city_name(self, obj) -> str:
+        city = self._city(obj)
+        return city.name if city else ""
+
+    def get_region_name(self, obj) -> str:
+        return obj.region.name if obj.region_id else ""
+
+    def validate(self, attrs):
+        instance = self.instance
+        region = attrs.get("region", instance.region if instance else None)
+        city = attrs.get("city", instance.city if instance else None)
+        if "city" in attrs and "region" not in attrs and instance and instance.region_id:
+            # the city changed and no region was sent: the old region no longer applies
+            if instance.region.city_id != getattr(city, "id", None):
+                region = None
+                attrs["region"] = None
+        if city is None and region is not None:
+            city = region.city
+            attrs["city"] = city
+        if city is None:
+            raise serializers.ValidationError({"city": ["اختر المدينة"]})
+        if region is not None and region.city_id != city.id:
+            raise serializers.ValidationError({"region": ["المنطقة لا تتبع المدينة المختارة"]})
+        return attrs

@@ -89,13 +89,13 @@ export default function AdminInventoryPage() {
     },
     {
       id: 'low',
-      label: 'مخزون منخفض (≤ 5)',
+      label: 'مخزون منخفض (5 أو أقل)',
       active: stockFilter === 'low',
       onClick: () => set({ stock_filter: 'low', page: 1 }),
     },
     {
       id: 'out',
-      label: 'نفد من المخزون (0)',
+      label: 'نفد من المخزون',
       active: stockFilter === 'out',
       onClick: () => set({ stock_filter: 'out', page: 1 }),
     },

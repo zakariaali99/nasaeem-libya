@@ -207,7 +207,27 @@ class CartItem(TimestampedModel):
         return f"{self.product.name} × {self.quantity}"
 
 
+class OrderQuerySet(models.QuerySet):
+    def placed(self):
+        """Orders a customer actually placed — baskets that never reached
+        confirmation are left out.
+
+        "Continue to checkout" creates the order row before the customer has
+        typed an address (that is what gives the checkout page its id). If they
+        leave, the row stays pending for an hour and is then cancelled. Those
+        rows are not orders: listing them filled the dashboard with nameless
+        "pending" and "cancelled" entries and inflated its counters.
+        """
+        return self.exclude(
+            finalised_at__isnull=True,
+            shipping_address="",
+            status__in=[OrderStatus.PENDING, OrderStatus.CANCELLED],
+        )
+
+
 class Order(TimestampedModel):
+    objects = OrderQuerySet.as_manager()
+
     order_number = models.CharField(
         "رقم الطلب", max_length=50, unique=True, db_index=True
     )

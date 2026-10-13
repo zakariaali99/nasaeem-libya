@@ -48,6 +48,9 @@ from .serializers import (
 DETAILS_SESSION_KEY = "checkout_details"
 
 
+LAST_ORDER_SESSION_KEY = "last_order_id"
+
+
 def _details(request) -> dict:
     return request.session.get(DETAILS_SESSION_KEY, {}) or {}
 
@@ -279,9 +282,8 @@ class CheckoutConfirmView(CsrfProtectedAPIView):
 
     def post(self, request):
         order_id = request.data.get("order_id")
-        session_draft = request.session.get("draft_order_id")
         order = order_queryset().filter(id=order_id).first() if order_id else None
-        if order is None or not _may_see(request.user, order, session_draft):
+        if order is None or not _may_see(request.user, order, _session_order_ids(request)):
             return Response({"message": "الطلب غير موجود"}, status=status.HTTP_404_NOT_FOUND)
 
         serializer = CheckoutSerializer(data=request.data)
@@ -293,9 +295,18 @@ class CheckoutConfirmView(CsrfProtectedAPIView):
         customer_name = (payload.get("customer_name") or "").strip()
         new_account_created = False
 
+        temp_password = ""
         user = request.user if (request.user and request.user.is_authenticated) else None
+        if user is not None and order.user_id is None and not getattr(user, "is_admin_role", False):
+            # The basket was started before signing in (cart -> login -> here):
+            # without this the order belonged to nobody, so it was missing from
+            # the customer's own orders and reached the dashboard with no name
+            # or phone number to call.
+            order.user = user
+            order.save(update_fields=["user", "updated_at"])
         if user is None and customer_phone:
             import re
+            import secrets
             from apps.core.models import Role, User
             from django.contrib.auth import login
             clean_digits = re.sub(r"[^\d]", "", customer_phone)
@@ -308,10 +319,13 @@ class CheckoutConfirmView(CsrfProtectedAPIView):
 
             user = User.objects.filter(phone_number=std_phone).first()
             if user is None:
+                # A password of its own per account. One shared default would
+                # let anyone who knows a customer's number open their account.
+                temp_password = f"{secrets.randbelow(10**6):06d}"
                 user = User.objects.create_user(
                     phone_number=std_phone,
                     name=customer_name or "عميل نسائم",
-                    password="000000",
+                    password=temp_password,
                     role=Role.CUSTOMER,
                 )
                 new_account_created = True
@@ -399,18 +413,22 @@ class CheckoutConfirmView(CsrfProtectedAPIView):
             account_whatsapp_msg = format_new_account_welcome_whatsapp_message(
                 user_name=user.name or "عميلنا العزيز",
                 phone_number=user.phone_number,
-                temp_password="000000",
+                temp_password=temp_password,
             )
             if customer_number:
                 account_whatsapp_link = f"https://wa.me/{customer_number}?text={urllib.parse.quote(account_whatsapp_msg)}"
 
         request.session.pop(DETAILS_SESSION_KEY, None)
         request.session.pop("draft_order_id", None)
+        # The thank-you page reads the order back; a guest who used the number
+        # of an existing account is not signed in, so the session vouches.
+        request.session[LAST_ORDER_SESSION_KEY] = str(order.id)
         request.session.modified = True
 
         return Response({
             "data": OrderSerializer(order, context={"request": request}).data,
             "message": "تم تأكيد الطلب بنجاح",
+            "temp_password": temp_password,
             "whatsapp_link": whatsapp_link,
             "whatsapp_invoice_message": invoice_msg,
             "new_account_created": new_account_created,
@@ -425,23 +443,29 @@ class CheckoutStateView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request, order_id):
-        session_draft = request.session.get("draft_order_id")
         order = order_queryset().filter(id=order_id).first()
-        if order is None or not _may_see(request.user, order, session_draft):
+        if order is None or not _may_see(request.user, order, _session_order_ids(request)):
             return Response({"message": "الطلب غير موجود"}, status=status.HTTP_404_NOT_FOUND)
         return Response({"data": OrderSerializer(order, context={"request": request}).data})
 
 
-def _may_see(user, order, session_draft_id=None) -> bool:
+def _session_order_ids(request) -> set[str]:
+    """Orders this browser session created: its open draft and its last order."""
+    ids = {request.session.get("draft_order_id"), request.session.get(LAST_ORDER_SESSION_KEY)}
+    return {str(value) for value in ids if value}
+
+
+def _may_see(user, order, session_order_ids=()) -> bool:
     if getattr(user, "is_admin_role", False):
         return True
     if user and user.is_authenticated and order.user_id == user.id:
         return True
-    if order.user_id is None:
-        return True
-    if session_draft_id and str(order.id) == str(session_draft_id):
-        return True
-    return False
+    # An order that belongs to nobody used to be readable by anyone holding
+    # its number, and numbers are sequential. Only the session that created it
+    # may read it now.
+    if isinstance(session_order_ids, str):
+        session_order_ids = {session_order_ids}
+    return str(order.id) in {str(value) for value in (session_order_ids or ()) if value}
 
 
 # The business's allowed paths. Anything else — pending→completed, a terminal
@@ -487,7 +511,7 @@ class OrderListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        queryset = order_queryset()
+        queryset = order_queryset().placed()
         if not getattr(request.user, "is_admin_role", False):
             queryset = queryset.filter(user=request.user)
         if state := request.query_params.get("status"):
@@ -517,7 +541,7 @@ class OrderDetailView(APIView):
 
     def get(self, request, lookup):
         order = self.get_object(request, lookup)
-        if order is None or not _may_see(request.user, order):
+        if order is None or not _may_see(request.user, order, _session_order_ids(request)):
             return Response({"message": "الطلب غير موجود"}, status=status.HTTP_404_NOT_FOUND)
         return Response({"data": OrderSerializer(order, context={"request": request}).data})
 

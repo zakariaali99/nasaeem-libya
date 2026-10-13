@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { api } from '@/lib/api'
+import { useMe } from '@/lib/queries/auth'
 import type { Product } from '@/types/api'
 
 export interface WishlistItemShape {
@@ -26,8 +27,11 @@ export function useWishlist() {
 }
 
 export function useWishlistIds() {
+  // A visitor has no wishlist: asking anyway returned 401 on every page.
+  const { data: user } = useMe()
   return useQuery({
     queryKey: wishlistKeys.ids,
+    enabled: Boolean(user),
     queryFn: async () => {
       try {
         const res = await api.get<string[]>('/wishlist/ids/')

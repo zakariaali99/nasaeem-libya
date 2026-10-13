@@ -17,6 +17,7 @@ import {
   Truck,
   User,
   XCircle,
+  Gift,
 } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
@@ -42,6 +43,15 @@ const STEPS = [
   { id: 'accepted', label: 'مع المندوب / الشحن', icon: Truck },
   { id: 'completed', label: 'تم التسليم بنجاح', icon: CheckCircle2 },
 ]
+
+/** The stored payment codes, in the words the checkout shows the customer. */
+const PAYMENT_LABELS: Record<string, string> = {
+  '': 'الدفع عند الاستلام',
+  manual_payment: 'الدفع عند الاستلام',
+  cod: 'الدفع عند الاستلام',
+  bank_transfer: 'تحويل مصرفي',
+  bank: 'تحويل مصرفي',
+}
 
 export default function AdminOrderDetail() {
   const { orderIdOrNumber = '' } = useParams()
@@ -306,6 +316,12 @@ export default function AdminOrderDetail() {
                   <span className="font-mono font-semibold text-foreground">{formatPrice(order.shipping_total)}</span>
                 </div>
               )}
+              {Number(order.gift_wrap_fee ?? 0) > 0 && (
+                <div className="flex justify-between text-muted-foreground">
+                  <span>رسوم تغليف الهدية:</span>
+                  <span className="font-mono font-semibold text-foreground">{formatPrice(order.gift_wrap_fee!)}</span>
+                </div>
+              )}
               <div className="flex justify-between border-t border-border/80 pt-2 text-sm font-extrabold text-foreground">
                 <span>المبلغ الإجمالي النهائي:</span>
                 <span className="font-mono text-base text-price">{formatPrice(order.total)}</span>
@@ -475,7 +491,7 @@ export default function AdminOrderDetail() {
                   {order.user?.name ? order.user.name.charAt(0) : <User className="size-4" />}
                 </div>
                 <div className="min-w-0">
-                  <p className="font-bold text-sm text-foreground truncate">{order.user?.name || 'عميل مسجل'}</p>
+                  <p className="font-bold text-sm text-foreground truncate">{order.user?.name || (order.user ? 'عميل بلا اسم' : 'طلب بلا حساب عميل')}</p>
                   <p className="font-mono text-xs text-muted-foreground">{order.user?.phone_number || '—'}</p>
                 </div>
               </div>
@@ -561,6 +577,47 @@ export default function AdminOrderDetail() {
             </div>
           </div>
 
+          {/* What the customer asked for when they ticked "send as a gift".
+              The checkout collected it and charged for it, but nothing here
+              showed it, so the store could not know a gift had been ordered. */}
+          {order.is_gift && (
+            <div className="rounded-3xl border border-primary/30 bg-primary/5 p-5 sm:p-6 shadow-xs space-y-3 text-xs">
+              <div className="flex items-center gap-2 border-b border-primary/20 pb-3">
+                <Gift className="size-4 text-primary" aria-hidden="true" />
+                <h3 className="font-bold text-sm text-foreground">طلب هدية</h3>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">نوع التغليف:</span>
+                <span className="font-bold text-foreground">
+                  {order.gift_wrap_type === 'ROYAL_VELVET' ? 'التغليف المخملي (برسوم)' : 'التغليف الكلاسيكي (مجاني)'}
+                </span>
+              </div>
+              {order.gift_sender_name ? (
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">من:</span>
+                  <span className="font-bold text-foreground">{order.gift_sender_name}</span>
+                </div>
+              ) : null}
+              {order.gift_recipient_name ? (
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">إلى:</span>
+                  <span className="font-bold text-foreground">{order.gift_recipient_name}</span>
+                </div>
+              ) : null}
+              {order.gift_message ? (
+                <div>
+                  <span className="mb-0.5 block text-muted-foreground">رسالة الإهداء:</span>
+                  <p className="whitespace-pre-line rounded-xl border border-border bg-card p-2.5 font-medium text-foreground">
+                    {order.gift_message}
+                  </p>
+                </div>
+              ) : null}
+              {order.hide_invoice_prices ? (
+                <p className="font-bold text-warning">العميل طلب عدم إظهار الأسعار داخل الطرد.</p>
+              ) : null}
+            </div>
+          )}
+
           {/* Courier Live Tracking Timeline */}
           {FEATURES.shipping && <OrderTrackingTimeline orderNumberOrId={order.order_number || order.id} />}
 
@@ -575,7 +632,7 @@ export default function AdminOrderDetail() {
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">طريقة الدفع:</span>
                 <Badge tone="neutral" className="font-semibold text-xs">
-                  {order.payment_method || 'دفع عند الاستلام'}
+                  {PAYMENT_LABELS[order.payment_method || ''] ?? order.payment_method ?? 'الدفع عند الاستلام'}
                 </Badge>
               </div>
 

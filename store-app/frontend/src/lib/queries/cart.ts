@@ -179,28 +179,24 @@ export interface CheckoutConfirmResult {
   order: Order
   whatsapp_link: string
   new_account_created: boolean
-  /** Shown once, on the thank-you page, when the purchase opened an account. */
-  temp_password: string
 }
 
 export function useConfirmCheckout() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (input: Record<string, string>): Promise<CheckoutConfirmResult> => {
-      // The WhatsApp link and the new account's password sit beside `data`
+      // The WhatsApp link and the new-account flag sit beside `data`
       // in the response, not inside it; taking `.data` alone dropped them, and
       // the WhatsApp button on the thank-you page never appeared.
       const envelope = (await api.post<Order>('/checkout/', input)) as unknown as {
         data: Order
         whatsapp_link?: string
         new_account_created?: boolean
-        temp_password?: string
       }
       return {
         order: envelope.data,
         whatsapp_link: envelope.whatsapp_link ?? '',
         new_account_created: Boolean(envelope.new_account_created),
-        temp_password: envelope.temp_password ?? '',
       }
     },
     onSuccess: async (result) => {

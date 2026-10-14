@@ -1,4 +1,4 @@
-import { Building2, Check, CheckCircle2, Copy, KeyRound, MessageSquare } from 'lucide-react'
+import { Building2, Check, CheckCircle2, Copy, MessageSquare, Smartphone } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 
@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button'
 import { LineThumb } from '@/components/ui/line-thumb'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatPrice } from '@/lib/format'
-import { useMe } from '@/lib/queries/auth'
 import { useCheckoutOrder } from '@/lib/queries/cart'
 import { useStoreSettings } from '@/lib/queries/storeSettings'
 import { useSiteText } from '@/lib/siteText'
@@ -19,9 +18,7 @@ export default function CheckoutCompletePage() {
   const [params] = useSearchParams()
   const reference = params.get('order') ?? ''
   const orderId = params.get('id') ?? ''
-  const { data: user } = useMe()
   const { data: order, isPending } = useCheckoutOrder(orderId || undefined)
-  const [tempPassword, setTempPassword] = useState<string | null>(null)
   const { data: storeSettings } = useStoreSettings()
   const [whatsappLink, setWhatsappLink] = useState<string | null>(null)
   const [copiedField, setCopiedField] = useState<string | null>(null)
@@ -35,10 +32,8 @@ export default function CheckoutCompletePage() {
   useEffect(() => {
     try {
       setWhatsappLink(reference ? sessionStorage.getItem(`whatsapp_link:${reference}`) : null)
-      setTempPassword(reference ? sessionStorage.getItem(`temp_password:${reference}`) : null)
     } catch {
       setWhatsappLink(null)
-      setTempPassword(null)
     }
   }, [reference])
 
@@ -57,26 +52,14 @@ export default function CheckoutCompletePage() {
         )}
       </div>
 
-      {/* The account opened by this purchase — its password is shown here once. */}
-      {tempPassword && user ? (
-        <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 sm:p-5 space-y-2">
-          <div className="flex items-center gap-2 text-sm font-bold text-foreground">
-            <KeyRound className="size-4 text-primary" aria-hidden="true" />
-            <span>فتحنا لك حساباً لمتابعة طلبك</span>
-          </div>
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            الدخول برقم هاتفك <bdi className="font-mono font-bold text-foreground">{user.phone_number}</bdi> وكلمة
-            المرور التالية. احفظها الآن، فلن تظهر مرة أخرى، ويمكنك تغييرها من صفحة «حسابي».
-          </p>
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-2">
-            <bdi className="font-mono text-lg font-black tracking-widest text-foreground">{tempPassword}</bdi>
-            <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => copyToClipboard(tempPassword, 'pass')}>
-              {copiedField === 'pass' ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-              {copiedField === 'pass' ? 'تم النسخ' : 'نسخ'}
-            </Button>
-          </div>
-        </div>
-      ) : null}
+      {/* No password to remember: this device keeps the customer's orders. */}
+      <div className="flex items-start gap-3 rounded-2xl border border-primary/30 bg-primary/5 p-4 text-xs leading-relaxed text-muted-foreground">
+        <Smartphone className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+        <p>
+          <span className="font-bold text-foreground">طلباتك محفوظة في «طلباتي» على هذا الجهاز.</span>{' '}
+          تابع حالة طلبك من هناك في أي وقت، دون كلمة مرور.
+        </p>
+      </div>
 
       {/* WhatsApp Quick Action Button */}
       {whatsappLink && (
@@ -210,15 +193,9 @@ export default function CheckoutCompletePage() {
       ) : null}
 
       <div className="flex flex-wrap justify-center gap-3 pt-2">
-        {user ? (
-          <Button asChild size="lg" className="rounded-xl">
-            <Link to="/me/orders">متابعة طلباتي</Link>
-          </Button>
-        ) : (
-          <Button asChild size="lg" className="rounded-xl">
-            <Link to="/login?next=%2Fme%2Forders">سجّل الدخول لمتابعة طلبك</Link>
-          </Button>
-        )}
+        <Button asChild size="lg" className="rounded-xl">
+          <Link to="/me/orders">متابعة طلباتي</Link>
+        </Button>
         <Button asChild variant="outline" size="lg" className="rounded-xl">
           <Link to="/products">مواصلة التسوّق</Link>
         </Button>

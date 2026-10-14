@@ -436,8 +436,11 @@ class TestOrderVisibility:
         by_number = buyer_api.get(reverse("order-detail", args=[created["order_number"]]))
         assert by_number.json()["data"]["id"] == created["id"]
 
-    def test_an_anonymous_visitor_cannot_list_orders(self, api):
-        assert api.get(reverse("order-list")).status_code == 401
+    def test_an_anonymous_visitor_lists_nothing_but_their_own_orders(self, api):
+        """A visitor who has bought nothing on this device sees an empty list."""
+        response = api.get(reverse("order-list"))
+        assert response.status_code == 200
+        assert response.json()["data"] == []
 
 
 @pytest.fixture

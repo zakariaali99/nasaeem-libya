@@ -244,7 +244,9 @@ class TestGuestCheckoutNeverSignsInToAnExistingAccount:
 
         assert response.status_code in (200, 201), response.json()
         assert guest.get(reverse("auth-me")).status_code in (401, 403)
-        assert guest.get(reverse("order-list")).status_code in (401, 403)
+        # The device sees the order it placed, and nothing else of the account.
+        listed = guest.get(reverse("order-list")).json()["data"]
+        assert [o["id"] for o in listed] == [response.json()["data"]["id"]]
 
     def test_a_customers_phone_does_not_open_their_account(self, customer, product, city):
         guest, _ = self._guest_confirm(product, city, customer.phone_number)
@@ -300,7 +302,7 @@ class TestCheckoutOwnership:
         assert order.user_id == customer.id
         assert order_id in [row["id"] for row in client.get("/api/orders/").json()["data"]]
 
-    def test_guest_gets_a_password_of_their_own(self, product, city):
+    def test_a_new_customer_buys_without_a_password_and_stays_signed_in(self, product, city):
         from rest_framework.test import APIClient
         from apps.core.models import User
 
@@ -310,11 +312,18 @@ class TestCheckoutOwnership:
         assert response.status_code == 200, response.content
         body = response.json()
         assert body["new_account_created"] is True
-        assert len(body["temp_password"]) == 6 and body["temp_password"].isdigit()
+        assert "temp_password" not in body
         user = User.objects.get(phone_number="0923330009")
-        assert user.check_password(body["temp_password"])
+        assert not user.has_usable_password()
+        assert not user.check_password("000000")
+        # This device is the customer's: signed in, and kept for a year.
+        assert client.get(reverse("auth-me")).status_code == 200
+        assert client.session.get_expiry_age() > 60 * 60 * 24 * 300
         # the same session can read its order back for the thank-you page
         assert client.get(f"/api/checkout/{order_id}/").status_code == 200
+        # and finds it under «طلباتي», with no other device seeing it
+        assert [o["id"] for o in client.get(reverse("order-list")).json()["data"]] == [order_id]
+        assert APIClient().get(reverse("order-list")).json()["data"] == []
 
     def test_a_stranger_cannot_read_an_order_that_has_no_owner(self, product, city):
         from rest_framework.test import APIClient
@@ -335,3 +344,17 @@ class TestCheckoutOwnership:
         assert self._confirm(guest, order_id, city, customer_name="زائر", customer_phone="0923330010").status_code == 200
         listed = [row["id"] for row in owner_api.get("/api/orders/").json()["data"]]
         assert order_id in listed
+
+
+def test_the_customer_page_lists_only_that_customers_orders(owner_api, order, product, region):
+    from apps.core.models import User
+
+    other = User.objects.create_user(phone_number="0925550001", name="آخر", password="Other-pass-9")
+    cart = Cart.objects.create(user=other)
+    CartItem.objects.create(cart=cart, product=product, quantity=1)
+    services.checkout(cart=cart, user=other, region_id=region.id, address="شارع 2")
+
+    listed = owner_api.get(reverse("order-list"), {"user": str(order.user_id)}).json()
+    assert [o["id"] for o in listed["data"]] == [str(order.id)]
+    assert listed["meta"]["total"] == 1
+    assert owner_api.get(reverse("order-list"), {"user": "not-an-id"}).json()["data"] == []

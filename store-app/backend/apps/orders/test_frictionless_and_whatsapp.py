@@ -84,12 +84,14 @@ class TestFrictionlessCheckoutAndWhatsApp:
         api.force_authenticate(user=admin)
         url = reverse("admin-user-reset-password", args=[customer.id])
         
-        # 1. Reset to default (no password provided -> 000000)
+        # 1. No password given -> a new random six-digit one, never a shared default
         res = api.post(url, {})
         assert res.status_code == 200
-        assert res.data["password"] == "000000"
+        generated = res.data["password"]
+        assert len(generated) == 6 and generated.isdigit() and generated != "000000"
         customer.refresh_from_db()
-        assert customer.check_password("000000")
+        assert customer.check_password(generated)
+        assert api.post(url, {"password": "000000"}).status_code == 400
 
         # 2. Reset to custom password
         res2 = api.post(url, {"password": "NewSecretPass789"})

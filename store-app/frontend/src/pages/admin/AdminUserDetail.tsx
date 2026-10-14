@@ -246,15 +246,23 @@ export default function AdminUserDetail() {
                 variant="outline"
                 loading={resetPasswordMutation.isPending}
                 onClick={() => {
-                  if (window.confirm(`هل تريد إعادة تعيين كلمة مرور العميل (${user.name || user.phone_number}) إلى الأصفار الافتراضية (000000)؟`)) {
-                    resetPasswordMutation.mutate('000000')
+                  if (window.confirm(`إنشاء كلمة مرور جديدة عشوائية للعميل (${user.name || user.phone_number})؟ ستُلغى كلمته الحالية.`)) {
+                    resetPasswordMutation.mutate('')
                   }
                 }}
                 className="w-full min-h-10 rounded-xl text-xs font-bold gap-1.5 border-primary/30 text-primary bg-primary/5 hover:bg-primary/10"
               >
                 <RotateCcw className="size-3.5" />
-                <span>إعادة التعيين السريع لكلمة المرور (000000)</span>
+                <span>كلمة مرور جديدة عشوائية</span>
               </Button>
+
+              {/* Shown once, so it can be passed to the customer; never kept. */}
+              {lastSetPassword && (
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2">
+                  <span className="text-xs text-muted-foreground">كلمة المرور الجديدة</span>
+                  <bdi dir="ltr" className="font-mono text-base font-black tracking-widest text-foreground">{lastSetPassword}</bdi>
+                </div>
+              )}
 
               <div className="flex gap-2">
                 <Input
@@ -275,7 +283,8 @@ export default function AdminUserDetail() {
                 </Button>
               </div>
 
-              {/* WhatsApp Share Credentials */}
+              {/* WhatsApp Share Credentials — only once there is a new password to send */}
+              {lastSetPassword && (
               <Button
                 size="sm"
                 variant="outline"
@@ -283,7 +292,7 @@ export default function AdminUserDetail() {
                   const cleanPhone = user.phone_number.replace(/\D/g, '')
                   const intlPhone = cleanPhone.startsWith('0') ? '218' + cleanPhone.slice(1) : (cleanPhone.startsWith('218') ? cleanPhone : '218' + cleanPhone)
                   const msg = encodeURIComponent(
-                    `مرحباً ${user.name || 'عميلنا العزيز'}، تم تحديث بيانات حسابك في متجر نسائم ليبيا:\n📱 الهاتف: ${user.phone_number}\n🔑 كلمة المرور: ${lastSetPassword || '000000'}\n\nننصحك بتسجيل الدخول وتغييرها من حسابك:\nhttps://nasaim.ly/profile`
+                    `مرحباً ${user.name || 'عميلنا العزيز'}، تم تحديث بيانات حسابك في متجر نسائم ليبيا:\n📱 الهاتف: ${user.phone_number}\n🔑 كلمة المرور: ${lastSetPassword}\n\nننصحك بتسجيل الدخول وتغييرها من حسابك:\n${window.location.origin}/login`
                   )
                   window.open(`https://wa.me/${intlPhone}?text=${msg}`, '_blank')
                 }}
@@ -292,6 +301,7 @@ export default function AdminUserDetail() {
                 <MessageSquare className="size-3.5" />
                 <span>إرسال بيانات الدخول المحدثة عبر واتساب</span>
               </Button>
+              )}
             </div>
           </div>
 

@@ -101,7 +101,7 @@ def format_bank_transfer_whatsapp_message(order, store_url: str = "") -> str:
 
 
 def format_new_account_welcome_whatsapp_message(
-    user_name: str, phone_number: str, temp_password: str = "000000", store_url: str = None
+    user_name: str, phone_number: str, temp_password: str, store_url: str = None
 ) -> str:
     """Format account creation welcome notice with security password advice."""
     from apps.core.store_settings import get_store_settings

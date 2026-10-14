@@ -138,12 +138,14 @@ const router = createBrowserRouter([
           // after their basket had already been turned into an order.
           { path: '/checkout/complete', element: withSuspense(<CheckoutCompletePage />) },
           { path: '/checkout/:orderId', element: withSuspense(<CheckoutPage />) },
+          // A customer who bought on this device sees those orders without
+          // signing in; the server lists only the orders this device placed.
+          { path: '/me/orders', element: withSuspense(<MyOrdersPage />) },
+          { path: '/me/orders/:orderId', element: withSuspense(<MyOrderDetailPage />) },
           {
             element: <RequireAuth />,
             children: [
               { path: '/me', element: withSuspense(<AccountPage />) },
-              { path: '/me/orders', element: withSuspense(<MyOrdersPage />) },
-              { path: '/me/orders/:orderId', element: withSuspense(<MyOrderDetailPage />) },
               { path: '/me/addresses', element: withSuspense(<MyAddressesPage />) },
             ],
           },

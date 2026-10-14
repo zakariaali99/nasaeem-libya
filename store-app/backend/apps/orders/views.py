@@ -50,6 +50,10 @@ DETAILS_SESSION_KEY = "checkout_details"
 
 
 LAST_ORDER_SESSION_KEY = "last_order_id"
+# Every order this device placed. Buying needs no password, so the device that
+# bought is how a customer finds their orders again ("طلباتي").
+DEVICE_ORDERS_SESSION_KEY = "device_order_ids"
+DEVICE_SESSION_AGE = 60 * 60 * 24 * 365
 
 
 def _details(request) -> dict:
@@ -278,8 +282,9 @@ def order_queryset():
 class CheckoutConfirmView(CsrfProtectedAPIView):
     """`POST /api/checkout/` — the confirm step of `/checkout/:orderId`.
 
-    Applies destination and payment choices to a draft order, auto-registers guest
-    users with default credentials ('000000') if needed, and dispatches rich WhatsApp telemetry.
+    Applies destination and payment choices to a draft order and links it to the
+    customer's account by phone number, opening one (with no password) for a new
+    number. Buying never asks for a password.
     """
 
     permission_classes = [AllowAny]
@@ -299,7 +304,6 @@ class CheckoutConfirmView(CsrfProtectedAPIView):
         customer_name = (payload.get("customer_name") or "").strip()
         new_account_created = False
 
-        temp_password = ""
         user = request.user if (request.user and request.user.is_authenticated) else None
         if user is not None and order.user_id is None and not getattr(user, "is_admin_role", False):
             # The basket was started before signing in (cart -> login -> here):
@@ -310,7 +314,6 @@ class CheckoutConfirmView(CsrfProtectedAPIView):
             order.save(update_fields=["user", "updated_at"])
         if user is None and customer_phone:
             import re
-            import secrets
             from apps.core.models import Role, User
             from django.contrib.auth import login
             clean_digits = re.sub(r"[^\d]", "", customer_phone)
@@ -323,13 +326,13 @@ class CheckoutConfirmView(CsrfProtectedAPIView):
 
             user = User.objects.filter(phone_number=std_phone).first()
             if user is None:
-                # A password of its own per account. One shared default would
-                # let anyone who knows a customer's number open their account.
-                temp_password = f"{secrets.randbelow(10**6):06d}"
+                # No password: the customer never needs one to buy, and this
+                # device stays signed in. A shared default ("000000") let anyone
+                # who knew a number open that account.
                 user = User.objects.create_user(
                     phone_number=std_phone,
                     name=customer_name or "عميل نسائم",
-                    password=temp_password,
+                    password=None,
                     role=Role.CUSTOMER,
                 )
                 new_account_created = True
@@ -343,8 +346,10 @@ class CheckoutConfirmView(CsrfProtectedAPIView):
             # still linked to the account so its owner sees it after a real
             # login, and nothing on that account is changed from here.
             if new_account_created:
-                login(request, user)
-        elif user is not None and customer_name and not user.name:
+                login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+                request.session.set_expiry(DEVICE_SESSION_AGE)
+        elif user is not None and customer_name and user.name != customer_name and not getattr(user, "is_admin_role", False):
+            # The signed-in customer's own profile follows their latest order.
             user.name = customer_name
             user.save(update_fields=["name", "updated_at"])
 
@@ -375,7 +380,6 @@ class CheckoutConfirmView(CsrfProtectedAPIView):
         from .notifications import (
             format_bank_transfer_whatsapp_message,
             format_cod_order_whatsapp_message,
-            format_new_account_welcome_whatsapp_message,
             dispatch_realtime_order_alert,
         )
         import re
@@ -395,7 +399,6 @@ class CheckoutConfirmView(CsrfProtectedAPIView):
         # WhatsApp); the welcome note goes to the customer's own chat.
         from apps.core.store_settings import get_store_settings
         store_number = wa_number(get_store_settings().whatsapp)
-        customer_number = wa_number(order.user.phone_number if order.user else customer_phone)
 
         payment_method = (payload.get("payment_method") or "").lower()
         is_bank = payment_method in ("bank_transfer", "bank")
@@ -411,28 +414,26 @@ class CheckoutConfirmView(CsrfProtectedAPIView):
             else ""
         )
 
+        # There is no password to send any more, so no welcome message either.
         account_whatsapp_msg = ""
         account_whatsapp_link = ""
-        if new_account_created and user:
-            account_whatsapp_msg = format_new_account_welcome_whatsapp_message(
-                user_name=user.name or "عميلنا العزيز",
-                phone_number=user.phone_number,
-                temp_password=temp_password,
-            )
-            if customer_number:
-                account_whatsapp_link = f"https://wa.me/{customer_number}?text={urllib.parse.quote(account_whatsapp_msg)}"
 
         request.session.pop(DETAILS_SESSION_KEY, None)
         request.session.pop("draft_order_id", None)
         # The thank-you page reads the order back; a guest who used the number
         # of an existing account is not signed in, so the session vouches.
         request.session[LAST_ORDER_SESSION_KEY] = str(order.id)
+        device_orders = [str(v) for v in request.session.get(DEVICE_ORDERS_SESSION_KEY) or []]
+        if str(order.id) not in device_orders:
+            device_orders.append(str(order.id))
+        request.session[DEVICE_ORDERS_SESSION_KEY] = device_orders[-100:]
+        if not request.user.is_authenticated or new_account_created:
+            request.session.set_expiry(DEVICE_SESSION_AGE)
         request.session.modified = True
 
         return Response({
             "data": OrderSerializer(order, context={"request": request}).data,
             "message": "تم تأكيد الطلب بنجاح",
-            "temp_password": temp_password,
             "whatsapp_link": whatsapp_link,
             "whatsapp_invoice_message": invoice_msg,
             "new_account_created": new_account_created,
@@ -454,8 +455,10 @@ class CheckoutStateView(APIView):
 
 
 def _session_order_ids(request) -> set[str]:
-    """Orders this browser session created: its open draft and its last order."""
+    """Orders this browser session created: its open draft, its last order and
+    every order it placed."""
     ids = {request.session.get("draft_order_id"), request.session.get(LAST_ORDER_SESSION_KEY)}
+    ids.update(request.session.get(DEVICE_ORDERS_SESSION_KEY) or [])
     return {str(value) for value in ids if value}
 
 
@@ -473,15 +476,34 @@ def _may_see(user, order, session_order_ids=()) -> bool:
 
 
 class OrderListView(APIView):
-    permission_classes = [IsAuthenticated]
+    """Staff: every placed order. A signed-in customer: their own. A device
+    that bought without signing in: the orders it placed (see
+    DEVICE_ORDERS_SESSION_KEY) — never anyone else's."""
+
+    permission_classes = [AllowAny]
 
     def get(self, request):
+        from django.db.models import Q
+
         queryset = order_queryset().placed()
+        device_ids = [i for i in _session_order_ids(request) if i]
         if not getattr(request.user, "is_admin_role", False):
-            queryset = queryset.filter(user=request.user)
+            mine = Q(id__in=device_ids)
+            if request.user.is_authenticated:
+                mine |= Q(user=request.user)
+            queryset = queryset.filter(mine)
         if state := request.query_params.get("status"):
             queryset = queryset.filter(status=state)
-        search = (request.query_params.get("search") or "").strip()
+        # The customer page asks for one customer's orders. Ignored before,
+        # so it listed — and totalled — every order in the store.
+        if (customer := request.query_params.get("user")) and getattr(request.user, "is_admin_role", False):
+            import uuid as _uuid
+
+            try:
+                queryset = queryset.filter(user_id=_uuid.UUID(customer))
+            except ValueError:
+                queryset = queryset.none()
+        search =(request.query_params.get("search") or "").strip()
         if search and getattr(request.user, "is_admin_role", False):
             from django.db.models import Q
 
@@ -504,7 +526,9 @@ class OrderListView(APIView):
 
 
 class OrderDetailView(APIView):
-    permission_classes = [IsAuthenticated]
+    # A device that bought without signing in reads its own orders here;
+    # `_may_see` decides, and changes stay staff-only.
+    permission_classes = [AllowAny]
 
     def get_object(self, request, lookup):
         queryset = order_queryset()

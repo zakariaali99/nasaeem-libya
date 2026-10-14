@@ -110,6 +110,13 @@ export default function LoginPage() {
         <Button type="submit" block size="lg" loading={isSubmitting || login.isPending}>
           تسجيل الدخول
         </Button>
+
+        {/* Buyers get no password at checkout; their device keeps their orders. */}
+        <p className="rounded-lg bg-muted/50 p-3 text-xs leading-relaxed text-muted-foreground">
+          اشتريت منّا دون كلمة مرور؟ طلباتك تظهر في{' '}
+          <Link to="/me/orders" className="font-semibold text-primary underline-offset-4 hover:underline">«طلباتي»</Link>{' '}
+          على الجهاز الذي طلبت منه، ويمكن لفريقنا أن يضبط لك كلمة مرور عند الطلب.
+        </p>
       </form>
     </AuthLayout>
   )

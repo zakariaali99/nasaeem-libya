@@ -208,13 +208,11 @@ export default function CheckoutPage() {
       const orderNumber = result.order.order_number || order.order_number
 
       // Not opened automatically: the confirmation page offers WhatsApp as a
-      // button the customer may or may not use. The new account's password is
-      // handed over the same way and shown once.
+      // button the customer may or may not use.
       try {
         if (result.whatsapp_link) sessionStorage.setItem(`whatsapp_link:${orderNumber}`, result.whatsapp_link)
-        if (result.temp_password) sessionStorage.setItem(`temp_password:${orderNumber}`, result.temp_password)
       } catch {
-        // storage unavailable (private mode) — the page simply shows neither
+        // storage unavailable (private mode) — the page simply shows no button
       }
 
       navigate(
@@ -329,7 +327,7 @@ export default function CheckoutPage() {
 
             {!user && (
               <p className="text-[11px] text-muted-foreground bg-muted/40 p-2.5 rounded-xl">
-                لا تحتاج إلى تسجيل: نفتح لك حساباً برقم هاتفك لتتابع طلبك، وتظهر لك كلمة المرور بعد تأكيد الطلب. إن كان لك حساب بهذا الرقم فسيُضاف الطلب إليه.
+                لا تحتاج إلى تسجيل ولا كلمة مرور: تتابع طلبك من «طلباتي» على هذا الجهاز. إن كان لك حساب بهذا الرقم فسيُضاف الطلب إليه.
               </p>
             )}
           </section>

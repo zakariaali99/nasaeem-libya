@@ -241,7 +241,9 @@ class AdminUserDetailView(APIView):
 
 
 class AdminUserResetPasswordView(APIView):
-    """Allows administrators to set or reset a customer's password (e.g. to '000000')."""
+    """An administrator sets a customer's password, or (empty) gets a new random
+    six-digit one to pass on. There is no shared default: "000000" let anyone
+    who knew a customer's number open their account."""
     permission_classes = [IsAdminRole]
 
     def post(self, request, user_id):
@@ -251,7 +253,14 @@ class AdminUserResetPasswordView(APIView):
 
         new_password = str(request.data.get("password", "")).strip()
         if not new_password:
-            new_password = "000000"
+            import secrets
+
+            new_password = f"{secrets.randbelow(10**6):06d}"
+        if new_password == "000000":
+            return Response(
+                {"message": "هذه الكلمة مستخدمة على نطاق واسع ولا يُسمح بها، اختر غيرها"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         if len(new_password) < 6:
             return Response(

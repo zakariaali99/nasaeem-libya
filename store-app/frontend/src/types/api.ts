@@ -418,6 +418,47 @@ export interface OrderLine {
   image: ProductImage | null
 }
 
+export type OrderStage =
+  | 'new'
+  | 'preparing'
+  | 'out_for_delivery'
+  | 'delivered'
+  | 'returned'
+  | 'cancelled'
+
+export interface StageEffect {
+  kind:
+    | 'stock_out'
+    | 'reservation_released'
+    | 'stock_back'
+    | 'damaged'
+    | 'reserved'
+    | 'back_to_reserved'
+    | 'sale_booked'
+    | 'sale_reversed'
+  item?: string
+  quantity?: number
+  amount?: string
+}
+
+export interface OrderStageEvent {
+  id: string
+  from_stage: OrderStage
+  to_stage: OrderStage
+  note: string
+  effects: StageEffect[]
+  changed_by: string | null
+  created_at: string
+}
+
+export interface StagePreview {
+  from_stage: OrderStage
+  to_stage: OrderStage
+  backward: boolean
+  effects: StageEffect[]
+  shortages: { item: string; needed: number; available: number }[]
+}
+
 export interface Order {
   id: string
   order_number: string
@@ -455,6 +496,13 @@ export interface Order {
   user?: { id: string; name: string; phone_number: string } | null
   /** Lines and address may still change (not yet with the courier). */
   editable?: boolean
+  /** The one state the operator works with (see `lib/orderStages.ts`). */
+  stage: OrderStage
+  stage_label: string
+  /** Staff-only; `null` for customers. */
+  admin_notes?: string | null
+  /** Staff-only history of stage changes, newest first; `null` for customers. */
+  stage_events?: OrderStageEvent[] | null
   /** Admin-only: the order's payment attempts. `null` for customers. */
   admin_payments?: {
     id: string

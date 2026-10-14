@@ -29,9 +29,11 @@ urlpatterns = [
     path("admin/orders/quick-create/", views.AdminQuickOrderCreateView.as_view(), name="admin-quick-order-create"),
     path("admin/customers/lookup/", views.AdminCustomerLookupView.as_view(), name="admin-customer-lookup"),
     path("admin/orders/bulk-action/", views.AdminBulkOrderActionView.as_view(), name="admin-bulk-order-action"),
+    path("admin/orders/stage-counts/", views.AdminOrderStageCountsView.as_view(), name="admin-order-stage-counts"),
 
     # Plan 02 — Thermal Waybills & Official Invoicing Suite
     path("admin/orders/<uuid:pk>/edit/", views.AdminOrderEditView.as_view(), name="admin-order-edit"),
+    path("admin/orders/<uuid:pk>/stage/", views.AdminOrderStageView.as_view(), name="admin-order-stage"),
     path("admin/orders/<str:lookup>/waybill/", views.AdminOrderWaybillView.as_view(), name="admin-order-waybill"),
     path("admin/orders/<str:lookup>/invoice/", views.AdminOrderInvoiceView.as_view(), name="admin-order-invoice"),
     path("admin/orders/batch-waybills/", views.AdminBatchWaybillsView.as_view(), name="admin-batch-waybills"),

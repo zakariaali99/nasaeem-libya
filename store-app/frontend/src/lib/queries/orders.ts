@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { api } from '@/lib/api'
-import type { Address, CartPromotion, CityAdmin, DashboardStats, Order } from '@/types/api'
+import type { Address, CartPromotion, CityAdmin, DashboardStats, Order, OrderStage, StagePreview } from '@/types/api'
 
 export const orderKeys = {
   list: (params?: Record<string, unknown>) => ['orders', params ?? {}] as const,
@@ -49,6 +49,43 @@ export function useUpdateOrder(lookup?: string) {
       queryClient.invalidateQueries({ queryKey: ['orders'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
+  })
+}
+
+export interface StageChangeBody {
+  stage: OrderStage
+  note?: string
+  damaged_item_ids?: string[]
+  allow_short?: boolean
+}
+
+/** Operator: what moving an order to `stage` would do — nothing is changed. */
+export async function previewStageChange(orderId: string, stage: OrderStage): Promise<StagePreview> {
+  return (await api.post<StagePreview>(`/admin/orders/${orderId}/stage/`, { stage, dry_run: true })).data
+}
+
+/** Operator: move an order to a stage. Any stage can follow any other; the
+ * server moves stock and money by the difference. */
+export function useChangeStage(orderId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (body: StageChangeBody) =>
+      (await api.post<Order>(`/admin/orders/${orderId}/stage/`, body)).data,
+    onSuccess: (data) => {
+      queryClient.setQueryData(orderKeys.detail(orderId), data)
+      queryClient.invalidateQueries({ queryKey: ['orders'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
+    },
+  })
+}
+
+/** Operator: how many placed orders sit in each stage. */
+export function useStageCounts() {
+  return useQuery({
+    queryKey: ['orders', 'stage-counts'],
+    queryFn: async () =>
+      (await api.get<Record<OrderStage | 'all', number>>('/admin/orders/stage-counts/')).data,
   })
 }
 
@@ -301,12 +338,14 @@ export function useQuickCreateOrder() {
 
 export interface BulkOrderActionPayload {
   order_ids: string[]
-  action: 'mark_processing' | 'mark_shipped' | 'mark_completed' | 'mark_cancelled'
+  /** A stage name; the older `mark_*` names are still accepted. */
+  action: OrderStage
   notes?: string
 }
 
 export interface BulkOrderActionResult {
   updated_count: number
+  failed: { id: string; order_number: string; reason: string }[]
   failed_ids: string[]
   message: string
 }
@@ -320,6 +359,8 @@ export function useBulkOrderAction() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
     },
   })
 }

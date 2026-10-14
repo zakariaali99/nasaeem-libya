@@ -10,6 +10,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -268,7 +269,10 @@ class CartCheckoutView(CsrfProtectedAPIView):
 def order_queryset():
     return Order.objects.select_related(
         "shipping_region", "shipping_city", "delivery_method", "discount", "user"
-    ).prefetch_related("items__product__images", "items__variant__values", "payments")
+    ).prefetch_related(
+        "items__product__images", "items__variant__values", "payments",
+        "stage_events__changed_by",
+    )
 
 
 class CheckoutConfirmView(CsrfProtectedAPIView):
@@ -468,45 +472,6 @@ def _may_see(user, order, session_order_ids=()) -> bool:
     return str(order.id) in {str(value) for value in (session_order_ids or ()) if value}
 
 
-# The business's allowed paths. Anything else — pending→completed, a terminal
-# state moving again — is refused server-side no matter what the client sends.
-STATUS_TRANSITIONS: dict[str, set[str]] = {
-    OrderStatus.PENDING: {OrderStatus.PROCESSING, OrderStatus.CANCELLED},
-    OrderStatus.PROCESSING: {OrderStatus.COMPLETED, OrderStatus.CANCELLED},
-    OrderStatus.COMPLETED: {OrderStatus.REFUNDED},
-    OrderStatus.CANCELLED: set(),
-    OrderStatus.REFUNDED: set(),
-}
-
-
-def _release_order_stock(order: Order) -> None:
-    """Undo the order's hold on stock.
-
-    Not yet paid → the goods were only reserved; give the reservation back.
-    Already paid   → the units left the shelf at confirmation; return them.
-    """
-    from django.db.models import F
-
-    from apps.catalog.models import Product, ProductVariant
-    from apps.payments.models import Payment
-    from apps.orders.models import PaymentStatus
-
-    paid = Payment.objects.filter(
-        order=order, status=PaymentStatus.COMPLETED
-    ).exists()
-    for item in order.items.select_related("product", "variant"):
-        if not item.product.track_quantity:
-            continue
-        if paid:
-            updates = {"stock": F("stock") + item.quantity}
-        else:
-            updates = {"reserved_stock": F("reserved_stock") - item.quantity}
-        if item.variant_id:
-            ProductVariant.objects.filter(pk=item.variant_id).update(**updates)
-        else:
-            Product.objects.filter(pk=item.product_id).update(**updates)
-
-
 class OrderListView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -516,6 +481,20 @@ class OrderListView(APIView):
             queryset = queryset.filter(user=request.user)
         if state := request.query_params.get("status"):
             queryset = queryset.filter(status=state)
+        search = (request.query_params.get("search") or "").strip()
+        if search and getattr(request.user, "is_admin_role", False):
+            from django.db.models import Q
+
+            queryset = queryset.filter(
+                Q(order_number__icontains=search)
+                | Q(user__name__icontains=search)
+                | Q(user__phone_number__icontains=search)
+            )
+        if stage := request.query_params.get("stage"):
+            from .stage_service import STAGE_FIELDS, stage_filter
+
+            if stage in STAGE_FIELDS:
+                queryset = queryset.filter(**stage_filter(stage))
 
         paginator = StandardPagination()
         page = paginator.paginate_queryset(queryset, request, view=self)
@@ -553,7 +532,7 @@ class OrderDetailView(APIView):
             return Response({"message": "الطلب غير موجود"}, status=status.HTTP_404_NOT_FOUND)
 
         allowed_enum_fields = {"status": OrderStatus, "shipping_status": ShippingStatus}
-        allowed_text_fields = {"tracking_number": 100, "tracking_url": 255}
+        allowed_text_fields = {"tracking_number": 100, "tracking_url": 255, "admin_notes": 4000}
         errors = {}
         for field, value in request.data.items():
             if field in allowed_enum_fields:
@@ -570,30 +549,97 @@ class OrderDetailView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Transitions are enforced here, not in the UI: an operator can only
-        # move an order along paths the business allows, whatever client sends.
-        next_status = request.data.get("status")
-        if next_status and next_status != order.status:
-            allowed_targets = STATUS_TRANSITIONS.get(order.status, set())
-            if next_status not in allowed_targets:
-                return Response(
-                    {"message": f"لا يمكن نقل الطلب من «{order.get_status_display()}» إلى «{dict(OrderStatus.choices).get(next_status, next_status)}»",
-                     "errors": {"status": ["انتقال غير مسموح"]}},
-                    status=status.HTTP_409_CONFLICT,
-                )
+        # A status change from an older screen is translated into a stage and
+        # goes through the same engine as every other change.
+        from .stage_service import StageError, change_stage, stage_of
 
-        with transaction.atomic():
-            locked = Order.objects.select_for_update().get(pk=order.pk)
-            for field, value in request.data.items():
-                setattr(locked, field, value.strip() if isinstance(value, str) else value)
-            if next_status in ("cancelled", "refunded"):
-                _release_order_stock(locked)
-            locked.save()
-            order = locked
+        if "status" in request.data or "shipping_status" in request.data:
+            probe = Order(
+                status=request.data.get("status", order.status),
+                shipping_status=request.data.get("shipping_status", order.shipping_status),
+            )
+            target = stage_of(probe)
+            if target != stage_of(order):
+                try:
+                    change_stage(order, target, by=request.user)
+                except StageError as exc:
+                    return _stage_error_response(exc)
+
+        text_updates = {k: v.strip() for k, v in request.data.items() if k in allowed_text_fields}
+        if text_updates:
+            Order.objects.filter(pk=order.pk).update(**text_updates, updated_at=timezone.now())
+        order = order_queryset().get(pk=order.pk)
         return Response({"data": OrderSerializer(order, context={"request": request}).data,
                          "message": "تم تحديث الطلب"})
-        return Response({"data": OrderSerializer(order, context={"request": request}).data,
-                         "message": "تم تحديث الطلب"})
+
+
+def _stage_error_response(exc):
+    body = {"message": exc.message, "code": exc.code, "errors": {"stage": [exc.message]}}
+    if exc.details:
+        body["details"] = exc.details
+    return Response(body, status=exc.status)
+
+
+class AdminOrderStageView(CsrfProtectedAPIView):
+    """`POST /api/admin/orders/<uuid:pk>/stage/` — move an order to a stage.
+
+    Body: `stage`, optional `note`, `damaged_item_ids`, `dry_run` (answer what
+    would happen without doing it) and `allow_short` (go ahead although the
+    shelf shows less stock than the order needs)."""
+
+    permission_classes = [IsAdminRole]
+
+    def post(self, request, pk):
+        from .stage_service import StageError, change_stage, is_backward
+
+        order = get_object_or_404(Order, pk=pk)
+        data = request.data
+        damaged = data.get("damaged_item_ids") or []
+        if not isinstance(damaged, list):
+            damaged = []
+        try:
+            result = change_stage(
+                order,
+                str(data.get("stage") or ""),
+                by=request.user,
+                note=str(data.get("note") or ""),
+                damaged_item_ids=damaged,
+                dry_run=bool(data.get("dry_run")),
+                allow_short=bool(data.get("allow_short")),
+            )
+        except StageError as exc:
+            return _stage_error_response(exc)
+
+        preview = {
+            "from_stage": result.from_stage,
+            "to_stage": result.to_stage,
+            "backward": is_backward(result.from_stage, result.to_stage),
+            "effects": result.effects,
+            "shortages": result.shortages,
+        }
+        if not result.applied:
+            return Response({"data": preview})
+        order = order_queryset().get(pk=order.pk)
+        return Response({
+            "data": OrderSerializer(order, context={"request": request}).data,
+            "meta": preview,
+            "message": "تم تحديث مرحلة الطلب",
+        })
+
+
+class AdminOrderStageCountsView(CsrfProtectedAPIView):
+    """`GET /api/admin/orders/stage-counts/` — how many placed orders sit in
+    each stage, for the list's filter chips."""
+
+    permission_classes = [IsAdminRole]
+
+    def get(self, request):
+        from .stage_service import STAGE_FIELDS, stage_filter
+
+        placed = Order.objects.placed()
+        counts = {stage: placed.filter(**stage_filter(stage)).count() for stage in STAGE_FIELDS}
+        counts["all"] = placed.count()
+        return Response({"data": counts})
 
 
 class AdminOrderEditView(CsrfProtectedAPIView):
@@ -933,8 +979,9 @@ class AdminBulkOrderActionView(CsrfProtectedAPIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        valid_actions = ["mark_processing", "mark_shipped", "mark_completed", "mark_cancelled"]
-        if action not in valid_actions:
+        from .stage_service import STAGE_FIELDS
+
+        if action not in services.BULK_ACTION_STAGES and action not in STAGE_FIELDS:
             return Response(
                 {"message": f"الإجراء المحدد غير صالح ({action})"},
                 status=status.HTTP_400_BAD_REQUEST,

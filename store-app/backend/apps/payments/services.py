@@ -136,11 +136,17 @@ def initiate_payment(*, order: Order, method_code: str, user_input: dict | None 
 
 def _convert_reservation_to_sale(order: Order) -> None:
     """The units were reserved at checkout; on a confirmed payment they leave
-    the shelf. `stock` decrements exactly once — here."""
+    the shelf. `stock` decrements exactly once — here. An order that no longer
+    holds a reservation (cancelled meanwhile, or already taken) is left alone."""
     from apps.catalog.models import Product, ProductVariant
+    from apps.orders.models import StockState
 
+    if order.stock_state != StockState.RESERVED:
+        return
+    order.stock_state = StockState.TAKEN
+    order.save(update_fields=["stock_state", "updated_at"])
     for item in order.items.select_related("product", "variant"):
-        if not item.product.track_quantity:
+        if item.product is None or not item.product.track_quantity:
             continue
         updates = {
             "stock": F("stock") - item.quantity,

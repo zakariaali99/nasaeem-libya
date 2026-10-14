@@ -6,6 +6,7 @@ The checkout transaction itself is Phase 5; these guard the shapes it relies on.
 from decimal import Decimal
 
 import pytest
+from django.utils import timezone
 
 from apps.orders.models import (
     Cart,
@@ -338,8 +339,12 @@ class TestAdminQuickOrderAndBulkActions:
         assert items[0]["phone_number"] == "0915556677"
 
     def test_bulk_order_action_updates_statuses(self, admin_client, customer):
-        order1 = Order.objects.create(order_number="202608MOA8801", user=customer, status=OrderStatus.PENDING)
-        order2 = Order.objects.create(order_number="202608MOA8802", user=customer, status=OrderStatus.PENDING)
+        # Confirmed orders (an address and a confirmation time): unconfirmed
+        # baskets are never moved by a bulk action.
+        order1 = Order.objects.create(order_number="202608MOA8801", user=customer, status=OrderStatus.PENDING,
+                                      shipping_address="شارع 1", finalised_at=timezone.now())
+        order2 = Order.objects.create(order_number="202608MOA8802", user=customer, status=OrderStatus.PENDING,
+                                      shipping_address="شارع 2", finalised_at=timezone.now())
 
         res = admin_client.post(
             "/api/admin/orders/bulk-action/",

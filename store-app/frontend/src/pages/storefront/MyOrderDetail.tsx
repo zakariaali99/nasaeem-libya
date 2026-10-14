@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Check, CheckCircle2, Clock, Copy, Package, Truck } from 'lucide-react'
-import { StatusBadge } from '@/components/admin/StatusBadge'
+import { StageBadge } from '@/components/admin/StatusBadge'
 import { ErrorState } from '@/components/storefront/ErrorState'
 import { Button } from '@/components/ui/button'
 import { LineThumb } from '@/components/ui/line-thumb'
@@ -78,7 +78,7 @@ export default function MyOrderDetail() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <StatusBadge status={order.status} />
+          <StageBadge stage={order.stage} />
         </div>
       </div>
 
@@ -177,8 +177,7 @@ export default function MyOrderDetail() {
       {/* Shipping Address & Courier Tracking */}
       <section className="rounded-2xl border border-border bg-card p-5 shadow-xs space-y-3 text-sm">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-bold text-foreground">بيانات التوصيل والشحنة</h2>
-          <StatusBadge status={order.shipping_status} />
+          <h2 className="text-base font-bold text-foreground">بيانات التوصيل</h2>
         </div>
 
         <p className="text-muted-foreground leading-relaxed bg-muted/30 p-3 rounded-xl border border-border/50">

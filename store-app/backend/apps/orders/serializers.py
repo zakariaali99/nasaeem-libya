@@ -198,6 +198,10 @@ class OrderSerializer(serializers.ModelSerializer):
     admin_payments = serializers.SerializerMethodField()
     user = serializers.SerializerMethodField()
     editable = serializers.SerializerMethodField()
+    stage = serializers.SerializerMethodField()
+    stage_label = serializers.SerializerMethodField()
+    admin_notes = serializers.SerializerMethodField()
+    stage_events = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
@@ -211,6 +215,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "is_gift", "gift_wrap_type", "gift_wrap_fee", "gift_sender_name",
             "gift_recipient_name", "gift_message", "hide_invoice_prices",
             "items", "created_at", "admin_payments", "user", "editable",
+            "stage", "stage_label", "admin_notes", "stage_events",
         ]
 
     @staticmethod
@@ -235,6 +240,41 @@ class OrderSerializer(serializers.ModelSerializer):
         from .services import order_is_editable
 
         return order_is_editable(order)
+
+    def get_stage(self, order):
+        from .stage_service import stage_of
+
+        return stage_of(order)
+
+    def get_stage_label(self, order):
+        from .models import OrderStage
+
+        return OrderStage(self.get_stage(order)).label
+
+    def _is_admin(self):
+        request = self.context.get("request")
+        return bool(request and getattr(request.user, "is_admin_role", False))
+
+    def get_admin_notes(self, order):
+        """Staff-only: never sent to the customer."""
+        return order.admin_notes if self._is_admin() else None
+
+    def get_stage_events(self, order):
+        """Staff-only history of stage changes, newest first."""
+        if not self._is_admin():
+            return None
+        return [
+            {
+                "id": str(event.id),
+                "from_stage": event.from_stage,
+                "to_stage": event.to_stage,
+                "note": event.note,
+                "effects": event.effects,
+                "changed_by": event.changed_by.name if event.changed_by else None,
+                "created_at": event.created_at,
+            }
+            for event in sorted(order.stage_events.all(), key=lambda e: e.created_at, reverse=True)
+        ]
 
     def get_admin_payments(self, order):
         """The order's payment attempts, for the operator's fulfilment screen.

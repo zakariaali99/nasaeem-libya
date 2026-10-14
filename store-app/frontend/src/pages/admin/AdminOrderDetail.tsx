@@ -1,8 +1,6 @@
 import {
   AlertCircle,
   ArrowLeft,
-  CheckCircle2,
-  Clock,
   Copy,
   CreditCard,
   ExternalLink,
@@ -14,15 +12,15 @@ import {
   Printer,
   RotateCcw,
   ShieldCheck,
-  Truck,
   User,
-  XCircle,
   Gift,
+  History,
 } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
 import { OrderEditDialog } from '@/components/admin/OrderEditDialog'
+import { OrderStageSelect } from '@/components/admin/OrderStageSelect'
 import { OrderTrackingTimeline } from '@/components/admin/OrderTrackingTimeline'
 import { RefundModal } from '@/components/admin/RefundModal'
 import { StatusBadge } from '@/components/admin/StatusBadge'
@@ -30,25 +28,24 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { LineThumb } from '@/components/ui/line-thumb'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Textarea } from '@/components/ui/textarea'
 import { FEATURES } from '@/lib/features'
 import { formatDateTime, formatPrice } from '@/lib/format'
-import { useOrder, useUpdateOrder } from '@/lib/queries/orders'
+import { describeEffect, NEXT_STAGE, STAGE_BY_VALUE } from '@/lib/orderStages'
+import { useChangeStage, useOrder, useUpdateOrder } from '@/lib/queries/orders'
 import { useVerifyPayment } from '@/lib/queries/payments'
 import { usePageTitle } from '@/lib/usePageTitle'
 import { cn } from '@/lib/utils'
 
-const STEPS = [
-  { id: 'pending', label: 'استلام الطلب', icon: Clock },
-  { id: 'processing', label: 'قيد التجهيز', icon: Package },
-  { id: 'accepted', label: 'مع المندوب / الشحن', icon: Truck },
-  { id: 'completed', label: 'تم التسليم بنجاح', icon: CheckCircle2 },
-]
+/** Cash at the door: given back by moving the order to "returned", never by a refund. */
+const PAY_ON_DELIVERY = new Set(['', 'manual_payment', 'cod', 'cash_on_delivery', 'bank_cards_on_delivery'])
 
 /** The stored payment codes, in the words the checkout shows the customer. */
 const PAYMENT_LABELS: Record<string, string> = {
   '': 'الدفع عند الاستلام',
   manual_payment: 'الدفع عند الاستلام',
   cod: 'الدفع عند الاستلام',
+  cash_on_delivery: 'الدفع عند الاستلام',
   bank_transfer: 'تحويل مصرفي',
   bank: 'تحويل مصرفي',
 }
@@ -62,6 +59,9 @@ export default function AdminOrderDetail() {
   const [copiedTracking, setCopiedTracking] = useState(false)
   const [refundModalOpen, setRefundModalOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
+  const [notesDraft, setNotesDraft] = useState<string | null>(null)
+  const [stageMessage, setStageMessage] = useState<string | null>(null)
+  const change = useChangeStage(order?.id ?? '')
 
   usePageTitle(order ? `الطلب #${order.order_number} — لوحة التحكم` : 'تفاصيل الطلب')
 
@@ -104,15 +104,7 @@ export default function AdminOrderDetail() {
     ? `https://wa.me/${cleanPhone.startsWith('0') ? '218' + cleanPhone.slice(1) : cleanPhone}`
     : null
 
-  // Determine current active step index
-  const currentStepIndex =
-    order.status === 'completed'
-      ? 3
-      : order.shipping_status === 'accepted' || order.shipping_status === 'delivered'
-      ? 2
-      : order.status === 'processing'
-      ? 1
-      : 0
+  const next = NEXT_STAGE[order.stage] ? STAGE_BY_VALUE[NEXT_STAGE[order.stage]!] : null
 
   return (
     <div className="space-y-6 animate-fade-rise print:m-0 print:p-0">
@@ -192,7 +184,7 @@ export default function AdminOrderDetail() {
             size="sm"
             className="rounded-xl text-xs font-bold gap-1.5 h-10 px-3.5 shadow-2xs border-primary/30 text-primary hover:bg-primary/10"
           >
-            <Link to={`/admin/orders/${order.order_number}/waybill`}>
+            <Link to={`/admin/orders/${order.id}/waybill`}>
               <Printer className="size-4" />
               <span>بوليصة الشحن (4x6 / 80mm)</span>
             </Link>
@@ -205,13 +197,13 @@ export default function AdminOrderDetail() {
             size="sm"
             className="rounded-xl text-xs font-bold gap-1.5 h-10 px-3.5 shadow-2xs"
           >
-            <Link to={`/admin/orders/${order.order_number}/invoice`}>
+            <Link to={`/admin/orders/${order.id}/invoice`}>
               <Printer className="size-4" />
               <span>الفاتورة الرسمية (A4)</span>
             </Link>
           </Button>
 
-          {order.payments && order.payments.length > 0 && order.payments[0]?.status === 'completed' && (
+          {order.payments && order.payments.length > 0 && order.payments[0]?.status === 'completed' && !PAY_ON_DELIVERY.has(order.payment_method) && (
             <Button
               variant="outline"
               size="sm"
@@ -225,39 +217,30 @@ export default function AdminOrderDetail() {
         </div>
       </div>
 
-      {/* Visual Order Lifecycle Stepper */}
+      {/* The order's stage: pick any stage from any stage; stock and money follow. */}
       <div className="rounded-3xl border border-border bg-card p-5 shadow-2xs print:hidden">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          {STEPS.map((step, idx) => {
-            const Icon = step.icon
-            const isPassed = idx <= currentStepIndex && order.status !== 'cancelled'
-            const isCurrent = idx === currentStepIndex && order.status !== 'cancelled'
-            return (
-              <div key={step.id} className="flex items-center gap-3">
-                <div
-                  className={cn(
-                    'flex size-10 shrink-0 items-center justify-center rounded-2xl border transition-all',
-                    isCurrent
-                      ? 'border-primary bg-primary text-primary-foreground shadow-md shadow-primary/20'
-                      : isPassed
-                      ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                      : 'border-border bg-muted/40 text-muted-foreground',
-                  )}
-                >
-                  <Icon className="size-5" />
-                </div>
-                <div className="min-w-0">
-                  <span className={cn('block text-xs font-bold truncate', isCurrent ? 'text-primary' : 'text-foreground')}>
-                    {step.label}
-                  </span>
-                  <span className="block text-[10px] text-muted-foreground font-mono">
-                    الخطوة {idx + 1}
-                  </span>
-                </div>
-              </div>
-            )
-          })}
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="space-y-1.5">
+            <h2 className="text-sm font-bold text-foreground">مرحلة الطلب</h2>
+            <OrderStageSelect order={order} onChanged={(stage) => setStageMessage(STAGE_BY_VALUE[stage].label)} />
+            {stageMessage ? (
+              <p className="text-xs font-bold text-success" role="status">تم النقل إلى «{stageMessage}»</p>
+            ) : null}
+          </div>
+          {next ? (
+            <Button
+              loading={change.isPending}
+              onClick={() => change.mutate({ stage: next.value }, { onSuccess: () => setStageMessage(next.label) })}
+              className="h-11 gap-2 rounded-xl px-5 text-sm font-bold"
+            >
+              <next.icon className="size-4" aria-hidden="true" />
+              <span>الخطوة التالية: {next.label}</span>
+            </Button>
+          ) : null}
         </div>
+        {change.error ? (
+          <p className="mt-2 text-xs text-destructive" role="alert">{change.error.message}</p>
+        ) : null}
       </div>
 
       {/* Main Order Content Layout */}
@@ -329,150 +312,75 @@ export default function AdminOrderDetail() {
             </div>
           </div>
 
-          {/* Operational Status Linear Pipeline Manager */}
-          <div className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-xs space-y-5 print:hidden">
-            <div className="flex items-center justify-between border-b border-border pb-3">
-              <div className="space-y-0.5">
-                <h3 className="font-bold text-sm sm:text-base text-foreground">مسار معالجة وتسليم الطلب</h3>
-                <p className="text-xs text-muted-foreground">خطوات واضحة وبنقرة واحدة لتحديث حالة الطلب والشحن</p>
-              </div>
+          {/* Staff notes — never shown to the customer. */}
+          <div className="space-y-3 rounded-3xl border border-border bg-card p-5 shadow-xs sm:p-6 print:hidden">
+            <label htmlFor="admin-notes" className="block text-sm font-bold text-foreground">
+              ملاحظات الإدارة <span className="font-normal text-muted-foreground">(داخلية، لا يراها العميل)</span>
+            </label>
+            <Textarea
+              id="admin-notes"
+              value={notesDraft ?? order.admin_notes ?? ''}
+              onChange={(e) => setNotesDraft(e.target.value)}
+              placeholder="مثال: العميل يفضّل الاتصال بعد الخامسة"
+              className="min-h-20"
+            />
+            {notesDraft !== null && notesDraft !== (order.admin_notes ?? '') ? (
               <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-muted-foreground">الحالة:</span>
-                <StatusBadge status={order.status} />
-              </div>
-            </div>
-
-            {/* Visual Step Indicator */}
-            <div className="grid grid-cols-4 gap-2 pt-1 text-center">
-              {[
-                { key: 'new', label: '1. طلب جديد', active: true, done: order.status !== 'pending' && order.status !== 'cancelled' },
-                { key: 'processing', label: '2. قيد التجهيز', active: order.status === 'processing' || order.shipping_status === 'accepted' || order.status === 'completed', done: order.shipping_status === 'accepted' || order.status === 'completed' },
-                { key: 'shipping', label: '3. مع المندوب', active: order.shipping_status === 'accepted' || order.status === 'completed', done: order.status === 'completed' },
-                { key: 'completed', label: '4. تم التسليم', active: order.status === 'completed', done: order.status === 'completed' },
-              ].map((step) => (
-                <div
-                  key={step.key}
-                  className={cn(
-                    'p-2.5 rounded-2xl border text-xs font-bold transition-all',
-                    step.done
-                      ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-                      : step.active
-                      ? 'border-primary bg-primary/10 text-primary shadow-xs ring-1 ring-primary/30'
-                      : 'border-border/60 bg-muted/20 text-muted-foreground/60'
-                  )}
+                <Button
+                  size="sm"
+                  loading={update.isPending}
+                  onClick={() => update.mutate({ admin_notes: notesDraft }, { onSuccess: () => setNotesDraft(null) })}
                 >
-                  <span className="block text-xs">{step.label}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* One Clear Primary Next Action Button */}
-            <div className="p-4 rounded-2xl border border-primary/20 bg-primary/5 space-y-3">
-              {order.status === 'pending' && (
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h4 className="font-bold text-sm text-foreground">الإجراء التالي المطلوب:</h4>
-                    <p className="text-xs text-muted-foreground">تأكيد توفر العطور في المخزن والبدء في تعبئتها وتجهيزها.</p>
-                  </div>
-                  <Button
-                    loading={update.isPending}
-                    onClick={() => update.mutate({ status: 'processing' })}
-                    className="rounded-xl text-xs font-bold h-11 px-6 gap-2 shadow-sm"
-                  >
-                    <Package className="size-4" />
-                    <span>تأكيد الطلب وبدء التجهيز الفوري 📦</span>
-                  </Button>
-                </div>
-              )}
-
-              {order.status === 'processing' && order.shipping_status !== 'accepted' && (
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h4 className="font-bold text-sm text-foreground">الإجراء التالي المطلوب:</h4>
-                    <p className="text-xs text-muted-foreground">تم تجهيز كيس العطور الفاخر وتغليفه وجاهز للتسليم لمندوب التوصيل.</p>
-                  </div>
-                  <Button
-                    loading={update.isPending}
-                    onClick={() => update.mutate({ shipping_status: 'accepted' })}
-                    className="rounded-xl text-xs font-bold h-11 px-6 gap-2 bg-sky-600 hover:bg-sky-700 text-white shadow-sm"
-                  >
-                    <Truck className="size-4" />
-                    <span>تسليم للمندوب (خروج للتوصيل 🚚)</span>
-                  </Button>
-                </div>
-              )}
-
-              {(order.shipping_status === 'accepted' || (order.status === 'processing' && order.shipping_status === 'accepted')) && order.status !== 'completed' && (
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h4 className="font-bold text-sm text-foreground">الإجراء التالي المطلوب:</h4>
-                    <p className="text-xs text-muted-foreground">أكد المندوب تسليم العطر للعميل واستلام المبلغ أو تأكيد التحويل.</p>
-                  </div>
-                  <Button
-                    loading={update.isPending}
-                    onClick={() => update.mutate({ status: 'completed', shipping_status: 'delivered' })}
-                    className="rounded-xl text-xs font-bold h-11 px-6 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
-                  >
-                    <CheckCircle2 className="size-4" />
-                    <span>تأكيد التسليم واستلام المبلغ (اكتمل الطلب) ✅</span>
-                  </Button>
-                </div>
-              )}
-
-              {order.status === 'completed' && (
-                <div className="flex items-center gap-2.5 text-emerald-700 dark:text-emerald-300 text-xs font-bold">
-                  <CheckCircle2 className="size-5" />
-                  <span>الطلب مكتمل بنجاح، وتم تسليم العطر للعميل وتحصيل القيمة.</span>
-                </div>
-              )}
-
-              {order.status === 'cancelled' && (
-                <div className="flex items-center gap-2.5 text-destructive text-xs font-bold">
-                  <XCircle className="size-5" />
-                  <span>تم إلغاء هذا الطلب وإرجاع المنتجات للمخزون.</span>
-                </div>
-              )}
-            </div>
-
-            {/* Secondary Actions (Cancel / Refund) */}
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-border">
-              <span className="text-xs text-muted-foreground">إجراءات استثنائية:</span>
-              <div className="flex items-center gap-2">
-                {order.status !== 'cancelled' && order.status !== 'completed' && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    loading={update.isPending}
-                    onClick={() => {
-                      if (window.confirm('هل أنت متأكد من رغبتك في إلغاء هذا الطلب؟')) {
-                        update.mutate({ status: 'cancelled' })
-                      }
-                    }}
-                    className="rounded-xl text-xs font-bold h-9 px-3.5 text-destructive border-destructive/30 hover:bg-destructive/10 gap-1.5"
-                  >
-                    <XCircle className="size-3.5" />
-                    <span>إلغاء الطلب</span>
-                  </Button>
-                )}
-
-                {order.status === 'completed' && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    loading={update.isPending}
-                    onClick={() => {
-                      if (window.confirm('هل أنت متأكد من تسجيل إرجاع (Refund) لهذا الطلب؟')) {
-                        update.mutate({ status: 'refunded' })
-                      }
-                    }}
-                    className="rounded-xl text-xs font-bold h-9 px-3.5 gap-1.5 text-amber-600 border-amber-500/30 hover:bg-amber-500/10"
-                  >
-                    <RotateCcw className="size-3.5" />
-                    <span>تسجيل استرجاع (Refund)</span>
-                  </Button>
-                )}
+                  حفظ الملاحظات
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setNotesDraft(null)}>
+                  تراجع
+                </Button>
               </div>
+            ) : null}
+          </div>
+
+          {/* Every stage change: who, when, why, and what it did. */}
+          <div className="space-y-4 rounded-3xl border border-border bg-card p-5 shadow-xs sm:p-6 print:hidden">
+            <div className="flex items-center gap-2.5 border-b border-border pb-3">
+              <History className="size-4 text-primary" aria-hidden="true" />
+              <h3 className="text-sm font-bold text-foreground">سجل مراحل الطلب</h3>
             </div>
+            {order.stage_events?.length ? (
+              <ol className="space-y-4">
+                {order.stage_events.map((event) => {
+                  const to = STAGE_BY_VALUE[event.to_stage]
+                  return (
+                    <li key={event.id} className="flex gap-3">
+                      <span className={cn('mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full border', to.tone)}>
+                        <to.icon className="size-4" aria-hidden="true" />
+                      </span>
+                      <div className="min-w-0 space-y-1 text-xs">
+                        <p className="font-bold text-foreground">
+                          {STAGE_BY_VALUE[event.from_stage].label} ← {to.label}
+                        </p>
+                        <p className="text-muted-foreground">
+                          {formatDateTime(event.created_at)}
+                          {event.changed_by ? ` · ${event.changed_by}` : ''}
+                        </p>
+                        {event.note ? <p className="text-foreground">«{event.note}»</p> : null}
+                        {event.effects.length ? (
+                          <ul className="list-inside list-disc text-muted-foreground">
+                            {event.effects.map((effect, i) => (
+                              <li key={i}>{describeEffect(effect)}</li>
+                            ))}
+                          </ul>
+                        ) : null}
+                      </div>
+                    </li>
+                  )
+                })}
+              </ol>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                لم تتغير مرحلة هذا الطلب منذ تسجيل السجل. كل تغيير من الآن يُحفظ هنا مع اسم من قام به.
+              </p>
+            )}
           </div>
         </div>
 
@@ -654,7 +562,7 @@ export default function AdminOrderDetail() {
                         className="rounded-xl border border-border bg-muted/20 p-2.5 space-y-1.5 text-[11px]"
                       >
                         <div className="flex items-center justify-between">
-                          <span className="font-bold font-mono text-foreground">{p.method_code}</span>
+                          <span className="font-bold text-foreground">{PAYMENT_LABELS[p.method_code] ?? p.method_code}</span>
                           <StatusBadge status={p.status} />
                         </div>
                         <div className="flex items-center justify-between text-muted-foreground font-mono">

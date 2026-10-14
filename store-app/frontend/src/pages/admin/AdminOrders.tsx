@@ -1,110 +1,82 @@
-import {
-  ArrowUpRight,
-  CheckCircle2,
-  Clock,
-  FilterX,
-  Loader2,
-  PackageCheck,
-  Printer,
-  ShoppingBag,
-  Trash2,
-  Truck,
-  User,
-  X,
-  Zap,
-} from 'lucide-react'
+import { Eye, FilterX, MessageCircle, Printer, User, X, Zap } from 'lucide-react'
 import * as React from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { DataTable } from '@/components/admin/DataTable'
+import { OrderQuickView } from '@/components/admin/OrderQuickView'
+import { OrderStageSelect } from '@/components/admin/OrderStageSelect'
 import { QuickOrderModal } from '@/components/admin/QuickOrderModal'
-import { StatusBadge } from '@/components/admin/StatusBadge'
 import { PageHeader } from '@/components/layout/AdminLayout'
 import { Button } from '@/components/ui/button'
 import { FEATURES } from '@/lib/features'
-import { formatNumber, formatPrice } from '@/lib/format'
-import { useBulkOrderAction, useMyOrders } from '@/lib/queries/orders'
+import { formatNumber, formatPrice, whatsappUrl } from '@/lib/format'
+import { STAGE_BY_VALUE, STAGES } from '@/lib/orderStages'
+import { useBulkOrderAction, useMyOrders, useStageCounts } from '@/lib/queries/orders'
 import { usePageTitle } from '@/lib/usePageTitle'
 import { useUrlState } from '@/lib/useUrlState'
-import type { Order } from '@/types/api'
+import { cn } from '@/lib/utils'
+import type { Order, OrderStage } from '@/types/api'
+
+/** The stages shown as counters above the list — the ones that need work. */
+const KPI_STAGES: OrderStage[] = ['new', 'preparing', 'out_for_delivery', 'delivered']
+
+const rowIcon =
+  'inline-flex size-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:border-primary hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring'
 
 export default function AdminOrders() {
   usePageTitle('إدارة الطلبات والمبيعات — لوحة التحكم')
   const navigate = useNavigate()
-  const url = useUrlState({ search: '', status: '', shipping: '', page: '1' })
-  const params = { get: (k: string) => String(url.get(k) ?? '') }
-  const currentStatus = params.get('status')
-  const currentShipping = params.get('shipping')
-  const currentSearch = params.get('search')
+  const url = useUrlState({ search: '', stage: '', page: '1' })
+  const currentStage = String(url.get('stage') ?? '') as OrderStage | ''
+  const currentSearch = String(url.get('search') ?? '')
+  const page = Number(url.get('page')) || 1
 
   const [quickOrderOpen, setQuickOrderOpen] = React.useState(false)
-  const [bulkFeedback, setBulkFeedback] = React.useState<string | null>(null)
+  const [viewing, setViewing] = React.useState<string | null>(null)
+  const [feedback, setFeedback] = React.useState<{ text: string; failed?: string[] } | null>(null)
 
   const query = useMyOrders({
     search: currentSearch || undefined,
-    status: currentStatus || undefined,
-    page: params.get('page'),
+    stage: currentStage || undefined,
+    page,
     limit: 20,
   })
-
+  const counts = useStageCounts()
   const bulkAction = useBulkOrderAction()
 
   const orders = query.data?.items ?? []
   const totalOrders = query.data?.meta?.total ?? 0
 
-  const handleBulkAction = async (action: 'mark_processing' | 'mark_shipped' | 'mark_completed' | 'mark_cancelled', targetIds: string[]) => {
-    if (!targetIds || targetIds.length === 0) return
-    try {
-      const res = await bulkAction.mutateAsync({
-        order_ids: targetIds,
-        action,
-      })
-      setBulkFeedback(res.message)
-      setTimeout(() => setBulkFeedback(null), 4000)
-    } catch {
-      setBulkFeedback('حدث خطأ أثناء تنفيذ العملية الجماعية')
-      setTimeout(() => setBulkFeedback(null), 4000)
-    }
+  const flash = (text: string, failed?: string[]) => {
+    setFeedback({ text, failed })
+    window.setTimeout(() => setFeedback(null), failed?.length ? 9000 : 4000)
   }
 
-  // Calculate quick metrics
-  const pendingCount = orders.filter((o) => o.status === 'pending').length
-  const processingCount = orders.filter((o) => o.status === 'processing').length
-  const completedCount = orders.filter((o) => o.status === 'completed').length
-
-  const hasActiveFilters = Boolean(currentStatus || currentShipping || currentSearch)
+  const moveSelected = async (stage: OrderStage, ids: string[], clear: () => void) => {
+    if (!ids.length) return
+    if (stage === 'cancelled' && !window.confirm(`إلغاء ${ids.length} طلبات؟ يرجع المخزون المحجوز لها.`)) return
+    try {
+      const result = await bulkAction.mutateAsync({ order_ids: ids, action: stage })
+      flash(result.message, result.failed.map((f) => `#${f.order_number}: ${f.reason}`))
+      clear()
+    } catch (err) {
+      flash(err instanceof Error ? err.message : 'حدث خطأ أثناء تنفيذ العملية الجماعية')
+    }
+  }
 
   const filterChips = [
     {
       id: 'all',
-      label: `كل الطلبات (${totalOrders})`,
-      active: !currentStatus && !currentShipping,
-      onClick: () => url.set({ status: '', shipping: '', page: 1 }),
+      label: `كل الطلبات (${formatNumber(counts.data?.all ?? totalOrders)})`,
+      active: !currentStage,
+      onClick: () => url.set({ stage: '', page: 1 }),
     },
-    {
-      id: 'pending',
-      label: 'بانتظار التأكيد',
-      active: currentStatus === 'pending',
-      onClick: () => url.set({ status: 'pending', page: 1 }),
-    },
-    {
-      id: 'processing',
-      label: 'قيد التجهيز والمعالجة',
-      active: currentStatus === 'processing',
-      onClick: () => url.set({ status: 'processing', page: 1 }),
-    },
-    {
-      id: 'completed',
-      label: 'مكتمل ومسلّم',
-      active: currentStatus === 'completed',
-      onClick: () => url.set({ status: 'completed', page: 1 }),
-    },
-    {
-      id: 'cancelled',
-      label: 'ملغي ومسترجع',
-      active: currentStatus === 'cancelled',
-      onClick: () => url.set({ status: 'cancelled', page: 1 }),
-    },
+    ...STAGES.map((stage) => ({
+      id: stage.value,
+      label: `${stage.label}${counts.data ? ` (${formatNumber(counts.data[stage.value])})` : ''}`,
+      active: currentStage === stage.value,
+      onClick: () => url.set({ stage: stage.value, page: 1 }),
+    })),
   ]
 
   const columns = [
@@ -113,10 +85,10 @@ export default function AdminOrders() {
       header: 'رقم وتاريخ الطلب',
       cell: (order: Order) => (
         <div className="space-y-0.5">
-          <span className="font-mono font-bold text-xs sm:text-sm text-foreground group-hover:text-primary transition-colors block">
+          <span className="block font-mono text-xs font-bold text-foreground transition-colors group-hover:text-primary sm:text-sm">
             #{order.order_number}
           </span>
-          <span className="font-mono text-[11px] text-muted-foreground block">
+          <span className="block font-mono text-[11px] text-muted-foreground">
             {new Date(order.created_at).toLocaleDateString('ar-LY', {
               month: 'short',
               day: 'numeric',
@@ -130,62 +102,66 @@ export default function AdminOrders() {
     },
     {
       key: 'user',
-      header: 'العميل ومكان الاستلام',
+      header: 'العميل',
       cell: (o: Order) => (
         <div className="flex items-center gap-2.5">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xs border border-primary/20">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-xs font-bold text-primary">
             {o.user?.name ? o.user.name.charAt(0) : <User className="size-3.5" />}
           </div>
           <div className="min-w-0">
-            <span className="font-bold text-xs sm:text-sm text-foreground block truncate">
+            <span className="block truncate text-xs font-bold text-foreground sm:text-sm">
               {o.user?.name || 'عميل المتجر'}
             </span>
-            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-              <span className="font-mono">{o.user?.phone_number || '—'}</span>
-            </div>
+            <span className="block font-mono text-[11px] text-muted-foreground">
+              {o.user?.phone_number || '—'}
+              {o.city_name ? ` · ${o.city_name}` : ''}
+            </span>
           </div>
         </div>
       ),
     },
     {
       key: 'total',
-      header: 'قيمة الطلب والأصناف',
+      header: 'القيمة',
       cell: (o: Order) => (
         <div className="space-y-0.5">
-          <span className="font-mono font-extrabold text-price text-xs sm:text-sm block">
-            {formatPrice(o.total)}
-          </span>
-          <span className="text-[11px] text-muted-foreground font-semibold">
-            {o.items?.length ?? 1} أصناف عطرية
+          <span className="block font-mono text-xs font-extrabold text-price sm:text-sm">{formatPrice(o.total)}</span>
+          <span className="text-[11px] font-semibold text-muted-foreground">
+            {o.items?.length === 1 ? 'صنف واحد' : `${o.items?.length ?? 0} أصناف`}
           </span>
         </div>
       ),
       sortable: true,
     },
     {
-      key: 'status',
-      header: 'حالة الطلب',
-      cell: (o: Order) => <StatusBadge status={o.status} />,
-    },
-    {
-      key: 'shipping_status',
-      header: 'حالة الشحن والتوصيل',
-      cell: (o: Order) => <StatusBadge status={o.shipping_status} />,
+      key: 'stage',
+      header: 'المرحلة',
+      cell: (o: Order) => (
+        <OrderStageSelect order={o} size="sm" onChanged={(stage) => flash(`#${o.order_number}: ${STAGE_BY_VALUE[stage].label}`)} />
+      ),
     },
     {
       key: 'actions',
-      header: '',
+      header: 'إجراءات',
       align: 'end' as const,
-      cell: (o: Order) => (
-        <Link
-          to={`/admin/orders/${o.order_number}`}
-          onClick={(e) => e.stopPropagation()}
-          className="rounded-xl border border-border bg-card px-3 py-1.5 text-xs font-bold text-foreground shadow-2xs hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all inline-flex items-center gap-1"
-        >
-          <span>معالجة الطلب</span>
-          <ArrowUpRight className="size-3.5" />
-        </Link>
-      ),
+      cell: (o: Order) => {
+        const chat = o.user?.phone_number ? whatsappUrl(o.user.phone_number) : null
+        return (
+          <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className={rowIcon} onClick={() => setViewing(o.id)} aria-label={`عرض سريع للطلب #${o.order_number}`} title="عرض سريع">
+              <Eye className="size-4" aria-hidden="true" />
+            </button>
+            {chat ? (
+              <a href={chat} target="_blank" rel="noopener noreferrer" className={rowIcon} aria-label={`واتساب العميل — #${o.order_number}`} title="واتساب العميل">
+                <MessageCircle className="size-4" aria-hidden="true" />
+              </a>
+            ) : null}
+            <Link to={`/admin/orders/${o.id}/invoice`} className={rowIcon} aria-label={`فاتورة الطلب #${o.order_number}`} title="الفاتورة">
+              <Printer className="size-4" aria-hidden="true" />
+            </Link>
+          </div>
+        )
+      },
     },
   ]
 
@@ -193,71 +169,61 @@ export default function AdminOrders() {
     <div className="space-y-6 animate-fade-rise">
       <PageHeader
         title="إدارة الطلبات والمبيعات"
-        description="متابعة طلبات العطور الواردة، تحديث الحالات التشغيلية، ومعالجة الشحنات"
+        description="غيّر مرحلة أي طلب من القائمة مباشرة، والمخزون والمبالغ تتبعها تلقائياً"
         action={
           <Button
             onClick={() => setQuickOrderOpen(true)}
-            className="h-10 px-4 text-xs font-bold gap-2 rounded-xl bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 transition-colors"
+            className="h-10 gap-2 rounded-xl bg-primary px-4 text-xs font-bold text-primary-foreground shadow-xs transition-colors hover:bg-primary/90"
           >
             <Zap className="size-4" />
-            <span>إضافة طلب يدوي سريع (⚡)</span>
+            <span>إضافة طلب يدوي</span>
           </Button>
         }
       />
 
-      {bulkFeedback && (
-        <div className="rounded-xl border border-primary/30 bg-primary/10 p-3.5 text-xs font-bold text-primary animate-fade-rise flex items-center justify-between">
-          <span>{bulkFeedback}</span>
-          <button
-            type="button"
-            onClick={() => setBulkFeedback(null)}
-            className="text-primary hover:opacity-80"
-          >
+      {feedback && (
+        <div
+          role="status"
+          className="flex items-start justify-between gap-3 rounded-xl border border-primary/30 bg-primary/10 p-3.5 text-xs font-bold text-primary animate-fade-rise"
+        >
+          <div className="space-y-1">
+            <p>{feedback.text}</p>
+            {feedback.failed?.map((line) => (
+              <p key={line} className="font-medium text-destructive">{line}</p>
+            ))}
+          </div>
+          <button type="button" onClick={() => setFeedback(null)} className="text-primary hover:opacity-80" aria-label="إغلاق">
             <X className="size-4" />
           </button>
         </div>
       )}
 
-      {/* KPI Metric Summary Ribbon */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="rounded-2xl border border-border bg-card p-4 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>إجمالي الطلبات</span>
-            <ShoppingBag className="size-4 text-primary" />
-          </div>
-          <p className="font-mono text-xl sm:text-2xl font-black text-foreground">{formatNumber(totalOrders)}</p>
-          <p className="text-[11px] text-muted-foreground">طلب مسجل بالمتجر</p>
-        </div>
-
-        <div className="rounded-2xl border border-border bg-card p-4 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>بانتظار التأكيد</span>
-            <Clock className="size-4 text-amber-500" />
-          </div>
-          <p className="font-mono text-xl sm:text-2xl font-black text-amber-600 dark:text-amber-400">{formatNumber(pendingCount)}</p>
-          <p className="text-[11px] text-muted-foreground">تحتاج مراجعة فورية</p>
-        </div>
-
-        <div className="rounded-2xl border border-border bg-card p-4 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>قيد التجهيز والشحن</span>
-            <Truck className="size-4 text-sky-500" />
-          </div>
-          <p className="font-mono text-xl sm:text-2xl font-black text-sky-600 dark:text-sky-400">{formatNumber(processingCount)}</p>
-          <p className="text-[11px] text-muted-foreground">في طور التجهيز للمندوب</p>
-        </div>
-
-        <div className="rounded-2xl border border-border bg-card p-4 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>المكتملة والمسلّمة</span>
-            <CheckCircle2 className="size-4 text-emerald-500" />
-          </div>
-          <p className="font-mono text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400">{formatNumber(completedCount)}</p>
-          <p className="text-[11px] text-muted-foreground">تم تسليمها للعملاء بنجاح</p>
-        </div>
+      {/* Counters across all orders (not just this page); each one filters. */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {KPI_STAGES.map((value) => {
+          const stage = STAGE_BY_VALUE[value]
+          return (
+            <button
+              key={value}
+              type="button"
+              onClick={() => url.set({ stage: value, page: 1 })}
+              className={cn(
+                'space-y-1 rounded-2xl border bg-card p-4 text-start shadow-2xs transition-colors hover:border-primary/50',
+                currentStage === value ? 'border-primary ring-1 ring-primary/30' : 'border-border',
+              )}
+            >
+              <span className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>{stage.label}</span>
+                <stage.icon className="size-4" aria-hidden="true" />
+              </span>
+              <span className="block font-mono text-xl font-black text-foreground sm:text-2xl">
+                {counts.data ? formatNumber(counts.data[value]) : '—'}
+              </span>
+            </button>
+          )
+        })}
       </div>
 
-      {/* Main Orders DataTable */}
       <DataTable
         columns={columns}
         rows={orders}
@@ -265,104 +231,57 @@ export default function AdminOrders() {
         isLoading={query.isPending}
         total={totalOrders}
         pages={query.data?.meta?.pages ?? 1}
-        page={Number(params.get('page')) || 1}
-        onPageChange={(page) => url.set({ page })}
-        search={String(currentSearch)}
+        page={page}
+        onPageChange={(next) => url.set({ page: next })}
+        search={currentSearch}
         onSearchChange={(search) => url.set({ search, page: 1 })}
         searchPlaceholder="ابحث برقم الطلب، اسم العميل، أو رقم الهاتف..."
         filterChips={filterChips}
         bulkActions={(selected, clear) => (
           <div className="flex flex-wrap items-center gap-2">
             {FEATURES.shipping && (
-              <Button
-                asChild
-                size="sm"
-                variant="outline"
-                className="h-8 text-xs font-bold rounded-lg border-primary/40 bg-primary/10 text-primary hover:bg-primary/20"
-              >
+              <Button asChild size="sm" variant="outline" className="h-8 rounded-lg text-xs font-bold">
                 <Link to={`/admin/orders/batch-waybills?ids=${selected.join(',')}`}>
-                  <Printer className="size-3.5 me-1" />
+                  <Printer className="me-1 size-3.5" />
                   <span>طباعة البوالص ({selected.length})</span>
                 </Link>
               </Button>
             )}
-
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={bulkAction.isPending}
-              onClick={async () => {
-                await handleBulkAction('mark_processing', selected)
-                clear()
-              }}
-              className="h-8 text-xs font-bold rounded-lg border-sky-500/30 text-sky-600 hover:bg-sky-500/10"
-            >
-              {bulkAction.isPending ? <Loader2 className="size-3 me-1 animate-spin" /> : <Clock className="size-3.5 me-1 text-sky-500" />}
-              <span>قيد التجهيز</span>
-            </Button>
-
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={bulkAction.isPending}
-              onClick={async () => {
-                await handleBulkAction('mark_shipped', selected)
-                clear()
-              }}
-              className="h-8 text-xs font-bold rounded-lg border-primary/30 text-primary hover:bg-primary/10"
-            >
-              {bulkAction.isPending ? <Loader2 className="size-3 me-1 animate-spin" /> : <Truck className="size-3.5 me-1" />}
-              <span>تسليم للمندوب</span>
-            </Button>
-
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={bulkAction.isPending}
-              onClick={async () => {
-                await handleBulkAction('mark_completed', selected)
-                clear()
-              }}
-              className="h-8 text-xs font-bold rounded-lg border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/10"
-            >
-              {bulkAction.isPending ? <Loader2 className="size-3 me-1 animate-spin" /> : <PackageCheck className="size-3.5 me-1 text-emerald-500" />}
-              <span>مكتمل ومسلّم</span>
-            </Button>
-
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={bulkAction.isPending}
-              onClick={async () => {
-                await handleBulkAction('mark_cancelled', selected)
-                clear()
-              }}
-              className="h-8 text-xs font-bold rounded-lg border-destructive/30 text-destructive hover:bg-destructive/10"
-            >
-              <Trash2 className="size-3.5 me-1" />
-              <span>إلغاء</span>
-            </Button>
+            <span className="text-xs font-bold text-muted-foreground">نقل المحدد إلى:</span>
+            {STAGES.map((stage) => (
+              <Button
+                key={stage.value}
+                size="sm"
+                variant="outline"
+                disabled={bulkAction.isPending}
+                onClick={() => moveSelected(stage.value, selected, clear)}
+                className={cn('h-8 gap-1 rounded-lg border text-xs font-bold', stage.tone)}
+              >
+                <stage.icon className="size-3.5" aria-hidden="true" />
+                {stage.label}
+              </Button>
+            ))}
           </div>
         )}
         toolbar={
-          hasActiveFilters ? (
+          currentStage || currentSearch ? (
             <Button
               variant="outline"
               size="sm"
-              onClick={() => url.set({ status: '', shipping: '', search: '', page: 1 })}
-              className="h-10 rounded-xl text-xs font-bold text-destructive hover:bg-destructive/10 border-destructive/30 gap-1.5"
+              onClick={() => url.set({ stage: '', search: '', page: 1 })}
+              className="h-10 gap-1.5 rounded-xl border-destructive/30 text-xs font-bold text-destructive hover:bg-destructive/10"
             >
               <FilterX className="size-3.5" />
-              <span>مسح كل الفلاتر</span>
+              <span>مسح الفلاتر</span>
             </Button>
           ) : null
         }
-        onRowClick={(order) => navigate(`/admin/orders/${order.order_number}`)}
+        onRowClick={(order) => navigate(`/admin/orders/${order.id}`)}
         emptyTitle="لا توجد طلبات مطابقة"
-        emptyDescription="جرّب تعديل عبارة البحث أو اختيار حالة تصفية أخرى من الأعلى."
+        emptyDescription="جرّب تعديل عبارة البحث أو اختيار مرحلة أخرى من الأعلى."
       />
 
-      {/* Quick Order Modal */}
+      <OrderQuickView orderId={viewing} onOpenChange={(open) => !open && setViewing(null)} onChanged={(text) => flash(text)} />
       <QuickOrderModal open={quickOrderOpen} onOpenChange={setQuickOrderOpen} />
     </div>
   )

@@ -43,6 +43,7 @@ from .models import (
     OrderStatus,
     PaymentStatus,
     ShippingStatus,
+    StockState,
 )
 
 TWO_PLACES = Decimal("0.01")
@@ -819,7 +820,7 @@ def edit_order(
         k = key(product.id, variant.id if variant else None)
         delta[k] = delta.get(k, 0) + quantity
 
-    paid = order.payments.filter(status=PaymentStatus.COMPLETED).exists()
+    paid = order.stock_state == StockState.TAKEN
     for (product_id, variant_id), change in delta.items():
         product = products.get(product_id)
         if change == 0 or product is None or not product.track_quantity:
@@ -936,8 +937,8 @@ def release_expired_drafts(*, now=None) -> int:
         product_qtys: dict[int, int] = {}
         variant_qtys: dict[int, int] = {}
         for order in expired:
-            for item in order.items.all():
-                if not item.product.track_quantity:
+            for item in (order.items.all() if order.stock_state == StockState.RESERVED else ()):
+                if item.product is None or not item.product.track_quantity:
                     continue
                 if item.variant_id:
                     variant_qtys[item.variant_id] = variant_qtys.get(item.variant_id, 0) + item.quantity
@@ -950,7 +951,9 @@ def release_expired_drafts(*, now=None) -> int:
                     usage_count=Greatest(F("usage_count") - 1, 0)
                 )
             order.status = OrderStatus.CANCELLED
-            order.save(update_fields=["status", "updated_at"])
+            order.shipping_status = ShippingStatus.CANCELLED
+            order.stock_state = StockState.RELEASED
+            order.save(update_fields=["status", "shipping_status", "stock_state", "updated_at"])
             released += 1
 
         if product_qtys:
@@ -1166,6 +1169,7 @@ def quick_create_admin_order(
         shipping_address=shipping_address.strip(),
         customer_notes=customer_notes.strip(),
         finalised_at=timezone.now(),
+        stock_state=StockState.TAKEN if paid_now else StockState.RESERVED,
     )
 
     # 8. Create OrderItems, then reserve (pay on delivery) or deduct (paid) stock
@@ -1208,7 +1212,15 @@ def quick_create_admin_order(
     return order
 
 
-@transaction.atomic
+# The list screen's older action names, kept so a stale page still works.
+BULK_ACTION_STAGES = {
+    "mark_processing": "preparing",
+    "mark_shipped": "out_for_delivery",
+    "mark_completed": "delivered",
+    "mark_cancelled": "cancelled",
+}
+
+
 def execute_bulk_order_action(
     *,
     order_ids: list[str],
@@ -1216,51 +1228,37 @@ def execute_bulk_order_action(
     operator_user=None,
     notes: str = "",
 ) -> dict:
-    """Bulk action runner for order lists.
+    """Move several orders to one stage. Each order goes through the same
+    `change_stage` as a single change, so stock and money stay right; an
+    order that cannot move is reported with the reason and the rest proceed."""
+    from .stage_service import StageError, change_stage
 
-    Applies mass updates atomically and skips invalid transitions gracefully.
-    """
+    target = BULK_ACTION_STAGES.get(action, action)
     if not order_ids:
-        return {"updated_count": 0, "failed_ids": [], "message": "لم يتم تحديد أي طلبات"}
+        return {"updated_count": 0, "failed": [], "failed_ids": [], "message": "لم يتم تحديد أي طلبات"}
 
-    orders = list(Order.objects.filter(id__in=order_ids).select_for_update().order_by("id"))
     updated_count = 0
-    failed_ids = []
-
-    for order in orders:
+    failed = []
+    for order in Order.objects.filter(id__in=order_ids).order_by("created_at"):
         try:
-            if action == "mark_processing":
-                if order.status == OrderStatus.PENDING:
-                    order.status = OrderStatus.PROCESSING
-                    order.save(update_fields=["status", "updated_at"])
-                    updated_count += 1
-            elif action == "mark_shipped":
-                if order.shipping_status in [ShippingStatus.PENDING, ShippingStatus.ACCEPTED]:
-                    order.shipping_status = ShippingStatus.ACCEPTED
-                    order.save(update_fields=["shipping_status", "updated_at"])
-                    updated_count += 1
-            elif action == "mark_completed":
-                if order.status != OrderStatus.CANCELLED:
-                    order.status = OrderStatus.COMPLETED
-                    order.shipping_status = ShippingStatus.DELIVERED
-                    order.save(update_fields=["status", "shipping_status", "updated_at"])
-                    updated_count += 1
-            elif action == "mark_cancelled":
-                if order.status != OrderStatus.COMPLETED:
-                    order.status = OrderStatus.CANCELLED
-                    order.shipping_status = ShippingStatus.CANCELLED
-                    order.save(update_fields=["status", "shipping_status", "updated_at"])
-                    updated_count += 1
-            else:
-                failed_ids.append(str(order.id))
-        except Exception as err:
-            logger.exception("Bulk action %s failed for order %s: %s", action, order.id, err)
-            failed_ids.append(str(order.id))
+            change_stage(order, target, by=operator_user, note=notes)
+            updated_count += 1
+        except StageError as err:
+            if err.code == "same_stage":
+                continue
+            failed.append({"id": str(order.id), "order_number": order.order_number, "reason": err.message})
+        except Exception as err:  # one bad order must not stop the batch
+            logger.exception("Bulk stage change to %s failed for order %s: %s", target, order.id, err)
+            failed.append({"id": str(order.id), "order_number": order.order_number, "reason": "خطأ غير متوقع"})
 
+    message = f"تم تحديث {updated_count} طلبات بنجاح"
+    if failed:
+        message += f"، وتعذّر {len(failed)}"
     return {
         "updated_count": updated_count,
-        "failed_ids": failed_ids,
-        "message": f"تم تحديث {updated_count} طلبات بنجاح",
+        "failed": failed,
+        "failed_ids": [row["id"] for row in failed],
+        "message": message,
     }
 
 

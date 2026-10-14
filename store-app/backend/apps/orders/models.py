@@ -31,6 +31,27 @@ class ShippingStatus(models.TextChoices):
     CANCELLED = "cancelled", "ملغي"
 
 
+class OrderStage(models.TextChoices):
+    """The one state the operator works with. It is stored as the
+    (`status`, `shipping_status`) pair the rest of the system already reads —
+    see `orders/stage_service.py` for the mapping."""
+
+    NEW = "new", "جديد"
+    PREPARING = "preparing", "قيد التجهيز"
+    OUT_FOR_DELIVERY = "out_for_delivery", "خرج للتوصيل"
+    DELIVERED = "delivered", "تم التسليم"
+    RETURNED = "returned", "مرتجع"
+    CANCELLED = "cancelled", "ملغي"
+
+
+class StockState(models.TextChoices):
+    """What the order is doing to stock right now."""
+
+    RESERVED = "reserved", "محجوز"
+    TAKEN = "taken", "خرج من المخزن"
+    RELEASED = "released", "رجع للمخزن"
+
+
 class PaymentStatus(models.TextChoices):
     PENDING = "pending", "قيد الانتظار"
     COMPLETED = "completed", "مكتمل"
@@ -294,6 +315,15 @@ class Order(TimestampedModel):
     tracking_url = models.CharField("رابط التتبع", max_length=255, blank=True)
     reference_id = models.CharField("المرجع", max_length=100, blank=True, db_index=True)
     finalised_at = models.DateTimeField("وقت التأكيد", null=True, blank=True)
+    stock_state = models.CharField(
+        "حالة المخزون", max_length=12, choices=StockState.choices,
+        default=StockState.RESERVED,
+    )
+    # A pay-on-delivery sale is booked in the ledger when the order is
+    # delivered and reversed if it leaves that stage; this flag keeps the
+    # booking from happening twice.
+    revenue_booked = models.BooleanField("قيد البيع مسجّل", default=False)
+    admin_notes = models.TextField("ملاحظات الإدارة", blank=True, default="")
 
     # Luxury Gifting Suite
     is_gift = models.BooleanField("طلب إهداء فاخر", default=False, db_index=True)
@@ -317,6 +347,37 @@ class Order(TimestampedModel):
 
     def __str__(self):
         return self.order_number
+
+
+class OrderStageEvent(models.Model):
+    """One stage change: who, when, from where to where, why, and what it did
+    to stock and money. Append-only."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    order = models.ForeignKey(
+        Order, on_delete=models.CASCADE, related_name="stage_events", verbose_name="الطلب"
+    )
+    from_stage = models.CharField("من", max_length=20, choices=OrderStage.choices)
+    to_stage = models.CharField("إلى", max_length=20, choices=OrderStage.choices)
+    note = models.TextField("السبب", blank=True, default="")
+    effects = models.JSONField("الأثر", default=list, blank=True)
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="order_stage_events",
+        verbose_name="بواسطة",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        verbose_name = "تغيير مرحلة طلب"
+        verbose_name_plural = "سجل مراحل الطلبات"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.order.order_number}: {self.from_stage} → {self.to_stage}"
 
 
 class OrderItem(TimestampedModel):

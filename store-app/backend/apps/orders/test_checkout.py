@@ -755,7 +755,7 @@ class TestExpiredDrafts:
 
 
 class TestStatusTransitions:
-    """Phase 7 gate: transitions are enforced server-side."""
+    """Any stage may follow any other; stock follows the stage (see test_stages)."""
 
     def _order(self, buyer_api, product, region):
         buyer_api.post(reverse("cart"), {"product_id": str(product.id)}, format="json")
@@ -770,20 +770,27 @@ class TestStatusTransitions:
         assert response.status_code == 200
         assert Order.objects.get(id=created["id"]).status == OrderStatus.PROCESSING
 
-    def test_pending_cannot_jump_to_completed(self, admin_api, buyer_api, product, region):
+    def test_pending_can_jump_to_completed_and_takes_the_stock(
+        self, admin_api, buyer_api, product, region,
+    ):
+        """The operator decides the path; the stock follows whatever it is."""
         created = self._order(buyer_api, product, region)
         response = admin_api.patch(reverse("order-detail", args=[created["order_number"]]),
                                    {"status": "completed"}, format="json")
-        assert response.status_code == 409
-        assert Order.objects.get(id=created["id"]).status == OrderStatus.PENDING
+        assert response.status_code == 200
+        assert Order.objects.get(id=created["id"]).status == OrderStatus.COMPLETED
+        product.refresh_from_db()
+        assert (product.stock, product.reserved_stock) == (9, 0)
 
-    def test_cancelled_is_terminal(self, admin_api, buyer_api, product, region):
+    def test_cancelled_is_no_longer_terminal(self, admin_api, buyer_api, product, region):
         created = self._order(buyer_api, product, region)
         admin_api.patch(reverse("order-detail", args=[created["order_number"]]),
                         {"status": "cancelled"}, format="json")
         response = admin_api.patch(reverse("order-detail", args=[created["order_number"]]),
                                    {"status": "processing"}, format="json")
-        assert response.status_code == 409
+        assert response.status_code == 200
+        product.refresh_from_db()
+        assert product.reserved_stock == 1
 
     def test_cancelling_an_unpaid_order_returns_the_reservation(
         self, admin_api, buyer_api, product, region,

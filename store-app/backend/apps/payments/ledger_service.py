@@ -135,8 +135,7 @@ def record_order_sale_ledger(order) -> LedgerTransaction:
     order_number = order.order_number
     amount = order.total
 
-    # Determine whether COD or Online Gateway
-    is_cod = order.payment_method == "manual_payment"
+    is_cod = _is_pay_on_delivery(order)
     receivable_code = "1010_CASH_ON_DELIVERY" if is_cod else "1020_GATEWAY_RECEIVABLES"
     desc = f"مبيعات عطور طلب #{order_number} ({'كاش مندوب' if is_cod else 'دفع إلكتروني'})"
 
@@ -147,6 +146,27 @@ def record_order_sale_ledger(order) -> LedgerTransaction:
         debits=[(receivable_code, amount)],
         credits=[("4010_SALES_REVENUE", amount)],
     )
+
+
+def record_order_sale_reversal(order, reason: str = "") -> LedgerTransaction:
+    """Undoes `record_order_sale_ledger`: the order left "delivered" (the
+    courier was wrong, or the customer sent it back)."""
+    is_cod = _is_pay_on_delivery(order)
+    receivable_code = "1010_CASH_ON_DELIVERY" if is_cod else "1020_GATEWAY_RECEIVABLES"
+    desc = f"عكس مبيعات طلب #{order.order_number}" + (f" — {reason}" if reason else "")
+    return record_double_entry_transaction(
+        reference_type="ORDER_SALE_REVERSAL",
+        reference_id=order.order_number,
+        description=desc,
+        debits=[("4010_SALES_REVENUE", order.total)],
+        credits=[(receivable_code, order.total)],
+    )
+
+
+def _is_pay_on_delivery(order) -> bool:
+    from apps.orders.services import PAY_ON_DELIVERY
+
+    return order.payment_method in PAY_ON_DELIVERY
 
 
 def record_courier_settlement(

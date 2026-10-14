@@ -68,13 +68,15 @@ def process_courier_webhook_event(
             locked_order.status = OrderStatus.COMPLETED
             # Record sale ledger
             try:
-                record_order_sale_ledger(locked_order)
+                if not locked_order.revenue_booked:
+                    record_order_sale_ledger(locked_order)
+                    locked_order.revenue_booked = True
             except Exception as e:
                 logger.error("Failed recording ledger on delivery for order %s: %s", locked_order.id, e)
         elif target_order_status == OrderStatus.CANCELLED:
             locked_order.status = OrderStatus.CANCELLED
 
-        locked_order.save(update_fields=["shipping_status", "status", "updated_at"])
+        locked_order.save(update_fields=["shipping_status", "status", "revenue_booked", "updated_at"])
 
         # Create tracking event
         event = CourierTrackingEvent.objects.create(

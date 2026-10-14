@@ -42,7 +42,9 @@ export function Breadcrumbs({ className = '' }: { className?: string }) {
     const url = `/${pathnames.slice(0, index + 1).join('/')}`
     const isLast = index === pathnames.length - 1
     const decodedSegment = decodeURIComponent(segment)
-    const label = ROUTE_LABELS[segment] || decodedSegment
+    // A record id says nothing to the operator; the page's own heading names it.
+    const isId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(decodedSegment)
+    const label = ROUTE_LABELS[segment] || (isId ? 'التفاصيل' : decodedSegment)
 
     return { url, label, isLast }
   })

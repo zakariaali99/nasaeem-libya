@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 
-import { StatusBadge } from '@/components/admin/StatusBadge'
+import { StageBadge } from '@/components/admin/StatusBadge'
 import { EmptyState } from '@/components/storefront/EmptyState'
 import { ErrorState } from '@/components/storefront/ErrorState'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -43,7 +43,7 @@ export default function MyOrders() {
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-semibold">{order.order_number}</span>
-                  <StatusBadge status={order.status} />
+                  <StageBadge stage={order.stage} />
                 </div>
                 <div className="mt-1 flex items-center justify-between text-sm text-muted-foreground">
                   <span>{new Date(order.created_at).toLocaleDateString('ar-LY')}</span>

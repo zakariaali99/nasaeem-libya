@@ -30,6 +30,13 @@ def process_payment_refund(
     if payment.status != PaymentStatus.COMPLETED:
         raise ValidationError("لا يمكن استرداد دفعة لم يتم تأكيد استلامها بنجاح")
 
+    from apps.orders.services import PAY_ON_DELIVERY
+
+    if order.payment_method in PAY_ON_DELIVERY:
+        # Cash collected at the door is given back by moving the order to
+        # "returned" or "cancelled": that reverses the booking exactly once.
+        raise ValidationError("طلبات الدفع عند الاستلام تُسترجع بتغيير مرحلة الطلب إلى «مرتجع»")
+
     # Compute already refunded amounts
     existing_refunds_sum = sum(
         (r.amount for r in payment.refunds.filter(status=PaymentRefund.STATUS_COMPLETED)),

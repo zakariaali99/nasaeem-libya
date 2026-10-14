@@ -944,7 +944,7 @@ function WidgetFields({ type, data, patch }: FieldsProps) {
       if (PERSONALISED.includes(type)) {
         return (
           <>
-            <Alert tone="info">يملأ النظام هذه القائمة تلقائياً لكل عميل، وللزائر الجديد تُعرض أحدث المنتجات المتوفرة.</Alert>
+            <Alert tone="info">يملأ النظام هذه القائمة تلقائياً لكل عميل من مشترياته أو ما شاهده. الزائر الذي لم يشترِ أو يشاهد شيئاً لا يرى هذا القسم.</Alert>
             {heading('العنوان')}
             <div className="grid gap-3 sm:grid-cols-2">
               <NumberInput label="عدد المنتجات (1–24)" value={data.limit} onChange={(v) => patch({ limit: v })} />

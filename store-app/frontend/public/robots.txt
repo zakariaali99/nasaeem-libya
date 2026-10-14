@@ -1,0 +1,9 @@
+User-agent: *
+Disallow: /admin
+Allow: /api/sitemap.xml
+Disallow: /api/
+Disallow: /django-admin/
+Disallow: /checkout/
+Disallow: /me
+
+Sitemap: https://shop.nasaeemlibya.ly/api/sitemap.xml

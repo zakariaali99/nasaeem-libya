@@ -37,13 +37,13 @@ const AccountPage = lazy(() => import('@/pages/storefront/Account'))
 // Storefront routes
 const CartPage = lazy(() => import('@/pages/storefront/Cart'))
 const CheckoutPage = lazy(() => import('@/pages/storefront/Checkout'))
+const NotFoundPage = lazy(() => import('@/pages/storefront/NotFound'))
 const CheckoutCompletePage = lazy(() => import('@/pages/storefront/CheckoutComplete'))
 const CheckoutRedirectPage = lazy(() => import('@/pages/storefront/CheckoutRedirect'))
 const MyOrdersPage = lazy(() => import('@/pages/storefront/MyOrders'))
 const MyOrderDetailPage = lazy(() => import('@/pages/storefront/MyOrderDetail'))
 const MyAddressesPage = lazy(() => import('@/pages/storefront/MyAddresses'))
 const WishlistPage = lazy(() => import('@/pages/storefront/WishlistPage'))
-const ApiDocsPage = lazy(() => import('@/pages/storefront/ApiDocs'))
 
 // Admin — 26 of the 44 routes. Lazy so a customer never downloads any of it.
 const AdminLayout = lazy(() =>
@@ -131,7 +131,6 @@ const router = createBrowserRouter([
           { path: '/collections/:slug', element: <CollectionListingPage /> },
           { path: '/wishlist', element: withSuspense(<WishlistPage />) },
           { path: '/cart', element: withSuspense(<CartPage />) },
-          { path: '/developers/api', element: withSuspense(<ApiDocsPage />) },
           { path: '/checkout/redirect', element: withSuspense(<CheckoutRedirectPage />) },
           // A visitor buys without an account: the checkout form takes a name
           // and a phone number, and the server opens the account. Behind
@@ -148,6 +147,8 @@ const router = createBrowserRouter([
               { path: '/me/addresses', element: withSuspense(<MyAddressesPage />) },
             ],
           },
+          // Any other address: the not-found page inside the store's header and footer.
+          { path: '*', element: withSuspense(<NotFoundPage />) },
         ],
       },
       { path: '/login', element: withSuspense(<LoginPage />) },

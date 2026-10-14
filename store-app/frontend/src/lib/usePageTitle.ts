@@ -8,7 +8,7 @@ export function usePageTitle(title: string, description?: string) {
     // A product's own `meta_title` usually already ends in the store name, and
     // appending the suffix blindly produced
     // "Armaf Club de Nuit Intense | نسائم ليبيا | نسائم ليبيا".
-    document.title = !title ? SUFFIX : title.includes(SUFFIX) ? title : `${title} | ${SUFFIX}`
+    document.title = !title ? SUFFIX : title.includes(SUFFIX) ? title : `${title} — ${SUFFIX}`
     if (description) {
       let tag = document.querySelector<HTMLMetaElement>('meta[name="description"]')
       if (!tag) {

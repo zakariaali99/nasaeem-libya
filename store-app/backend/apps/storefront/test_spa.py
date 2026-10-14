@@ -117,9 +117,14 @@ class TestShellFallback:
 @pytest.mark.django_db
 class TestRobotsAndSitemap:
     def test_robots_disallows_admin_and_points_at_sitemap(self, client):
-        body = client.get("/robots.txt").content.decode("utf-8")
+        # Served as the built front end's static file when it exists (as on the
+        # live host, where only /api/ reaches Django), else by the view.
+        response = client.get("/robots.txt")
+        raw = b"".join(response.streaming_content) if response.streaming else response.content
+        body = raw.decode("utf-8")
         assert "Disallow: /admin" in body
-        assert "Sitemap: https://nasaeem.ly/sitemap.xml" in body
+        assert "/api/sitemap.xml" in body.split("Sitemap:", 1)[1]
+        assert client.get("/api/sitemap.xml").status_code == 200
 
     def test_sitemap_lists_active_products(self, client, product):
         body = client.get("/sitemap.xml").content.decode("utf-8")

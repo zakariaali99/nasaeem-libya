@@ -12,7 +12,8 @@ User = get_user_model()
 
 
 @pytest.mark.django_db
-def test_product_bundles_and_gifting_checkout():
+def test_product_bundles_and_gifting_checkout(settings):
+    settings.FEATURE_GIFTING = True  # the suite is switched off by default
     # 1. Setup user & products
     user = User.objects.create_user(
         phone_number="0912223344",
@@ -90,6 +91,20 @@ def test_product_bundles_and_gifting_checkout():
     assert order.hide_invoice_prices is True
     # Subtotal (250) + Shipping (15) + Velvet Gift Wrap (15) = 280 LYD
     assert order.total == Decimal("280.00")
+
+    # Switched off (the default), the same request is an ordinary order.
+    settings.FEATURE_GIFTING = False
+    cart = Cart.objects.create(user=user)
+    CartItem.objects.create(cart=cart, product=main_p, quantity=1)
+    plain = services.checkout(
+        cart=cart, user=user, region_id=str(region.id), address="شارع النوفليين",
+        delivery_method_code="nasaim_express", payment_method="moamalat",
+        is_gift=True, gift_wrap_type="ROYAL_VELVET", gift_message="رسالة", hide_invoice_prices=True,
+    )
+    assert (plain.is_gift, plain.gift_wrap_fee, plain.gift_message, plain.hide_invoice_prices) == (
+        False, Decimal("0.00"), "", False
+    )
+    assert plain.total == Decimal("265.00")
 
 
 @pytest.mark.django_db

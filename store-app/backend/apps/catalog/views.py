@@ -630,9 +630,13 @@ class InventoryListView(APIView):
         )
         if search := request.query_params.get("search"):
             queryset = queryset.filter(Q(name__icontains=search) | Q(sku__icontains=search))
+        queryset = services.with_available(queryset)
+        # Counts for the filter chips, over every matching product, not one page.
+        counts = {bucket: services.stock_bucket(queryset, bucket).count() for bucket in ("low", "out", "in")}
+        bucket = request.query_params.get("stock", "")
         if request.query_params.get("low_stock", "").lower() in ("1", "true", "yes"):
-            threshold = int(request.query_params.get("threshold", 5))
-            queryset = queryset.filter(stock__lte=threshold)
+            bucket = "low"
+        queryset = services.stock_bucket(queryset, bucket)
 
         paginator = StandardPagination()
         page = paginator.paginate_queryset(queryset, request, view=self)
@@ -659,7 +663,9 @@ class InventoryListView(APIView):
             }
             for product in page
         ]
-        return paginator.get_paginated_response(rows)
+        response = paginator.get_paginated_response(rows)
+        response.data["meta"]["counts"] = counts
+        return response
 
 
 class InventoryAdjustView(APIView):

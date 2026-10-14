@@ -246,7 +246,7 @@ export default function CheckoutPage() {
         ? selectedCity.delivery_fee
         : order.shipping_total
   const shipping = isFreeShipping ? '0.00' : regularShipping
-  const giftWrapFee = gifting.is_gift && gifting.gift_wrap_type === 'ROYAL_VELVET' ? 15 : 0
+  const giftWrapFee = FEATURES.gifting && gifting.is_gift && gifting.gift_wrap_type === 'ROYAL_VELVET' ? 15 : 0
   const total = (
     Number(order.subtotal) - Number(order.discount_total) + Number(shipping) + giftWrapFee
   ).toFixed(2)
@@ -446,7 +446,7 @@ export default function CheckoutPage() {
           </section>
 
           {/* Luxury Gifting Suite */}
-          <LuxuryGiftingSection value={gifting} onChange={setGifting} />
+          {FEATURES.gifting ? <LuxuryGiftingSection value={gifting} onChange={setGifting} /> : null}
 
           {/* Payment Methods Section */}
           <section className="space-y-4 rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-xs">

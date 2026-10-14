@@ -349,6 +349,7 @@ class DashboardStatsSerializer(serializers.Serializer):
         from django.utils import timezone
 
         from apps.catalog.models import Product
+        from apps.catalog.services import stock_bucket, with_available
         from apps.core.models import User
         from apps.orders.models import Order, OrderStatus
 
@@ -457,9 +458,8 @@ class DashboardStatsSerializer(serializers.Serializer):
             ),
             "revenue_total": str(revenue),
             "customers": User.objects.filter(role="customer").count(),
-            "low_stock": Product.objects.filter(track_quantity=True).filter(
-                stock__lte=F("reserved_stock") + 5,
-            ).count(),
+            "low_stock": stock_bucket(with_available(Product.objects.filter(track_quantity=True)), "low").count(),
+            "out_of_stock": stock_bucket(with_available(Product.objects.filter(track_quantity=True)), "out").count(),
             "start_date": parsed_start.isoformat() if parsed_start else None,
             "end_date": parsed_end.isoformat() if parsed_end else None,
             "timeframe_days": num_days,

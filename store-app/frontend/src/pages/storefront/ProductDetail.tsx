@@ -28,7 +28,6 @@ import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ApiError } from '@/lib/api'
-import { formatNumber } from '@/lib/format'
 import { useAddToCart } from '@/lib/queries/cart'
 import { useProductBySlug, useProducts } from '@/lib/queries/catalog'
 import { useStorefrontLayout } from '@/lib/queries/storefront'
@@ -417,7 +416,8 @@ function Specs({ product, variant }: { product: Product; variant: ProductVariant
     product.collections?.length
       ? ['المجموعة', product.collections.map((collection) => collection.name).join('، ')]
       : null,
-    product.track_quantity ? ['المتوفر', `${formatNumber(product.available_stock)} قطعة`] : null,
+    // The exact count is the store's business, not the customer's (owner's
+    // decision): availability is shown by the stock badge instead.
   ].filter(Boolean) as [string, string][]
 
   if (rows.length === 0) return null

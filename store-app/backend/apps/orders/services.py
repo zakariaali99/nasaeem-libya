@@ -369,6 +369,9 @@ def checkout(
     gift_message: str = "",
     hide_invoice_prices: bool = False,
 ) -> Order:
+    if not settings.FEATURE_GIFTING:
+        is_gift, gift_wrap_type, gift_sender_name, gift_recipient_name, gift_message = False, "", "", "", ""
+        hide_invoice_prices = False
     lines = list(cart.items.select_related("product", "variant").all())
     if not lines:
         raise CheckoutError("السلة فارغة")
@@ -652,6 +655,9 @@ def finalise_order(
     it is how a shop quietly charges a different number than it quoted. Only the
     delivery fee is added, and the total is recomputed from the stored figures.
     """
+    if not settings.FEATURE_GIFTING:
+        is_gift, gift_wrap_type, gift_sender_name, gift_recipient_name, gift_message = False, "", "", "", ""
+        hide_invoice_prices = False
     if order.status != OrderStatus.PENDING:
         raise CheckoutError("لا يمكن تعديل هذا الطلب", status=409)
 

@@ -22,6 +22,8 @@ export interface ApiMetaShape {
   limit: number
   total: number
   pages: number
+  /** Inventory: products per stock state, over every match (not one page). */
+  counts?: { low: number; out: number; in: number }
 }
 
 export interface Paginated<T> {
@@ -577,7 +579,10 @@ export interface DashboardStats {
   month_revenue: string
   revenue_total: string
   customers: number
+  /** 1–5 sellable units left (see LOW_STOCK_THRESHOLD on the server). */
   low_stock: number
+  /** Nothing left to sell. */
+  out_of_stock?: number
   start_date?: string
   end_date?: string
   timeframe_days?: number

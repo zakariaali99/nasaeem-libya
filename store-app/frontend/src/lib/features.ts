@@ -13,6 +13,10 @@
  *   directly when it confirms the order. Mirrors `FEATURE_SHIPPING_FEES` in
  *   the backend settings — flip both to bring it back.
  *
+ * - gifting: gift wrapping, the gift card and hiding prices in the parcel
+ *   (checkout section). Stopped by the owner on 2026-10-14. Mirrors
+ *   `FEATURE_GIFTING` in the backend settings.
+ *
  * Reviews and loyalty were put on hold by the owner on 2026-09-28. The backend
  * keeps its endpoints and data; only what the customer sees is hidden.
  */
@@ -20,4 +24,5 @@ export const FEATURES = {
   reviews: false,
   loyalty: false,
   shipping: false,
+  gifting: false,
 } as const

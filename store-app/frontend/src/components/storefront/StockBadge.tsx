@@ -1,5 +1,4 @@
 import { cn } from '@/lib/utils'
-import { formatNumber } from '@/lib/format'
 
 export interface StockBadgeProps {
   /** `false` means unlimited — skip every stock check. */
@@ -44,7 +43,7 @@ export function StockBadge({
   return (
     <span className={cn('inline-flex items-center gap-1.5 text-sm text-low-stock', className)}>
       <Dot className="bg-low-stock" />
-      بقي {formatNumber(availableStock)} فقط
+      كمية محدودة
     </span>
   )
 }

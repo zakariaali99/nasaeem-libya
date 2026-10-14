@@ -67,6 +67,29 @@ class StockChange:
     user: object | None = None
 
 
+# One rule for "low" everywhere (dashboard, inventory filter and counters):
+# what can still be sold — stock minus reservations — is above zero and at most
+# this many. Zero or less is "out", not "low".
+LOW_STOCK_THRESHOLD = 5
+
+
+def with_available(queryset):
+    from django.db.models import F
+
+    return queryset.annotate(available=F("stock") - F("reserved_stock"))
+
+
+def stock_bucket(queryset, bucket: str):
+    """`queryset` (annotated by `with_available`) narrowed to low/out/in."""
+    if bucket == "low":
+        return queryset.filter(available__gt=0, available__lte=LOW_STOCK_THRESHOLD)
+    if bucket == "out":
+        return queryset.filter(available__lte=0)
+    if bucket == "in":
+        return queryset.filter(available__gt=LOW_STOCK_THRESHOLD)
+    return queryset
+
+
 @transaction.atomic
 def adjust_stock(*, product, variant=None, change, reason, note="", user=None, allow_negative=False):
     """Applies a signed change and records it. Locks the row it touches.

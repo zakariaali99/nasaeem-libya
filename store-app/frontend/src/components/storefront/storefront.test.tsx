@@ -65,9 +65,10 @@ describe('stock badge', () => {
     expect(screen.getByText('غير متوفر حالياً')).toBeInTheDocument()
   })
 
-  it('warns when only a few are left', () => {
+  it('warns when only a few are left, without saying how many', () => {
     render(<StockBadge trackQuantity availableStock={2} inStock />)
-    expect(screen.getByText('بقي 2 فقط')).toBeInTheDocument()
+    expect(screen.getByText('كمية محدودة')).toBeInTheDocument()
+    expect(screen.queryByText(/2/)).toBeNull()
   })
 
   it('treats an untracked product as always available', () => {

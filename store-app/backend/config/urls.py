@@ -23,6 +23,7 @@ urlpatterns = [
     path("api/", include("apps.payments.urls")),
     path("robots.txt", spa.robots_txt, name="robots"),
     path("sitemap.xml", spa.sitemap_xml, name="sitemap"),
+    path("api/sitemap.xml", spa.sitemap_xml, name="api-sitemap"),
 ]
 
 from django.views.static import serve

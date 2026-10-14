@@ -126,7 +126,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-8 animate-fade-rise">
       {/* Low stock warning banner */}
-      {data.low_stock > 0 && (
+      {(data.low_stock > 0 || (data.out_of_stock ?? 0) > 0) && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-900 dark:text-amber-200">
           <div className="flex items-center gap-3">
             <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-300">
@@ -135,12 +135,18 @@ export default function Dashboard() {
             <div>
               <p className="text-sm font-bold">تنبيه مستويات المخزون</p>
               <p className="text-xs text-amber-800/80 dark:text-amber-300/80">
-                يوجد <span className="font-bold">{formatNumber(data.low_stock)}</span> منتجات قاربت على النفاد وتحتاج إلى إعادة طلب.
+                <span className="font-bold">{formatNumber(data.low_stock)}</span> منتجات قاربت على النفاد (5 أو أقل)
+                {(data.out_of_stock ?? 0) > 0 ? (
+                  <>
+                    ، و<span className="font-bold">{formatNumber(data.out_of_stock ?? 0)}</span> نفدت
+                  </>
+                ) : null}
+                .
               </p>
             </div>
           </div>
           <Link
-            to="/admin/inventory"
+            to="/admin/inventory?stock_filter=low"
             className="text-xs font-bold text-amber-700 dark:text-amber-300 underline hover:no-underline"
           >
             عرض المنتجات المنخفضة ←

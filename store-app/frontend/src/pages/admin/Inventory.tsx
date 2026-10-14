@@ -52,7 +52,8 @@ export default function AdminInventoryPage() {
   const query = useInventory({
     page,
     search: search || undefined,
-    low_stock: stockFilter === 'low' ? 1 : undefined,
+    // The server filters (one rule: low = 1–5 sellable, out = none).
+    stock: stockFilter || undefined,
   })
   const adjust = useAdjustInventory()
 
@@ -75,9 +76,10 @@ export default function AdminInventoryPage() {
 
   const items = query.data?.items ?? []
   const totalTracked = query.data?.meta?.total ?? 0
-  const outOfStockCount = items.filter((i) => i.available_stock <= 0).length
-  const lowStockCount = items.filter((i) => i.available_stock > 0 && i.available_stock <= 5).length
-  const inStockCount = items.filter((i) => i.available_stock > 5).length
+  const counts = query.data?.meta?.counts
+  const outOfStockCount = counts?.out ?? 0
+  const lowStockCount = counts?.low ?? 0
+  const inStockCount = counts?.in ?? 0
 
   // Filter chips
   const filterChips = [
@@ -101,11 +103,7 @@ export default function AdminInventoryPage() {
     },
   ]
 
-  // Client filtering when 'out' is selected
-  const displayedItems = items.filter((item) => {
-    if (stockFilter === 'out') return item.available_stock <= 0
-    return true
-  })
+  const displayedItems = items
 
   const calculateChange = (): number => {
     const num = Number.parseInt(amount, 10) || 0

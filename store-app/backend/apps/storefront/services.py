@@ -551,7 +551,12 @@ def _personalised_products(widget_type, limit, *, user, recent_ids=()):
                 break
         return _ordered_by_ids(ordered)
 
-    if widget_type == WidgetType.RECOMMENDED_FOR_YOU and user and user.is_authenticated:
+    # "For you" and "near you" are only shown when they are true: without a
+    # purchase history or a region they render nothing, rather than the store's
+    # popular products under a heading that claims to know the visitor.
+    if widget_type == WidgetType.RECOMMENDED_FOR_YOU:
+        if not (user and user.is_authenticated):
+            return []
         # Products from the categories this customer has actually bought from.
         categories = Category.objects.filter(
             products__order_items__order__user=user
@@ -564,9 +569,8 @@ def _personalised_products(widget_type, limit, *, user, recent_ids=()):
                 .exclude(id__in=list(bought_ids))
                 .distinct()[:limit]
             )
-            if chosen:
-                return chosen
-        return popular_products(limit)
+            return chosen
+        return []
 
     if widget_type == WidgetType.TRENDING_NEAR_YOU:
         region_id = _user_region_id(user)
@@ -579,10 +583,8 @@ def _personalised_products(widget_type, limit, *, user, recent_ids=()):
                 if product_id and product_id not in seen:
                     seen.add(product_id)
                     ordered.append(str(product_id))
-            chosen = _ordered_by_ids(ordered[:limit])
-            if chosen:
-                return chosen
-        return popular_products(limit)
+            return _ordered_by_ids(ordered[:limit])
+        return []
 
     return popular_products(limit)
 

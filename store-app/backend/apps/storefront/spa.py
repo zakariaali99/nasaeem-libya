@@ -107,7 +107,7 @@ def _meta_description(product: Product) -> str:
 
 def _product_head(request, product: Product) -> tuple[str, str, str]:
     """Returns (title, description, head_html) for a product page."""
-    title = product.meta_title or f"{product.name} · {_SITE_NAME}"
+    title = product.meta_title or f"{product.name} — {_SITE_NAME}"
     description = _meta_description(product)
     url = _absolute(request, _product_path(product.slug))
     price = _display_price(product)
@@ -197,12 +197,15 @@ def robots_txt(request):
     lines = [
         "User-agent: *",
         "Disallow: /admin",
+        # The map lives under /api/ because, on the live host, /api/ is the
+        # one path that reaches Django; everything else is the static app.
+        "Allow: /api/sitemap.xml",
         "Disallow: /api/",
         "Disallow: /django-admin/",
         "Disallow: /checkout/",
         "Disallow: /me",
         "",
-        f"Sitemap: {_absolute(request, '/sitemap.xml')}",
+        f"Sitemap: {_absolute(request, '/api/sitemap.xml')}",
         "",
     ]
     return HttpResponse("\n".join(lines), content_type="text/plain; charset=utf-8")

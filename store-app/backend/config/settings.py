@@ -261,6 +261,10 @@ FEATURE_LOYALTY = config("FEATURE_LOYALTY", default=False, cast=bool)
 # charged and no courier is attached to an order. Set to True to bring both
 # back (and flip `FEATURES.shipping` in the frontend).
 FEATURE_SHIPPING_FEES = config("FEATURE_SHIPPING_FEES", default=False, cast=bool)
+# Gift wrapping, the gift card and hiding prices in the parcel (owner's
+# decision, 2026-10-14: stopped for now). Off, the checkout ignores every gift
+# field and charges no wrapping fee. Mirrors `FEATURES.gifting` in the frontend.
+FEATURE_GIFTING = config("FEATURE_GIFTING", default=False, cast=bool)
 
 # --------------------------------------------------------------------------
 # SEO shell

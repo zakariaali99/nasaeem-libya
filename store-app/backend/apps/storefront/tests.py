@@ -205,16 +205,18 @@ def test_an_inactive_product_never_reaches_the_homepage(layout, client):
     assert response.json()["data"]["widgets"][0]["data"]["products"] == []
 
 
-def test_a_personalised_widget_falls_back_to_popular_for_a_guest(layout, client):
-    """A guest must never see an empty personalised widget — the fallback is the
-    whole reason the widget can be placed on a public homepage."""
+def test_a_personalised_widget_shows_nothing_to_a_guest(layout, client):
+    """"Recommended for you" and "trending near you" claim to know the visitor.
+    For a guest they used to show the store's popular products under that
+    heading; now they show nothing and the storefront hides the empty row."""
     _make_products(3)
-    Widget.objects.create(
-        layout=layout, type=WidgetType.RECOMMENDED_FOR_YOU,
-        data=services.normalise_widget_data(WidgetType.RECOMMENDED_FOR_YOU, {"limit": 8}),
-    )
+    for widget_type in (WidgetType.RECOMMENDED_FOR_YOU, WidgetType.TRENDING_NEAR_YOU):
+        Widget.objects.create(
+            layout=layout, type=widget_type,
+            data=services.normalise_widget_data(widget_type, {"limit": 8}),
+        )
     response = client.get(reverse("storefront-layout"))
-    assert len(response.json()["data"]["widgets"][0]["data"]["products"]) == 3
+    assert [w["data"]["products"] for w in response.json()["data"]["widgets"]] == [[], []]
 
 
 def test_recently_viewed_uses_the_ids_the_client_sends(layout, client):

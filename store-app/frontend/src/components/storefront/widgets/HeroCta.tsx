@@ -1,6 +1,7 @@
 import { ArrowLeft, ShoppingBag, Sparkles } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
+import { Carousel, type BannerVariant } from '@/components/storefront/widgets/Carousel'
 import { Button } from '@/components/ui/button'
 import { renditionUrl } from '@/lib/images'
 import { cn } from '@/lib/utils'
@@ -24,7 +25,15 @@ const ALIGN = {
  * component used to fill blanks with built-in slogans, a fixed second button
  * and three fixed "trust" lines nobody had approved.
  */
-export function HeroCta({ widget, priority = false }: { widget: Widget; priority?: boolean }) {
+export function HeroCta({
+  widget,
+  priority = false,
+  variant,
+}: {
+  widget: Widget
+  priority?: boolean
+  variant?: BannerVariant
+}) {
   const {
     heroMode,
     title,
@@ -66,13 +75,26 @@ export function HeroCta({ widget, priority = false }: { widget: Widget; priority
 
   if (heroMode === 'image') {
     if (!hasImage) return null
-    const image = picture(cn('block h-auto w-full', rounded))
-    return linkUrl ? (
-      <Link to={linkUrl} className={cn('block focus-visible:outline-2 focus-visible:outline-ring', rounded)}>
-        {image}
-      </Link>
-    ) : (
-      image
+    // The picture as designed, in the same frame as the slider: a phone
+    // picture, a focus point and a chosen height.
+    const slide = {
+      imageUrl: String(desktop),
+      mobileImageUrl: mobileImageUrl || '',
+      mobileSrc: widget.data.mobileSrc,
+      focusX: widget.data.focusX,
+      focusY: widget.data.focusY,
+      mobileFocusX: widget.data.mobileFocusX,
+      mobileFocusY: widget.data.mobileFocusY,
+      linkUrl: linkUrl || '',
+      title: '',
+      subtitle: '',
+    }
+    return (
+      <Carousel
+        widget={{ ...widget, data: { slides: [slide], bannerHeight: widget.data.bannerHeight ?? 'auto', interval: 0 } }}
+        priority={priority}
+        variant={variant}
+      />
     )
   }
 

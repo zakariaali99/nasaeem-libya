@@ -214,7 +214,7 @@ def rendition_url(url, name):
     return rendition_urls(url).get(name, url)
 
 
-def store_image(uploaded_file, *, subdir="products", full_size=None, quality=78):
+def store_image(uploaded_file, *, subdir="products", full_size=None, quality=78, extra_renditions=None):
     """Saves an upload and writes thumb/medium/full WebP renditions.
 
     Returns the `full` URL, which is what `ProductImage.url` stores.
@@ -223,6 +223,9 @@ def store_image(uploaded_file, *, subdir="products", full_size=None, quality=78)
     banner spans the screen, and the 1200px product cap made it visibly soft.
     The three file names stay the same, so every caller of `rendition_url`
     keeps working.
+
+    `extra_renditions` adds named sizes beside the three, e.g. a banner's
+    `mobile` file (1080px) so a phone does not download the 1920px one.
     """
     import io
     import logging
@@ -283,6 +286,10 @@ def store_image(uploaded_file, *, subdir="products", full_size=None, quality=78)
             size = full_size
         rendition = image.copy()
         rendition.thumbnail((size, size), Image.LANCZOS)
+        rendition.save(directory / f"{stem}-{name}.webp", "WEBP", quality=quality, method=6)
+    for name, size in (extra_renditions or {}).items():
+        rendition = image.copy()
+        rendition.thumbnail((size, size * 4), Image.LANCZOS)
         rendition.save(directory / f"{stem}-{name}.webp", "WEBP", quality=quality, method=6)
 
     return f"{settings.MEDIA_URL}{subdir}/{stem}-full.webp"

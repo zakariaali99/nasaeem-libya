@@ -242,24 +242,26 @@ def _script_json(value) -> str:
 
 def _hero_preload_tags(widgets) -> list[str]:
     """Preload exactly the image the first hero/carousel will render, one per
-    breakpoint, so a phone never downloads the desktop banner."""
+    breakpoint, so a phone never downloads the desktop banner. The phone url
+    is chosen exactly as the client chooses it (`phoneSrc` in Carousel.tsx)."""
     from apps.catalog.services import rendition_url
 
     for widget in widgets:
         data = widget.get("data") or {}
         if widget.get("type") == "hero_cta":
             desktop = data.get("desktopImageUrl") or data.get("backgroundImageUrl") or data.get("mobileImageUrl")
-            mobile = data.get("mobileImageUrl") or desktop
+            mobile = data.get("mobileSrc") or rendition_url(data.get("mobileImageUrl") or desktop, "full")
         elif widget.get("type") == "carousel":
             slides = data.get("slides") or []
-            desktop = slides[0].get("imageUrl") if slides else None
-            mobile = (slides[0].get("mobileImageUrl") if slides else None) or desktop
+            first = slides[0] if slides else {}
+            desktop = first.get("imageUrl")
+            mobile = first.get("mobileSrc") or rendition_url(first.get("mobileImageUrl") or desktop, "full")
         else:
             continue
         if not desktop:
             return []
         return [
-            f'<link rel="preload" as="image" href="{escape(rendition_url(mobile, "full"))}" '
+            f'<link rel="preload" as="image" href="{escape(mobile)}" '
             f'media="(max-width: 640px)" fetchpriority="high">',
             f'<link rel="preload" as="image" href="{escape(desktop)}" '
             f'media="(min-width: 641px)" fetchpriority="high">',

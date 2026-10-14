@@ -165,6 +165,64 @@ def _int(value, default: int, low: int, high: int) -> int:
     return max(low, min(number, high))
 
 
+BANNER_HEIGHTS = ("band", "full", "auto")
+
+
+def _banner_height(data: dict) -> str:
+    """`band` (a wide strip), `full` (the screen) or `auto` (the picture's
+    own shape). Older layouts stored `carouselStyle`: hero/normal → band."""
+    value = data.get("bannerHeight")
+    if value in BANNER_HEIGHTS:
+        return value
+    return "auto" if data.get("carouselStyle") == "auto" else "band"
+
+
+def _percent(value, default=50) -> int:
+    return _int(value, default, 0, 100)
+
+
+def mobile_rendition_src(url: str) -> str:
+    """The 1080px phone copy of an uploaded banner when it exists on disk,
+    otherwise "" (banners uploaded before the copy was made, external urls)."""
+    from pathlib import Path
+
+    from apps.catalog.services import rendition_url
+
+    if not url or not url.startswith(settings.MEDIA_URL):
+        return ""
+    candidate = url.replace("-full.webp", "-mobile.webp") if url.endswith("-full.webp") else ""
+    if not candidate or candidate == url:
+        return ""
+    path = Path(settings.MEDIA_ROOT) / candidate[len(settings.MEDIA_URL):]
+    return candidate if path.exists() else ""
+
+
+def _banner_slide(slide: dict, image: str, mobile: str) -> dict:
+    """One banner picture: a desktop image, an optional phone image, a focus
+    point for each (where to keep when the frame crops), and optional text."""
+    align = slide.get("textAlign")
+    valign = slide.get("textVAlign")
+    return {
+        "imageUrl": image,
+        "mobileImageUrl": mobile,
+        "mobileSrc": mobile_rendition_src(mobile or image),
+        "focusX": _percent(slide.get("focusX")),
+        "focusY": _percent(slide.get("focusY")),
+        "mobileFocusX": _percent(slide.get("mobileFocusX")),
+        "mobileFocusY": _percent(slide.get("mobileFocusY")),
+        "linkUrl": _first(slide, "linkUrl", "link_url", "href"),
+        "title": str(slide.get("title") or ""),
+        "subtitle": str(slide.get("subtitle") or ""),
+        "buttonLabel": str(slide.get("buttonLabel") or ""),
+        "textAlign": align if align in ("start", "center", "end") else "start",
+        "textVAlign": valign if valign in ("top", "middle", "bottom") else "bottom",
+        "textTone": "dark" if slide.get("textTone") == "dark" else "light",
+        "overlay": _int(slide.get("overlay", 35), 35, 0, 80),
+        # False when the words are already drawn into the phone picture.
+        "textOnMobile": slide.get("textOnMobile") is not False,
+    }
+
+
 def normalise_widget_data(widget_type: str, data: dict | None) -> dict:
     """The canonical `data` for each of the 14 types, per `08-features.md`."""
     data = data if isinstance(data, dict) else {}
@@ -175,22 +233,17 @@ def normalise_widget_data(widget_type: str, data: dict | None) -> dict:
             if not isinstance(slide, dict):
                 continue
             image = _first(slide, "imageUrl", "image_url", "url")
-            if not image:
+            mobile = _first(slide, "mobileImageUrl", "mobile_image_url")
+            if not image and not mobile:
                 continue
-            slides.append({
-                "imageUrl": image,
-                "mobileImageUrl": _first(slide, "mobileImageUrl", "mobile_image_url"),
-                "linkUrl": _first(slide, "linkUrl", "link_url", "href"),
-                "title": slide.get("title", "") or "",
-                "subtitle": slide.get("subtitle", "") or "",
-            })
-        style = data.get("carouselStyle")
+            slides.append(_banner_slide(slide, image or mobile, mobile))
         return {
             "slides": slides,
-            "carouselStyle": style if style in ("normal", "auto") else "hero",
+            "bannerHeight": _banner_height(data),
             # `cover` fills the frame edge to edge; `contain` shows the whole
             # picture and leaves bars where its shape differs from the frame.
             "imageFit": "contain" if data.get("imageFit") == "contain" else "cover",
+            "interval": _int(data.get("interval", 6), 6, 0, 30),
         }
 
     if widget_type == WidgetType.TEXT_BLOCK:
@@ -276,6 +329,12 @@ def normalise_widget_data(widget_type: str, data: dict | None) -> dict:
             "desktopImageUrl": desktop_img,
             "mobileImageUrl": mobile_img,
             "backgroundImageUrl": desktop_img,
+            "mobileSrc": mobile_rendition_src(mobile_img or desktop_img),
+            "bannerHeight": _banner_height(data) if data.get("bannerHeight") else "auto",
+            "focusX": _percent(data.get("focusX")),
+            "focusY": _percent(data.get("focusY")),
+            "mobileFocusX": _percent(data.get("mobileFocusX")),
+            "mobileFocusY": _percent(data.get("mobileFocusY")),
         }
 
     if widget_type == WidgetType.ANNOUNCEMENT_BAR:

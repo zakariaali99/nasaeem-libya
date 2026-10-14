@@ -238,13 +238,33 @@ export interface WidgetStyle {
 }
 
 export interface CarouselSlide {
+  /** The desktop picture. */
   imageUrl: string
-  /** A taller picture for phones; the main one is used when empty. */
+  /** A picture made for phones; the desktop one is used when empty. */
   mobileImageUrl?: string
+  /** The 1080px phone copy the server made at upload, when it exists. */
+  mobileSrc?: string
+  /** Where to keep the picture when the frame crops it, in percent. */
+  focusX?: number
+  focusY?: number
+  mobileFocusX?: number
+  mobileFocusY?: number
   linkUrl: string
   title: string
   subtitle: string
+  buttonLabel?: string
+  textAlign?: 'start' | 'center' | 'end'
+  textVAlign?: 'top' | 'middle' | 'bottom'
+  textTone?: 'light' | 'dark'
+  /** How dark the picture gets behind light text (or light behind dark), 0–80. */
+  overlay?: number
+  /** False when the words are already drawn into the phone picture. */
+  textOnMobile?: boolean
 }
+
+/** `band`: a wide strip (3:1 desktop, 4:5 phone). `full`: the screen.
+ * `auto`: the first picture's own shape. */
+export type BannerHeight = 'band' | 'full' | 'auto'
 
 export interface PhotoLinkItem {
   imageUrl: string
@@ -262,8 +282,10 @@ export interface TrustBadgeItem {
 export interface WidgetData {
   // carousel
   slides?: CarouselSlide[]
-  carouselStyle?: 'hero' | 'normal' | 'auto'
+  bannerHeight?: BannerHeight
   imageFit?: 'cover' | 'contain'
+  /** Seconds between slides; 0 = no automatic change. */
+  interval?: number
   // text_block
   content?: string
   // image
@@ -303,6 +325,11 @@ export interface WidgetData {
   backgroundImageUrl?: string
   desktopImageUrl?: string
   mobileImageUrl?: string
+  mobileSrc?: string
+  focusX?: number
+  focusY?: number
+  mobileFocusX?: number
+  mobileFocusY?: number
   // announcement_bar
   message?: string
   linkLabel?: string

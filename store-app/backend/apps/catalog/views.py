@@ -730,7 +730,8 @@ class ImageUploadView(APIView):
                             status=status.HTTP_400_BAD_REQUEST)
         try:
             if request.data.get("purpose") == "banner":
-                url = services.store_image(uploaded, subdir="banners", full_size=1920, quality=86)
+                url = services.store_image(uploaded, subdir="banners", full_size=1920, quality=86,
+                                          extra_renditions={"mobile": 1080})
             else:
                 url = services.store_image(uploaded)
         except ValueError as exc:

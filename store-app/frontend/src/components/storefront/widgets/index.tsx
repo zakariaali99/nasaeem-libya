@@ -1,5 +1,5 @@
 import { AnnouncementBar } from '@/components/storefront/widgets/AnnouncementBar'
-import { Carousel } from '@/components/storefront/widgets/Carousel'
+import { Carousel, type BannerVariant } from '@/components/storefront/widgets/Carousel'
 import {
   CategoryListWidget,
   CollectionShowcase,
@@ -17,7 +17,7 @@ import { TrustBadgesWidget } from '@/components/storefront/widgets/TrustBadgesWi
 import { WidgetShell } from '@/components/storefront/widgets/WidgetShell'
 import type { Widget, WidgetType } from '@/types/api'
 
-type Renderer = (props: { widget: Widget; priority?: boolean }) => React.ReactNode
+type Renderer = (props: { widget: Widget; priority?: boolean; variant?: BannerVariant }) => React.ReactNode
 
 /**
  * All widget types, one registry.
@@ -46,7 +46,16 @@ export const WIDGET_RENDERERS: Record<WidgetType, Renderer> = {
   trending_near_you: ProductListWidget,
 }
 
-export function WidgetRenderer({ widget, priority = false }: { widget: Widget; priority?: boolean }) {
+export function WidgetRenderer({
+  widget,
+  priority = false,
+  variant,
+}: {
+  widget: Widget
+  priority?: boolean
+  /** The builder's preview pins a device; the storefront leaves it to the screen. */
+  variant?: BannerVariant
+}) {
   const Render = WIDGET_RENDERERS[widget.type]
 
   // An unknown type means the server has a widget this build does not know
@@ -57,7 +66,7 @@ export function WidgetRenderer({ widget, priority = false }: { widget: Widget; p
 
   return (
     <WidgetShell style={widget.style} type={widget.type}>
-      <Render widget={widget} priority={priority} />
+      <Render widget={widget} priority={priority} variant={variant} />
     </WidgetShell>
   )
 }

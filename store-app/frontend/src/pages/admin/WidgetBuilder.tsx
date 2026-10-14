@@ -2,6 +2,7 @@ import { ArrowDown, ArrowRight, ArrowUp, GripVertical, Plus, Search, Trash2 } fr
 import * as React from 'react'
 import { Link, useBlocker, useParams } from 'react-router-dom'
 
+import { BannerImageField } from '@/components/admin/BannerImageField'
 import { ImageUploadField } from '@/components/admin/ImageUploadField'
 import { WidgetRenderer } from '@/components/storefront/widgets'
 import { Alert } from '@/components/ui/alert'
@@ -13,12 +14,13 @@ import { LineThumb } from '@/components/ui/line-thumb'
 import { Select } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ApiError } from '@/lib/api'
+import { BANNER_SIZES, sizeNumbers, sizeUnit } from '@/lib/bannerSizes'
 import { formatPrice } from '@/lib/format'
 import { useCategories, useCollections, useProducts } from '@/lib/queries/catalog'
 import { useLayout, useSaveLayout, type Layout, type LayoutDraft } from '@/lib/queries/customization'
 import { usePageTitle } from '@/lib/usePageTitle'
 import { cn } from '@/lib/utils'
-import type { Category, Collection, Product, Widget, WidgetStyle } from '@/types/api'
+import type { BannerHeight, Category, Collection, Product, Widget, WidgetStyle } from '@/types/api'
 
 // --------------------------------------------------------------------------
 // What the operator can add. `free_shipping_bar` and `gift_wrap_upsell` are
@@ -504,6 +506,7 @@ function Editor({ layout, notice, setNotice, lastIndex }: EditorProps) {
                             style: widget.style,
                             targeting: null,
                           }}
+                          variant={previewDevice}
                         />
                       )}
                     </div>
@@ -566,14 +569,42 @@ function WidgetFields({ type, data, patch }: FieldsProps) {
             { value: 'image', label: 'صورتي فقط — تظهر كما صمّمتها، بلا تعتيم ولا نص' },
             { value: 'text', label: 'نص فوق صورة خلفية' },
           ])}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <ImageUploadField label="صورة الحاسوب" purpose="banner" aspectRatio="auto"
-              hint="المقاس المقترح 1920×700 تقريباً" value={String(data.desktopImageUrl ?? '')}
-              onChange={(url) => patch({ desktopImageUrl: url, backgroundImageUrl: url })} />
-            <ImageUploadField label="صورة الهاتف (اختياري)" purpose="banner" aspectRatio="auto"
-              hint="صورة طولية للهواتف؛ إن تُركت فارغة تُستخدم صورة الحاسوب" value={String(data.mobileImageUrl ?? '')}
-              onChange={(url) => patch({ mobileImageUrl: url })} />
-          </div>
+          {imageOnly ? (
+            <>
+              <BannerHeightChoice
+                value={(data.bannerHeight as BannerHeight) ?? 'auto'}
+                onChange={(value) => patch({ bannerHeight: value })}
+              />
+              <BannerImageField
+                device="desktop"
+                height={(data.bannerHeight as BannerHeight) ?? 'auto'}
+                value={String(data.desktopImageUrl ?? '')}
+                onChange={(url) => patch({ desktopImageUrl: url, backgroundImageUrl: url })}
+                focusX={Number(data.focusX ?? 50)}
+                focusY={Number(data.focusY ?? 50)}
+                onFocusChange={(x, y) => patch({ focusX: x, focusY: y })}
+              />
+              <BannerImageField
+                device="mobile"
+                optional
+                height={(data.bannerHeight as BannerHeight) ?? 'auto'}
+                value={String(data.mobileImageUrl ?? '')}
+                onChange={(url) => patch({ mobileImageUrl: url })}
+                focusX={Number(data.mobileFocusX ?? 50)}
+                focusY={Number(data.mobileFocusY ?? 50)}
+                onFocusChange={(x, y) => patch({ mobileFocusX: x, mobileFocusY: y })}
+              />
+            </>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <ImageUploadField label="صورة الخلفية للحاسوب" purpose="banner" aspectRatio="auto"
+                hint="المقاس المطلوب 1920 × 640 بكسل" value={String(data.desktopImageUrl ?? '')}
+                onChange={(url) => patch({ desktopImageUrl: url, backgroundImageUrl: url })} />
+              <ImageUploadField label="صورة الخلفية للهاتف (موصى بها)" purpose="banner" aspectRatio="auto"
+                hint="المقاس المطلوب 1080 × 1350 بكسل" value={String(data.mobileImageUrl ?? '')}
+                onChange={(url) => patch({ mobileImageUrl: url })} />
+            </div>
+          )}
           {imageOnly ? (
             link('linkUrl', 'الرابط عند النقر على الصورة (اختياري)')
           ) : (
@@ -604,52 +635,36 @@ function WidgetFields({ type, data, patch }: FieldsProps) {
       )
     }
 
-    case 'carousel':
+    case 'carousel': {
+      const height = bannerHeightOf(data)
       return (
         <>
-          {choice('carouselStyle', 'شكل السلايدر', [
-            { value: 'hero', label: 'بانر عريض (21:9 على الحاسوب، 16:9 على الهاتف)' },
-            { value: 'normal', label: 'عادي 16:9' },
-            { value: 'auto', label: 'بأبعاد الصورة الأولى — تظهر كاملة بلا قص' },
-          ])}
-          {data.carouselStyle === 'auto' ? (
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              الإطار يأخذ شكل الصورة الأولى، فاجعل كل الشرائح بالمقاس نفسه. الصورة المربعة تملأ شاشة الهاتف، لكنها على الحاسوب تصير عالية جداً فيُقصّ منها ما زاد عن ارتفاع الشاشة.
-            </p>
-          ) : (
-            <>
-              {choice('imageFit', 'الصورة داخل الإطار', [
-                { value: 'cover', label: 'تملأ الإطار كاملاً (يُقصّ الزائد من الأطراف)' },
-                { value: 'contain', label: 'تظهر كاملة (يبقى فراغ على الجانبين إن اختلف شكلها عن الإطار)' },
-              ])}
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                لتملأ الصورة الإطار بلا قص: {data.carouselStyle === 'normal' ? '1920×1080' : '1920×820 للحاسوب، و1080×608 للهاتف'}.
-              </p>
-            </>
-          )}
+          <BannerHeightChoice value={height} onChange={(value) => patch({ bannerHeight: value, carouselStyle: undefined })} />
+          <div className="grid gap-3 sm:grid-cols-2">
+            {height !== 'auto'
+              ? choice('imageFit', 'الصورة داخل الإطار', [
+                  { value: 'cover', label: 'تملأ الإطار (يُقص الزائد حسب نقطة التركيز)' },
+                  { value: 'contain', label: 'تظهر كاملة (قد يبقى فراغ على الجانبين)' },
+                ])
+              : null}
+            {choice('interval', 'التقليب التلقائي', [
+              { value: '6', label: 'كل 6 ثوانٍ' },
+              { value: '4', label: 'كل 4 ثوانٍ' },
+              { value: '8', label: 'كل 8 ثوانٍ' },
+              { value: '0', label: 'بلا تقليب تلقائي' },
+            ])}
+          </div>
           <Repeater
             title="الشرائح"
             addLabel="إضافة شريحة"
             items={(data.slides as Data[]) ?? []}
             blank={{ imageUrl: '', mobileImageUrl: '', title: '', subtitle: '', linkUrl: '' }}
             onChange={(slides) => patch({ slides })}
-            render={(slide, update) => (
-              <>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <ImageUploadField label="صورة الشريحة" purpose="banner" aspectRatio="auto" value={String(slide.imageUrl ?? '')} onChange={(url) => update({ imageUrl: url })} />
-                  <ImageUploadField label="صورة الهاتف (اختياري)" purpose="banner" aspectRatio="auto"
-                    hint="إن تُركت فارغة تُستخدم صورة الشريحة" value={String(slide.mobileImageUrl ?? '')} onChange={(url) => update({ mobileImageUrl: url })} />
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <TextInput label="عنوان على الصورة (اختياري)" value={String(slide.title ?? '')} onChange={(v) => update({ title: v })} />
-                  <TextInput label="نص فرعي (اختياري)" value={String(slide.subtitle ?? '')} onChange={(v) => update({ subtitle: v })} />
-                </div>
-                <TextInput label="الرابط عند النقر (اختياري)" dir="ltr" list="link-suggestions" value={String(slide.linkUrl ?? '')} onChange={(v) => update({ linkUrl: v })} />
-              </>
-            )}
+            render={(slide, update) => <SlideFields slide={slide} update={update} height={height} />}
           />
         </>
       )
+    }
 
     case 'image':
       return (
@@ -948,6 +963,118 @@ function Check({ label, checked, onChange }: { label: string; checked: boolean; 
 }
 
 /** A list of sub-items (slides, pictures, badges) with add, remove and reorder. */
+/** Older layouts stored `carouselStyle` (hero / normal / auto). */
+function bannerHeightOf(data: Data): BannerHeight {
+  const value = data.bannerHeight
+  if (value === 'band' || value === 'full' || value === 'auto') return value
+  return data.carouselStyle === 'auto' ? 'auto' : 'band'
+}
+
+/** The banner's height, with the picture sizes the designer must deliver. */
+function BannerHeightChoice({ value, onChange }: { value: BannerHeight; onChange: (value: BannerHeight) => void }) {
+  return (
+    <fieldset className="space-y-2">
+      <legend className="text-sm font-bold">ارتفاع البانر</legend>
+      <div className="grid gap-2 sm:grid-cols-3">
+        {(Object.keys(BANNER_SIZES) as BannerHeight[]).map((key) => {
+          const option = BANNER_SIZES[key]
+          return (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={value === key}
+              onClick={() => onChange(key)}
+              className={cn(
+                'space-y-1.5 rounded-xl border p-3 text-start text-xs transition-colors',
+                value === key ? 'border-primary bg-primary/5 ring-1 ring-primary/30' : 'border-border hover:border-primary/40',
+              )}
+            >
+              <span className="block text-sm font-bold">{option.label}</span>
+              <span className="block text-muted-foreground">
+                {key === 'band' ? 'شريط يترك المنتجات ظاهرة تحته' : key === 'full' ? 'يملأ الشاشة كلها، للحملات' : 'الإطار يأخذ شكل صورتك'}
+              </span>
+              <span className="block">
+                حاسوب: <bdi dir="ltr" className="font-mono font-bold text-foreground">{sizeNumbers(option.desktop)}</bdi> {sizeUnit(option.desktop)}
+              </span>
+              <span className="block">
+                هاتف: <bdi dir="ltr" className="font-mono font-bold text-foreground">{sizeNumbers(option.mobile)}</bdi> {sizeUnit(option.mobile)}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </fieldset>
+  )
+}
+
+/** One slide: a desktop and a phone picture, each with a focus point, and
+ * optional words over the picture. */
+function SlideFields({ slide, update, height }: { slide: Data; update: (patch: Data) => void; height: BannerHeight }) {
+  const value = (key: string) => String(slide[key] ?? '')
+  const num = (key: string, fallback: number) => Number(slide[key] ?? fallback)
+  const select = (key: string, label: string, options: [string, string][], fallback: string) => (
+    <Field label={label} id={`slide-${key}`}>
+      {(props) => (
+        <Select {...props} value={value(key) || fallback} onChange={(e) => update({ [key]: e.target.value })}>
+          {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </Select>
+      )}
+    </Field>
+  )
+  const hasText = Boolean(value('title') || value('subtitle') || value('buttonLabel'))
+  return (
+    <>
+      <BannerImageField
+        device="desktop"
+        height={height}
+        value={value('imageUrl')}
+        onChange={(url) => update({ imageUrl: url })}
+        focusX={num('focusX', 50)}
+        focusY={num('focusY', 50)}
+        onFocusChange={(x, y) => update({ focusX: x, focusY: y })}
+      />
+      <BannerImageField
+        device="mobile"
+        optional
+        height={height}
+        value={value('mobileImageUrl')}
+        onChange={(url) => update({ mobileImageUrl: url })}
+        focusX={num('mobileFocusX', 50)}
+        focusY={num('mobileFocusY', 50)}
+        onFocusChange={(x, y) => update({ mobileFocusX: x, mobileFocusY: y })}
+      />
+      <TextInput label="الرابط عند النقر (اختياري)" dir="ltr" list="link-suggestions" value={value('linkUrl')} onChange={(v) => update({ linkUrl: v })} />
+      <details className="rounded-xl border border-border p-3" open={hasText}>
+        <summary className="cursor-pointer text-sm font-bold">نص فوق الصورة (اختياري)</summary>
+        <div className="mt-3 space-y-3">
+          <p className="text-xs text-muted-foreground">
+            اتركه فارغاً إن كان النص مكتوباً داخل الصورة نفسها.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <TextInput label="العنوان" value={value('title')} onChange={(v) => update({ title: v })} />
+            <TextInput label="سطر تحت العنوان" value={value('subtitle')} onChange={(v) => update({ subtitle: v })} />
+            <TextInput label="نص الزر" hint="يظهر الزر إن وُضع رابط أعلاه" value={value('buttonLabel')} onChange={(v) => update({ buttonLabel: v })} />
+            {select('textTone', 'لون النص', [['light', 'فاتح (على صورة داكنة)'], ['dark', 'داكن (على صورة فاتحة)']], 'light')}
+            {select('textAlign', 'مكان النص أفقياً', [['start', 'يمين'], ['center', 'وسط'], ['end', 'يسار']], 'start')}
+            {select('textVAlign', 'مكان النص عمودياً', [['bottom', 'أسفل'], ['middle', 'وسط'], ['top', 'أعلى']], 'bottom')}
+          </div>
+          <Field label={`تظليل خلف النص: ${num('overlay', 35)}%`} id="slide-overlay" hint="يجعل النص مقروءاً دون تعتيم الصورة كلها">
+            {(props) => (
+              <input {...props} type="range" min={0} max={80} step={5} className="w-full"
+                value={num('overlay', 35)} onChange={(e) => update({ overlay: Number(e.target.value) })} />
+            )}
+          </Field>
+          <Check
+            label="النص مكتوب داخل صورة الهاتف، لا تكرّره على الهاتف"
+            checked={slide.textOnMobile === false}
+            onChange={(v) => update({ textOnMobile: !v })}
+          />
+        </div>
+      </details>
+    </>
+  )
+}
+
 function Repeater({ title, addLabel, items, blank, onChange, render }: {
   title: string
   addLabel: string

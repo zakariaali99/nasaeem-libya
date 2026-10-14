@@ -13,6 +13,7 @@ import {
   Spacer,
   TextBlock,
 } from '@/components/storefront/widgets/SimpleWidgets'
+import { PromoBanners } from '@/components/storefront/widgets/PromoBanners'
 import { TrustBadgesWidget } from '@/components/storefront/widgets/TrustBadgesWidget'
 import { WidgetShell } from '@/components/storefront/widgets/WidgetShell'
 import type { Widget, WidgetType } from '@/types/api'
@@ -31,6 +32,7 @@ export const WIDGET_RENDERERS: Record<WidgetType, Renderer> = {
   category_list: CategoryListWidget,
   photo_link_grid: PhotoLinkGrid,
   hero_cta: HeroCta,
+  promo_banners: PromoBanners,
   announcement_bar: AnnouncementBar,
   discovery_box: DiscoveryBoxWidget,
   trust_badges: TrustBadgesWidget,

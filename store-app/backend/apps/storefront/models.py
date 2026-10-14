@@ -9,6 +9,10 @@ import uuid
 from django.db import models
 
 
+# Adding a type here needs no migration: choices are not stored in the
+# database. Do not run `makemigrations storefront` for a choice change — the
+# live server holds an untracked `0003_alter_widget_type.py`, and a second
+# 0003 from this repository would make `migrate` refuse to run there.
 class WidgetType(models.TextChoices):
     CAROUSEL = "carousel", "سلايدر متحرك"
     TEXT_BLOCK = "text_block", "كتلة نصية"
@@ -18,6 +22,7 @@ class WidgetType(models.TextChoices):
     CATEGORY_LIST = "category_list", "قائمة تصنيفات"
     PHOTO_LINK_GRID = "photo_link_grid", "شبكة صور بروابط"
     HERO_CTA = "hero_cta", "بانر رئيسي تفاعلي"
+    PROMO_BANNERS = "promo_banners", "بانرات العروض"
     ANNOUNCEMENT_BAR = "announcement_bar", "شريط الإعلانات"
     DISCOVERY_BOX = "discovery_box", "بانر باقة عينات التجربة"
     TRUST_BADGES = "trust_badges", "شريط مزايا وضمانات المتجر"

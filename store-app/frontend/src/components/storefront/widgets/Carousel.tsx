@@ -171,39 +171,13 @@ function Slide({
   variant?: BannerVariant
   label?: string
 }) {
-  const desktopSrc = slide.imageUrl || slide.mobileImageUrl || ''
-  const mobileSrc = phoneSrc(slide)
-  // The phone picture has its own focus point; without one, the desktop
-  // picture keeps the desktop focus on a phone too.
-  const desktopFocus = `${slide.focusX ?? 50}% ${slide.focusY ?? 50}%`
-  const mobileFocus = slide.mobileImageUrl
-    ? `${slide.mobileFocusX ?? 50}% ${slide.mobileFocusY ?? 50}%`
-    : desktopFocus
-  const focusClass =
-    variant === 'mobile'
-      ? '[object-position:var(--focus-m)]'
-      : variant === 'desktop'
-        ? '[object-position:var(--focus-d)]'
-        : '[object-position:var(--focus-m)] sm:[object-position:var(--focus-d)]'
-
   const image = (
-    <picture className="block size-full">
-      {variant === undefined ? <source media="(max-width: 640px)" srcSet={mobileSrc} /> : null}
-      <img
-        src={variant === 'mobile' ? mobileSrc : desktopSrc}
-        alt={slide.title || ''}
-        loading={eager ? 'eager' : 'lazy'}
-        fetchPriority={eager ? 'high' : undefined}
-        decoding="async"
-        draggable={false}
-        style={{ '--focus-m': mobileFocus, '--focus-d': desktopFocus } as React.CSSProperties}
-        className={cn(
-          'block w-full',
-          sizer ? 'h-auto max-h-[85dvh] object-cover' : cn('size-full', contain ? 'object-contain' : 'object-cover'),
-          focusClass,
-        )}
-      />
-    </picture>
+    <BannerPicture
+      slide={slide}
+      variant={variant}
+      eager={eager}
+      className={sizer ? 'h-auto max-h-[85dvh] object-cover' : cn('size-full', contain ? 'object-contain' : 'object-cover')}
+    />
   )
 
   const hasText = Boolean(slide.title || slide.subtitle || slide.buttonLabel)
@@ -234,7 +208,55 @@ function Slide({
   )
 }
 
-function SlideText({
+/**
+ * A banner picture: the phone picture (or the server's 1080px copy) on small
+ * screens, the desktop one above, each cropped around its own focus point.
+ * `variant` pins one of the two for the builder's previews.
+ */
+export function BannerPicture({
+  slide,
+  variant,
+  eager = false,
+  className,
+}: {
+  slide: CarouselSlide
+  variant?: BannerVariant
+  eager?: boolean
+  className?: string
+}) {
+  const desktopSrc = slide.imageUrl || slide.mobileImageUrl || ''
+  const mobileSrc = phoneSrc(slide)
+  // The phone picture has its own focus point; without one, the desktop
+  // picture keeps the desktop focus on a phone too.
+  const desktopFocus = `${slide.focusX ?? 50}% ${slide.focusY ?? 50}%`
+  const mobileFocus = slide.mobileImageUrl
+    ? `${slide.mobileFocusX ?? 50}% ${slide.mobileFocusY ?? 50}%`
+    : desktopFocus
+  const focusClass =
+    variant === 'mobile'
+      ? '[object-position:var(--focus-m)]'
+      : variant === 'desktop'
+        ? '[object-position:var(--focus-d)]'
+        : '[object-position:var(--focus-m)] sm:[object-position:var(--focus-d)]'
+
+  return (
+    <picture className="block size-full">
+      {variant === undefined ? <source media="(max-width: 640px)" srcSet={mobileSrc} /> : null}
+      <img
+        src={variant === 'mobile' ? mobileSrc : desktopSrc}
+        alt={slide.title || ''}
+        loading={eager ? 'eager' : 'lazy'}
+        fetchPriority={eager ? 'high' : undefined}
+        decoding="async"
+        draggable={false}
+        style={{ '--focus-m': mobileFocus, '--focus-d': desktopFocus } as React.CSSProperties}
+        className={cn('block w-full', className, focusClass)}
+      />
+    </picture>
+  )
+}
+
+export function SlideText({
   slide,
   active,
   className,

@@ -72,6 +72,27 @@ export function PhotoLinkGrid({ widget }: { widget: Widget }) {
       >
         {items.map((item, index) => (
           <li key={`${item.imageUrl}-${index}`} className={cn(slider && 'w-36 shrink-0 snap-start sm:w-44')}>
+            {widget.data.tileStyle === 'image' ? (
+              // The picture fills the tile and the name sits over it: for
+              // category and brand pictures, not logos on white.
+              <Link
+                to={item.linkUrl || '/products'}
+                className="group relative block aspect-[4/5] overflow-hidden rounded-2xl bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
+                <img
+                  src={item.imageUrl}
+                  alt={item.label || ''}
+                  loading="lazy"
+                  decoding="async"
+                  className="size-full object-cover transition-transform duration-500 group-hover:scale-105"
+                />
+                {item.label ? (
+                  <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/65 to-transparent p-3 pt-10 text-sm font-bold text-white">
+                    {item.label}
+                  </span>
+                ) : null}
+              </Link>
+            ) : (
             <Link
               to={item.linkUrl || '/products'}
               className="card-hover group flex flex-col items-center justify-between gap-3 rounded-2xl border border-border/80 bg-card p-4 text-center hover:border-primary/50 hover:shadow-md transition-all shadow-2xs"
@@ -93,6 +114,7 @@ export function PhotoLinkGrid({ widget }: { widget: Widget }) {
                 </span>
               ) : null}
             </Link>
+            )}
           </li>
         ))}
       </ul>

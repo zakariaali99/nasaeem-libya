@@ -215,6 +215,7 @@ export type WidgetType =
   | 'category_list'
   | 'photo_link_grid'
   | 'hero_cta'
+  | 'promo_banners'
   | 'announcement_bar'
   | 'discovery_box'
   | 'trust_badges'
@@ -309,8 +310,13 @@ export interface WidgetData {
   // category_list
   categoryIds?: string[]
   categories?: Category[]
-  // photo_link_grid
+  // photo_link_grid (and promo_banners, whose items are CarouselSlide)
   items?: PhotoLinkItem[]
+  /** photo_link_grid: a padded card, or the picture filling the tile. */
+  tileStyle?: 'card' | 'image'
+  // promo_banners
+  shape?: 'strip' | 'grid' | 'editorial'
+  imageSide?: 'start' | 'end'
   // hero_cta
   heroMode?: 'image' | 'text'
   badgeText?: string

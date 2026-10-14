@@ -2,7 +2,7 @@ import { AlertTriangle, Crosshair, Monitor, Smartphone } from 'lucide-react'
 import * as React from 'react'
 
 import { ImageUploadField } from '@/components/admin/ImageUploadField'
-import { BANNER_SIZES, cropPercent, sizeNumbers, sizeUnit } from '@/lib/bannerSizes'
+import { BANNER_SIZES, cropPercent, sizeNumbers, sizeUnit, type BannerSize } from '@/lib/bannerSizes'
 import { cn } from '@/lib/utils'
 import type { BannerHeight } from '@/types/api'
 
@@ -39,9 +39,12 @@ export function BannerImageField({
   focusY = 50,
   onFocusChange,
   optional = false,
+  required: requiredSize,
 }: {
   device: 'desktop' | 'mobile'
-  height: BannerHeight
+  /** The banner height the picture is for; or pass the size directly. */
+  height?: BannerHeight
+  required?: BannerSize
   value: string
   onChange: (url: string) => void
   focusX?: number
@@ -49,7 +52,7 @@ export function BannerImageField({
   onFocusChange: (x: number, y: number) => void
   optional?: boolean
 }) {
-  const required = BANNER_SIZES[height][device]
+  const required = requiredSize ?? BANNER_SIZES[height ?? 'band'][device]
   const actual = useImageSize(value || undefined)
   const crop = actual ? cropPercent(actual, required) : 0
   const tooSmall = actual ? actual.width < required.width * 0.7 : false

@@ -282,6 +282,29 @@ def normalise_widget_data(widget_type: str, data: dict | None) -> dict:
             **_action(data),
         }
 
+    if widget_type == WidgetType.PROMO_BANNERS:
+        # `strip`: thin full-width offers; `grid`: two or three pictures side
+        # by side; `editorial`: one picture beside a title, text and button.
+        shape = data.get("shape")
+        items = []
+        for item in data.get("items") or []:
+            if not isinstance(item, dict):
+                continue
+            image = _first(item, "imageUrl", "image_url", "url")
+            mobile = _first(item, "mobileImageUrl", "mobile_image_url")
+            if not image and not mobile:
+                continue
+            items.append(_banner_slide(item, image or mobile, mobile))
+        return {
+            "shape": shape if shape in ("strip", "grid", "editorial") else "strip",
+            "items": items,
+            "title": str(data.get("title") or ""),
+            "content": str(data.get("content") or ""),
+            "buttonLabel": str(data.get("buttonLabel") or ""),
+            "buttonUrl": _first(data, "buttonUrl", "button_url"),
+            "imageSide": "end" if data.get("imageSide") == "end" else "start",
+        }
+
     if widget_type == WidgetType.PHOTO_LINK_GRID:
         items = []
         for item in data.get("items") or []:
@@ -301,6 +324,9 @@ def normalise_widget_data(widget_type: str, data: dict | None) -> dict:
             "title": data.get("title", "") or "",
             "items": items,
             "layout": _layout(data.get("layout")),
+            # `card`: the picture inside a padded card (logos, bottles on
+            # white); `image`: the picture fills the tile, the name over it.
+            "tileStyle": "image" if data.get("tileStyle") == "image" else "card",
             **_action(data),
         }
 

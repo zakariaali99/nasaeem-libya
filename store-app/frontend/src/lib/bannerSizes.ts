@@ -29,6 +29,28 @@ export const BANNER_SIZES: Record<BannerHeight, { desktop: BannerSize; mobile: B
   },
 }
 
+/** Offer banners (`promo_banners`): the picture sizes per shape. */
+export const PROMO_SIZES: Record<'strip' | 'grid' | 'editorial', { desktop: BannerSize; mobile: BannerSize; label: string; note: string }> = {
+  strip: {
+    label: 'شريط رفيع',
+    note: 'عرض أو إعلان قصير بعرض الصفحة',
+    desktop: { width: 1920, height: 320 },
+    mobile: { width: 1080, height: 360 },
+  },
+  grid: {
+    label: 'بانران أو ثلاثة متجاورة',
+    note: 'تصبح شريطاً يُسحب على الهاتف',
+    desktop: { width: 1080, height: 1350 },
+    mobile: { width: 1080, height: 1350 },
+  },
+  editorial: {
+    label: 'صورة بجانبها نص',
+    note: 'لقصة عطر أو مجموعة جديدة',
+    desktop: { width: 1080, height: 1350 },
+    mobile: { width: 1080, height: 1350 },
+  },
+}
+
 /** "1920 × 640" — the numbers only, for a left-to-right <bdi>. */
 export function sizeNumbers(size: BannerSize): string {
   return size.height ? `${size.width} × ${size.height}` : `${size.width} × —`

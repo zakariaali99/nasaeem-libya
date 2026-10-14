@@ -5,7 +5,9 @@ import { Link } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import type { WidgetStyle } from '@/types/api'
 
-const PADDING_Y = { none: '', sm: 'py-4', md: 'py-6', lg: 'py-10' } as const
+// One rhythm for the whole page: the default leaves 32px between sections on a
+// phone and 64px on a computer (each section adds half above and half below).
+const PADDING_Y = { none: '', sm: 'py-2 sm:py-4', md: 'py-4 sm:py-8', lg: 'py-8 sm:py-14' } as const
 const PADDING_X = { none: '', sm: 'px-4', md: 'px-6', lg: 'px-8' } as const
 const RADIUS = { none: '', md: 'rounded-md', lg: 'rounded-2xl' } as const
 

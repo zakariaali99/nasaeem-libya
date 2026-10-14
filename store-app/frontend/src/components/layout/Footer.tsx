@@ -45,7 +45,7 @@ export function Footer() {
     .filter((badge) => badge.title)
 
   return (
-    <footer className="mt-16 border-t border-border bg-card/60 backdrop-blur-sm">
+    <footer className="mt-8 sm:mt-16 border-t border-border bg-card/60 backdrop-blur-sm">
       {/* Trust Badges Strip */}
       {trust.length > 0 && (
         <div className="border-b border-border/80 bg-muted/20">

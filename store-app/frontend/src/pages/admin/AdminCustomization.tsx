@@ -10,7 +10,9 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
+import { api } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
+import { LAYOUT_TEMPLATES } from '@/lib/layoutTemplates'
 import {
   useCreateLayout,
   useDeleteLayout,
@@ -30,13 +32,19 @@ export default function AdminCustomization() {
 
   const [name, setName] = useState('')
   const [creating, setCreating] = useState(false)
+  const [template, setTemplate] = useState<'' | 'store' | 'brand'>('')
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string; live: boolean } | null>(null)
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
     if (!name.trim()) return
     const layout = await create.mutateAsync(name.trim())
+    if (template) {
+      // A new layout is never live, so filling it from a template changes nothing on the store.
+      await api.patch(`/admin/storefront-layouts/${layout.id}/`, { widgets: LAYOUT_TEMPLATES[template].widgets })
+    }
     setName('')
+    setTemplate('')
     setCreating(false)
     navigate(`/admin/customization/${layout.id}`)
   }
@@ -110,6 +118,29 @@ export default function AdminCustomization() {
                 />
               )}
             </Field>
+
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-bold">البداية</legend>
+              {([['', 'صفحة فارغة', 'تضيف الأدوات بنفسك'] as const, ...(Object.entries(LAYOUT_TEMPLATES).map(([key, t]) => [key, t.label, t.description] as const))]).map(([key, label, description]) => (
+                <label
+                  key={key || 'blank'}
+                  className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm ${template === key ? 'border-primary bg-primary/5' : 'border-border'}`}
+                >
+                  <input
+                    type="radio"
+                    name="layout-template"
+                    className="mt-1"
+                    checked={template === key}
+                    onChange={() => setTemplate(key as '' | 'store' | 'brand')}
+                  />
+                  <span>
+                    <span className="block font-bold">{label}</span>
+                    <span className="block text-xs text-muted-foreground">{description}</span>
+                  </span>
+                </label>
+              ))}
+              <p className="text-xs text-muted-foreground">القالب ترتيب أقسام فقط، بلا صور ولا منتجات. الأقسام الناقصة لا تظهر في المتجر حتى تملأها.</p>
+            </fieldset>
 
             <div className="flex justify-end gap-2.5 pt-2">
               <Button type="button" variant="outline" onClick={() => setCreating(false)} className="rounded-xl">

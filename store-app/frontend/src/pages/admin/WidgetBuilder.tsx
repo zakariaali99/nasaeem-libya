@@ -14,7 +14,7 @@ import { LineThumb } from '@/components/ui/line-thumb'
 import { Select } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ApiError } from '@/lib/api'
-import { BANNER_SIZES, sizeNumbers, sizeUnit } from '@/lib/bannerSizes'
+import { BANNER_SIZES, PROMO_SIZES, sizeNumbers, sizeUnit } from '@/lib/bannerSizes'
 import { formatPrice } from '@/lib/format'
 import { useCategories, useCollections, useProducts } from '@/lib/queries/catalog'
 import { useLayout, useSaveLayout, type Layout, type LayoutDraft } from '@/lib/queries/customization'
@@ -31,6 +31,7 @@ import type { BannerHeight, Category, Collection, Product, Widget, WidgetStyle }
 const TYPE_LABELS: Record<string, string> = {
   hero_cta: 'بانر رئيسي',
   carousel: 'سلايدر صور متحرك',
+  promo_banners: 'بانرات العروض (شريط، متجاورة، صورة ونص)',
   image: 'صورة منفردة',
   announcement_bar: 'شريط إعلان',
   category_list: 'تصنيفات / علامات تجارية',
@@ -122,6 +123,10 @@ function emptyReason(widget: DraftWidget): string | null {
       return list('categoryIds').length ? null : 'اختر التصنيفات'
     case 'photo_link_grid':
       return list('items').length ? null : 'أضف صورة واحدة على الأقل'
+    case 'promo_banners':
+      return list('items').some((item) => (item as Data).imageUrl || (item as Data).mobileImageUrl)
+        ? null
+        : 'ارفع صورة واحدة على الأقل'
     case 'product_list':
       return list('productIds').length ? null : 'اختر المنتجات'
     case 'collection_showcase':
@@ -244,6 +249,7 @@ function Editor({ layout, notice, setNotice, lastIndex }: EditorProps) {
     const data: Data =
       type === 'hero_cta' ? { heroMode: 'image', overlay: 45, alignment: 'center' }
       : type === 'announcement_bar' ? { dismissible: true, icon: 'megaphone' }
+      : type === 'promo_banners' ? { shape: 'strip', items: [{ imageUrl: '', mobileImageUrl: '', linkUrl: '', title: '' }] }
       : type === 'trust_badges' ? { items: [{ icon: 'shield-check', title: '', subtitle: '' }] }
       // Starting words the operator can see and change — never hidden defaults.
       : PERSONALISED.includes(type) ? { limit: 8, layout: 'slider', title: TYPE_LABELS[type]!.replace(' (تلقائي)', '') }
@@ -710,7 +716,16 @@ function WidgetFields({ type, data, patch }: FieldsProps) {
       return (
         <>
           {heading()}
-          {layoutChoice}
+          <div className="grid gap-3 sm:grid-cols-2">
+            {layoutChoice}
+            {choice('tileStyle', 'شكل البطاقة', [
+              { value: 'card', label: 'الصورة داخل بطاقة (للشعارات والعبوات على خلفية بيضاء)' },
+              { value: 'image', label: 'الصورة تملأ البطاقة والاسم فوقها (لصور الأقسام)' },
+            ])}
+          </div>
+          {data.tileStyle === 'image' ? (
+            <p className="text-xs text-muted-foreground">المقاس المطلوب لكل صورة: 1080 × 1350 بكسل (طولية 4:5).</p>
+          ) : null}
           <Repeater
             title="الصور"
             addLabel="إضافة صورة"
@@ -729,6 +744,101 @@ function WidgetFields({ type, data, patch }: FieldsProps) {
           />
         </>
       )
+
+    case 'promo_banners': {
+      const shape = (data.shape as keyof typeof PROMO_SIZES) || 'strip'
+      const sizes = PROMO_SIZES[shape]
+      return (
+        <>
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-bold">شكل البانرات</legend>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {(Object.keys(PROMO_SIZES) as (keyof typeof PROMO_SIZES)[]).map((key) => {
+                const option = PROMO_SIZES[key]
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    aria-pressed={shape === key}
+                    onClick={() => patch({ shape: key })}
+                    className={cn(
+                      'space-y-1.5 rounded-xl border p-3 text-start text-xs transition-colors',
+                      shape === key ? 'border-primary bg-primary/5 ring-1 ring-primary/30' : 'border-border hover:border-primary/40',
+                    )}
+                  >
+                    <span className="block text-sm font-bold">{option.label}</span>
+                    <span className="block text-muted-foreground">{option.note}</span>
+                    <span className="block">
+                      حاسوب: <bdi dir="ltr" className="font-mono font-bold text-foreground">{sizeNumbers(option.desktop)}</bdi> {sizeUnit(option.desktop)}
+                    </span>
+                    <span className="block">
+                      هاتف: <bdi dir="ltr" className="font-mono font-bold text-foreground">{sizeNumbers(option.mobile)}</bdi> {sizeUnit(option.mobile)}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </fieldset>
+          {shape === 'editorial' ? (
+            <>
+              {text('title', 'العنوان')}
+              <Field label="النص" id="f-content">
+                {(props) => (
+                  <textarea {...props} rows={4} className="w-full rounded-md border border-input bg-background px-4 py-3 text-base"
+                    value={String(data.content ?? '')} onChange={(e) => patch({ content: e.target.value })} />
+                )}
+              </Field>
+              <div className="grid gap-3 sm:grid-cols-3">
+                {text('buttonLabel', 'نص الزر (اختياري)')}
+                {link('buttonUrl', 'رابط الزر')}
+                {choice('imageSide', 'مكان الصورة على الحاسوب', [
+                  { value: 'start', label: 'يمين النص' },
+                  { value: 'end', label: 'يسار النص' },
+                ])}
+              </div>
+            </>
+          ) : (
+            text('title', 'عنوان فوق البانرات (اختياري)')
+          )}
+          <Repeater
+            title={shape === 'editorial' ? 'الصورة' : 'البانرات'}
+            addLabel="إضافة بانر"
+            items={((data.items as Data[]) ?? []).slice(0, shape === 'editorial' ? 1 : shape === 'grid' ? 3 : 6)}
+            blank={{ imageUrl: '', mobileImageUrl: '', linkUrl: '', title: '' }}
+            onChange={(items) => patch({ items })}
+            render={(item, update) => (
+              <>
+                <BannerImageField
+                  device="desktop"
+                  required={sizes.desktop}
+                  value={String(item.imageUrl ?? '')}
+                  onChange={(url) => update({ imageUrl: url })}
+                  focusX={Number(item.focusX ?? 50)}
+                  focusY={Number(item.focusY ?? 50)}
+                  onFocusChange={(x, y) => update({ focusX: x, focusY: y })}
+                />
+                <BannerImageField
+                  device="mobile"
+                  optional
+                  required={sizes.mobile}
+                  value={String(item.mobileImageUrl ?? '')}
+                  onChange={(url) => update({ mobileImageUrl: url })}
+                  focusX={Number(item.mobileFocusX ?? 50)}
+                  focusY={Number(item.mobileFocusY ?? 50)}
+                  onFocusChange={(x, y) => update({ mobileFocusX: x, mobileFocusY: y })}
+                />
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <TextInput label="الرابط عند النقر" dir="ltr" list="link-suggestions" value={String(item.linkUrl ?? '')} onChange={(v) => update({ linkUrl: v })} />
+                  {shape !== 'editorial' ? (
+                    <TextInput label="اسم فوق الصورة (اختياري)" hint="اتركه فارغاً إن كان مكتوباً في الصورة" value={String(item.title ?? '')} onChange={(v) => update({ title: v })} />
+                  ) : null}
+                </div>
+              </>
+            )}
+          />
+        </>
+      )
+    }
 
     case 'product_list':
       return (
@@ -852,7 +962,7 @@ function WidgetFields({ type, data, patch }: FieldsProps) {
 // --------------------------------------------------------------------------
 
 /** Picture widgets, where "edge to edge with no gaps" is one click. */
-const EDGE_TO_EDGE: string[] = ['carousel', 'image', 'hero_cta']
+const EDGE_TO_EDGE: string[] = ['carousel', 'image', 'hero_cta', 'promo_banners']
 
 function AppearanceEditor({ widget, patch }: { widget: DraftWidget; patch: (patch: Partial<DraftWidget>) => void }) {
   const style = widget.style

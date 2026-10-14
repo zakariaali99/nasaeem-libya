@@ -78,6 +78,8 @@ export interface ProductVariant {
   sku: string
   price: string | null
   compare_at_price: string | null
+  /** Staff-only; null for everyone else. */
+  cost_price?: string | null
   stock: number
   reserved_stock: number
   available_stock: number
@@ -135,6 +137,8 @@ export interface Product {
   description?: string
   price: string | null
   compare_at_price: string | null
+  /** Staff-only; null for everyone else. */
+  cost_price?: string | null
   sku: string
   barcode?: string
   images: ProductImage[]
@@ -694,8 +698,9 @@ export interface BrandProfitRow {
   brand_name: string
   units_sold: number
   revenue: string
-  margin_percent: number
-  net_profit: string
+  /** Null when this product's cost was not recorded for every sale. */
+  margin_percent: number | null
+  net_profit: string | null
 }
 
 export interface VipSpenderRow {
@@ -728,11 +733,13 @@ export interface ExecutiveAnalyticsData {
   start_date?: string
   end_date?: string
   total_revenue: string
-  estimated_profit: string
+  /** Null until a sold line has a recorded cost. */
+  estimated_profit: string | null
+  /** Percent of sales whose cost is known (the profit covers this much). */
+  profit_coverage: number
   total_orders_count: number
   average_order_value: string
   repeat_purchase_rate: number
-  avg_days_between_orders: number
   city_breakdown: CitySalesRow[]
   brand_performance: BrandProfitRow[]
   vip_top_spenders: VipSpenderRow[]

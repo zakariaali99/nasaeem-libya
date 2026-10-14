@@ -410,6 +410,9 @@ class OrderItem(TimestampedModel):
     unit_price = models.DecimalField("سعر الوحدة", max_digits=10, decimal_places=2)
     total_price = models.DecimalField("الإجمالي", max_digits=10, decimal_places=2)
     product_name = models.CharField("اسم المنتج", max_length=255)
+    # The cost price at the moment of sale, so a later change of cost never
+    # rewrites past profit. Empty when no cost was recorded.
+    unit_cost = models.DecimalField("تكلفة الوحدة", max_digits=10, decimal_places=2, null=True, blank=True)
 
     class Meta:
         verbose_name = "عنصر طلب"

@@ -100,10 +100,16 @@ class ProductVariantSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductVariant
         fields = [
-            "id", "product", "sku", "price", "compare_at_price",
+            "id", "product", "sku", "price", "compare_at_price", "cost_price",
             "stock", "reserved_stock", "is_active", "values", "value_ids", "available_stock",
         ]
         read_only_fields = ["reserved_stock"]
+
+    def to_representation(self, instance):
+        # Writable for staff, never shown to anyone else.
+        data = super().to_representation(instance)
+        data["cost_price"] = staff_cost(self.context, instance.cost_price)
+        return data
 
     def get_available_stock(self, obj):
         return obj.stock - obj.reserved_stock
@@ -217,8 +223,20 @@ class ProductBundleSerializer(serializers.ModelSerializer):
         ]
 
 
+def staff_cost(context, value):
+    """Cost prices are the store's business: staff see them, nobody else."""
+    request = (context or {}).get("request")
+    if value is None or not request or not getattr(request.user, "is_admin_role", False):
+        return None
+    return str(value)
+
+
 class ProductDetailSerializer(ProductListSerializer):
     variants = ProductVariantSerializer(many=True, read_only=True)
+    cost_price = serializers.SerializerMethodField()
+
+    def get_cost_price(self, obj):
+        return staff_cost(self.context, obj.cost_price)
     perfume_details = serializers.SerializerMethodField()
     bundles = serializers.SerializerMethodField()
 
@@ -226,6 +244,7 @@ class ProductDetailSerializer(ProductListSerializer):
         fields = ProductListSerializer.Meta.fields + [
             "description", "barcode", "meta_title", "meta_description",
             "width", "length", "height", "weight", "variants", "perfume_details", "bundles", "created_at",
+            "cost_price",
         ]
 
     def get_bundles(self, obj):
@@ -255,7 +274,7 @@ class ProductWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = [
-            "id", "name", "slug", "description", "price", "compare_at_price",
+            "id", "name", "slug", "description", "price", "compare_at_price", "cost_price",
             "sku", "barcode", "is_active", "has_variants", "track_quantity",
             "meta_title", "meta_description", "width", "length", "height", "weight",
             "category_ids", "collection_ids", "images", "perfume_details", "sizes",
@@ -370,6 +389,13 @@ class ProductWriteSerializer(serializers.ModelSerializer):
                     except Exception:
                         compare_val = None
 
+                cost_val = None
+                if s.get("cost_price") not in (None, ""):
+                    try:
+                        cost_val = Decimal(str(s["cost_price"]))
+                    except Exception:
+                        cost_val = None
+
                 stock_val = int(s.get("stock") or 0)
                 sku_val = str(s.get("sku") or f"{product.sku or 'NAS'}-{size_name}").strip()
                 is_active_val = bool(s.get("is_active", True))
@@ -378,6 +404,7 @@ class ProductWriteSerializer(serializers.ModelSerializer):
                     variant = existing_variants[size_name]
                     variant.price = price_val
                     variant.compare_at_price = compare_val
+                    variant.cost_price = cost_val
                     variant.sku = sku_val
                     variant.is_active = is_active_val
                     if stock_val != variant.stock:
@@ -396,6 +423,7 @@ class ProductWriteSerializer(serializers.ModelSerializer):
                         product=product,
                         price=price_val,
                         compare_at_price=compare_val,
+                        cost_price=cost_val,
                         sku=sku_val,
                         stock=stock_val,
                         is_active=is_active_val,

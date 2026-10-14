@@ -76,6 +76,11 @@ class Product(TimestampedModel):
     compare_at_price = models.DecimalField(
         "السعر قبل الخصم", max_digits=10, decimal_places=2, null=True, blank=True
     )
+    # What the store paid for one unit. Staff-only; drives the real profit
+    # figures. Empty = unknown, and the product is left out of profit.
+    cost_price = models.DecimalField(
+        "سعر التكلفة", max_digits=10, decimal_places=2, null=True, blank=True
+    )
     sku = models.CharField("رمز المنتج", max_length=50, blank=True, db_index=True)
     barcode = models.CharField("الباركود", max_length=50, blank=True)
     is_active = models.BooleanField("نشط", default=True, db_index=True)
@@ -187,6 +192,10 @@ class ProductVariant(TimestampedModel):
     )
     compare_at_price = models.DecimalField(
         "السعر قبل الخصم", max_digits=10, decimal_places=2, null=True, blank=True
+    )
+    # Empty = the product's cost price.
+    cost_price = models.DecimalField(
+        "سعر التكلفة", max_digits=10, decimal_places=2, null=True, blank=True
     )
     stock = models.IntegerField("المخزون", default=0)
     reserved_stock = models.IntegerField("المخزون المحجوز", default=0)

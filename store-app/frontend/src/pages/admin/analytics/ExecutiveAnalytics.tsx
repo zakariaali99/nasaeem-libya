@@ -232,9 +232,31 @@ export default function ExecutiveAnalytics() {
           </div>
         </div>
 
-        {/* No profit card: the catalogue records no cost price, so there is
-            nothing to compute a profit from. The figure that stood here was
-            55% of sales, for every product and every period. */}
+        {/* Profit from recorded cost prices only (it used to be 55% of
+            sales, invented). The coverage line says how much of the sales the
+            figure covers, so a half-costed catalogue never passes for all of it. */}
+        <div className="rounded-3xl border border-border bg-card p-4 sm:p-5 shadow-2xs space-y-1.5">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>صافي الربح (من التكلفة المسجلة)</span>
+            <DollarSign className="size-4 text-primary" />
+          </div>
+          {data.estimated_profit !== null ? (
+            <>
+              <p className="font-mono text-xl sm:text-2xl font-black text-foreground">{formatPrice(data.estimated_profit)}</p>
+              <p className="text-[11px] text-muted-foreground">
+                يغطي {formatNumber(data.profit_coverage)}% من المبيعات
+                {data.profit_coverage < 100 ? ' (منتجات بلا سعر تكلفة لا تُحسب)' : ''}
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="font-mono text-xl sm:text-2xl font-black text-muted-foreground">—</p>
+              <p className="text-[11px] text-muted-foreground">
+                أدخل «سعر التكلفة» في صفحة المنتج ليظهر الربح للمبيعات القادمة.
+              </p>
+            </>
+          )}
+        </div>
         {/* Average Order Value (AOV) */}
         <div className="rounded-3xl border border-border bg-card p-4 sm:p-5 shadow-2xs space-y-1.5">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -482,6 +504,7 @@ export default function ExecutiveAnalytics() {
                     <th className="pb-3 text-start font-bold">العطر / الصنف</th>
                     <th className="pb-3 text-center font-bold">المبيعات</th>
                     <th className="pb-3 text-end font-bold">قيمة المبيعات</th>
+                    <th className="pb-3 text-end font-bold">الربح</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -493,6 +516,16 @@ export default function ExecutiveAnalytics() {
                       </td>
                       <td className="py-3.5 text-end font-mono font-bold text-price">
                         {formatPrice(brand.revenue)}
+                      </td>
+                      <td className="py-3.5 text-end font-mono text-muted-foreground">
+                        {brand.net_profit !== null ? (
+                          <>
+                            <span className="font-bold text-foreground">{formatPrice(brand.net_profit)}</span>
+                            <span className="block text-[10px]">{formatNumber(brand.margin_percent ?? 0)}%</span>
+                          </>
+                        ) : (
+                          <span title="لا يوجد سعر تكلفة لكل مبيعاته">—</span>
+                        )}
                       </td>
                     </tr>
                   ))}

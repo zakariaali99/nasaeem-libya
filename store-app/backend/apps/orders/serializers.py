@@ -547,8 +547,19 @@ class ExecutiveAnalyticsSerializer(serializers.Serializer):
         total_orders_count = confirmed_orders.count()
         total_revenue = confirmed_orders.aggregate(s=Sum("total"))["s"] or Decimal("0.00")
         
-        # Real Margin Calculation: based on 55% average luxury perfume markup or order totals
-        estimated_profit = (total_revenue * Decimal("0.55")).quantize(Decimal("0.01"))
+        # Profit only from lines whose cost was recorded at the time of sale.
+        # `profit_coverage` says how much of the sales that profit covers, so a
+        # half-costed catalogue never passes for the whole picture.
+        def line_profit(lines):
+            costed = lines.filter(unit_cost__isnull=False)
+            sold = costed.aggregate(s=Sum("total_price"))["s"] or Decimal("0.00")
+            cost = costed.aggregate(s=Sum(F("unit_cost") * F("quantity")))["s"] or Decimal("0.00")
+            return sold, (sold - cost).quantize(Decimal("0.01"))
+
+        all_lines = OrderItem.objects.filter(order__in=confirmed_orders)
+        line_sales = all_lines.aggregate(s=Sum("total_price"))["s"] or Decimal("0.00")
+        costed_sales, gross_profit = line_profit(all_lines)
+        profit_coverage = round(float(costed_sales / line_sales * 100), 1) if line_sales else 0.0
         aov = (
             (total_revenue / Decimal(total_orders_count)).quantize(Decimal("0.01"))
             if total_orders_count > 0
@@ -566,7 +577,7 @@ class ExecutiveAnalyticsSerializer(serializers.Serializer):
         for g in city_groups:
             c_name = g["shipping_city__name"]
             if not c_name:
-                c_name = "طرابلس (العاصمة)"
+                c_name = "غير محددة"
             c_rev = g["city_revenue"] or Decimal("0.00")
             pct = round(float(c_rev / total_revenue * 100), 1) if total_revenue > Decimal("0.00") else 0
             city_breakdown.append({
@@ -596,16 +607,17 @@ class ExecutiveAnalyticsSerializer(serializers.Serializer):
         )
         brand_performance = []
         for it in items:
-            p_name = it["product_name"] or "عطر نسائم فاخر"
+            p_name = it["product_name"] or "—"
             b_rev = it["brand_rev"] or Decimal("0.00")
-            # 55% standard luxury margin
-            b_profit = (b_rev * Decimal("0.55")).quantize(Decimal("0.01"))
+            b_costed, b_profit = line_profit(all_lines.filter(product_name=it["product_name"]))
+            known = b_costed == b_rev and b_rev > 0
             brand_performance.append({
                 "brand_name": p_name,
                 "units_sold": it["units_sold"] or 0,
                 "revenue": str(b_rev),
-                "margin_percent": 55,
-                "net_profit": str(b_profit),
+                # Null when this product's cost was not recorded for every sale.
+                "margin_percent": round(float(b_profit / b_rev * 100), 1) if known else None,
+                "net_profit": str(b_profit) if known else None,
             })
 
         # 4. VIP Top Spenders (Real Customers ordered by confirmed spending)
@@ -732,11 +744,12 @@ class ExecutiveAnalyticsSerializer(serializers.Serializer):
             "start_date": parsed_start.isoformat() if parsed_start else None,
             "end_date": parsed_end.isoformat() if parsed_end else None,
             "total_revenue": str(total_revenue),
-            "estimated_profit": str(estimated_profit),
+            # Null until at least one sold line has a recorded cost.
+            "estimated_profit": str(gross_profit) if costed_sales else None,
+            "profit_coverage": profit_coverage,
             "total_orders_count": total_orders_count,
             "average_order_value": str(aov),
             "repeat_purchase_rate": repeat_rate,
-            "avg_days_between_orders": 24,
             "city_breakdown": city_breakdown,
             "brand_performance": brand_performance,
             "vip_top_spenders": vip_top_spenders,

@@ -100,7 +100,16 @@ def test_executive_analytics_builder_metrics(executive_dataset):
 
     assert Decimal(data["total_revenue"]) == Decimal("790.00")
     assert data["total_orders_count"] == 2
-    assert Decimal(data["estimated_profit"]) > Decimal("0.00")
+    # No cost recorded → no profit figure (it used to be 55% of sales, invented).
+    assert data["estimated_profit"] is None
+    assert data["profit_coverage"] == 0.0
+
+    # With the cost recorded on each sold line: (250 − 150) × 3 units = 300.
+    OrderItem.objects.update(unit_cost=Decimal("150.00"))
+    data = ExecutiveAnalyticsSerializer().build()
+    assert Decimal(data["estimated_profit"]) == Decimal("300.00")
+    assert data["profit_coverage"] == 100.0
+    assert data["brand_performance"][0]["margin_percent"] == 40.0
     assert len(data["city_breakdown"]) >= 2
     assert any(c["city_name"] == "طرابلس" for c in data["city_breakdown"])
     assert any(c["city_name"] == "بنغازي" for c in data["city_breakdown"])

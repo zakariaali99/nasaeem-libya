@@ -35,6 +35,7 @@ const schema = z
     description: z.string().max(5000).optional(),
     price: z.string().optional(),
     compare_at_price: z.string().optional(),
+    cost_price: z.string().optional(),
     sku: z.string().max(50).optional(),
     barcode: z.string().max(50).optional(),
     meta_title: z.string().max(255).optional(),
@@ -144,6 +145,7 @@ export function ProductForm({
       size: string
       price: string
       compare_at_price: string
+      cost_price: string
       stock: number
       sku: string
       is_active: boolean
@@ -155,6 +157,7 @@ export function ProductForm({
         size: v.values?.map((val) => val.value).join(' / ') || v.sku || 'حجم',
         price: v.price || product.price || '',
         compare_at_price: v.compare_at_price || '',
+        cost_price: v.cost_price || '',
         stock: v.stock ?? 0,
         sku: v.sku || '',
         is_active: v.is_active ?? true,
@@ -180,6 +183,7 @@ export function ProductForm({
         size: trimmed,
         price: currentPrice,
         compare_at_price: currentCompare,
+        cost_price: form.getValues('cost_price') || '',
         stock: 10,
         sku: `${baseSku}-${cleanSizeSlug}`,
         is_active: true,
@@ -193,7 +197,7 @@ export function ProductForm({
 
   const updateSizeField = (
     index: number,
-    field: 'size' | 'price' | 'compare_at_price' | 'stock' | 'sku' | 'is_active',
+    field: 'size' | 'price' | 'compare_at_price' | 'cost_price' | 'stock' | 'sku' | 'is_active',
     value: any,
   ) => {
     setSizes((prev) => {
@@ -204,6 +208,7 @@ export function ProductForm({
           size: field === 'size' ? String(value) : currentItem.size,
           price: field === 'price' ? String(value) : currentItem.price,
           compare_at_price: field === 'compare_at_price' ? String(value) : currentItem.compare_at_price,
+          cost_price: field === 'cost_price' ? String(value) : currentItem.cost_price,
           stock: field === 'stock' ? Number(value) || 0 : currentItem.stock,
           sku: field === 'sku' ? String(value) : currentItem.sku,
           is_active: field === 'is_active' ? Boolean(value) : currentItem.is_active,
@@ -221,6 +226,7 @@ export function ProductForm({
       description: product?.description ?? '',
       price: product?.price ?? '',
       compare_at_price: product?.compare_at_price ?? '',
+      cost_price: product?.cost_price ?? '',
       sku: product?.sku ?? '',
       barcode: product?.barcode ?? '',
       meta_title: product?.meta_title ?? '',
@@ -238,6 +244,7 @@ export function ProductForm({
         description: product.description ?? '',
         price: product.price ?? '',
         compare_at_price: product.compare_at_price ?? '',
+        cost_price: product.cost_price ?? '',
         sku: product.sku ?? '',
         barcode: product.barcode ?? '',
         meta_title: product.meta_title ?? '',
@@ -273,6 +280,7 @@ export function ProductForm({
             size: v.values?.map((val) => val.value).join(' / ') || v.sku || 'حجم',
             price: v.price || product.price || '',
             compare_at_price: v.compare_at_price || '',
+            cost_price: v.cost_price || '',
             stock: v.stock ?? 0,
             sku: v.sku || '',
             is_active: v.is_active ?? true,
@@ -389,12 +397,14 @@ export function ProductForm({
       ...values,
       price: effectivePrice,
       compare_at_price: effectiveCompare,
+      cost_price: cleanNum(values.cost_price) || null,
       has_variants: hasMultipleSizes && sizes.length > 0,
       sizes: hasMultipleSizes && sizes.length > 0
         ? sizes.map((s) => ({
             size: s.size,
             price: cleanNum(s.price) || effectivePrice,
             compare_at_price: cleanNum(s.compare_at_price) || null,
+            cost_price: cleanNum(s.cost_price) || null,
             stock: Number(s.stock) || 0,
             sku: s.sku,
             is_active: s.is_active,
@@ -986,6 +996,31 @@ export function ProductForm({
               />
             </div>
 
+            {!hasMultipleSizes && (
+              // One size: the price lives here. Without this block a product
+              // without sizes had no price field at all and was saved unpriced.
+              <div className="grid gap-3 sm:grid-cols-3">
+                <Field id="price" label="السعر (د.ل)" error={errors.price?.message}>
+                  {(field) => (
+                    <Input {...field} {...form.register('price')} type="number" step="0.01" min="0" dir="ltr"
+                      placeholder="0.00" className="h-11 rounded-xl font-mono font-bold" />
+                  )}
+                </Field>
+                <Field id="compare_at_price" label="السعر قبل الخصم (اختياري)" error={errors.compare_at_price?.message}>
+                  {(field) => (
+                    <Input {...field} {...form.register('compare_at_price')} type="number" step="0.01" min="0" dir="ltr"
+                      placeholder="0.00" className="h-11 rounded-xl font-mono" />
+                  )}
+                </Field>
+                <Field id="cost_price" label="سعر التكلفة (داخلي)" hint="لا يراه العميل. يُستخدم لحساب الربح الحقيقي." error={errors.cost_price?.message}>
+                  {(field) => (
+                    <Input {...field} {...form.register('cost_price')} type="number" step="0.01" min="0" dir="ltr"
+                      placeholder="0.00" className="h-11 rounded-xl font-mono" />
+                  )}
+                </Field>
+              </div>
+            )}
+
             {hasMultipleSizes && (
               <div className="space-y-4 pt-2 animate-fade-rise">
                 {/* Preset Quick Chips */}
@@ -1062,6 +1097,7 @@ export function ProductForm({
                           <th className="p-3 text-start">السعة / الحجم</th>
                           <th className="p-3 text-start">السعر الحالي (د.ل) *</th>
                           <th className="p-3 text-start">السعر قبل الخصم (اختياري)</th>
+                          <th className="p-3 text-start">سعر التكلفة (داخلي)</th>
                           <th className="p-3 text-start">المخزون (قطعة)</th>
                           <th className="p-3 text-start">رمز SKU</th>
                           <th className="p-3 text-center">الحالة</th>
@@ -1099,6 +1135,19 @@ export function ProductForm({
                                 value={item.compare_at_price || ''}
                                 onChange={(e) => updateSizeField(idx, 'compare_at_price', e.target.value)}
                                 placeholder="0.00"
+                                className="h-8 text-xs font-mono text-muted-foreground w-28 rounded-lg"
+                              />
+                            </td>
+                            <td className="p-3">
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                dir="ltr"
+                                value={item.cost_price || ''}
+                                onChange={(e) => updateSizeField(idx, 'cost_price', e.target.value)}
+                                placeholder="0.00"
+                                aria-label={`سعر تكلفة ${item.size}`}
                                 className="h-8 text-xs font-mono text-muted-foreground w-28 rounded-lg"
                               />
                             </td>

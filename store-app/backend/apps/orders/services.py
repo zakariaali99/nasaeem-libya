@@ -174,6 +174,14 @@ def unit_price(product: Product, variant: ProductVariant | None) -> Decimal:
     return money(product.price)
 
 
+def unit_cost(product: Product, variant: ProductVariant | None) -> Decimal | None:
+    """What one unit cost the store, or None when it was never recorded.
+    A size without its own cost uses the product's."""
+    if variant is not None and variant.cost_price is not None:
+        return money(variant.cost_price)
+    return money(product.cost_price) if product.cost_price is not None else None
+
+
 # --------------------------------------------------------------------------
 # Discounts — validated server-side, every time
 # --------------------------------------------------------------------------
@@ -518,6 +526,7 @@ def checkout(
             # Snapshotted: an order is a historical record, and renaming or
             # repricing a product must never rewrite it.
             product_name=product.name,
+            unit_cost=unit_cost(product, variant),
         )
         for line, product, variant, price, line_total in priced_lines
     ])
@@ -860,6 +869,7 @@ def edit_order(
             new_lines.append(OrderItem(
                 order=order, product=product, variant=variant, quantity=quantity,
                 unit_price=price, total_price=line_total, product_name=product.name,
+                unit_cost=unit_cost(product, variant),
             ))
     order.items.exclude(id__in=kept_ids).delete()
     OrderItem.objects.bulk_create(new_lines)
@@ -1188,6 +1198,7 @@ def quick_create_admin_order(
             unit_price=line["unit_price"],
             total_price=line["total_price"],
             product_name=line["product"].name,
+            unit_cost=unit_cost(line["product"], line["variant"]),
         )
         if not line["product"].track_quantity:
             continue

@@ -757,3 +757,30 @@ class ExecutiveAnalyticsSerializer(serializers.Serializer):
             "delivery_couriers_breakdown": delivery_couriers_breakdown,
             "trend_series": trend_series,
         }
+
+
+class OrderTrackItemSerializer(serializers.ModelSerializer):
+    variant_label = serializers.SerializerMethodField()
+    image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = OrderItem
+        fields = ["product_name", "variant_label", "quantity", "total_price", "image"]
+
+    get_variant_label = OrderItemSerializer.get_variant_label
+    get_image = OrderItemSerializer.get_image
+
+
+class OrderTrackSerializer(serializers.ModelSerializer):
+    """What public tracking may show — nothing that identifies the buyer."""
+
+    stage = serializers.SerializerMethodField()
+    stage_label = serializers.SerializerMethodField()
+    items = OrderTrackItemSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Order
+        fields = ["order_number", "created_at", "stage", "stage_label", "total", "items", "tracking_url"]
+
+    get_stage = OrderSerializer.get_stage
+    get_stage_label = OrderSerializer.get_stage_label

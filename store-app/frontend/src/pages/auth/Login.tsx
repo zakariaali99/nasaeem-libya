@@ -97,16 +97,6 @@ export default function LoginPage() {
           )}
         </Field>
 
-        <div className="flex justify-start">
-          {/* -my-2 keeps the visual rhythm while the hit area reaches 44px. */}
-          <Link
-            to="/forgot-password"
-            className="-my-2 inline-flex min-h-11 items-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-          >
-            نسيت كلمة المرور؟
-          </Link>
-        </div>
-
         <Button type="submit" block size="lg" loading={isSubmitting || login.isPending}>
           تسجيل الدخول
         </Button>
@@ -115,7 +105,9 @@ export default function LoginPage() {
         <p className="rounded-lg bg-muted/50 p-3 text-xs leading-relaxed text-muted-foreground">
           اشتريت منّا دون كلمة مرور؟ طلباتك تظهر في{' '}
           <Link to="/me/orders" className="font-semibold text-primary underline-offset-4 hover:underline">«طلباتي»</Link>{' '}
-          على الجهاز الذي طلبت منه، ويمكن لفريقنا أن يضبط لك كلمة مرور عند الطلب.
+          على الجهاز الذي طلبت منه، ومن أي جهاز عبر{' '}
+          <Link to="/track" className="font-semibold text-primary underline-offset-4 hover:underline">تتبّع الطلب</Link>.
+          نسيت كلمة المرور؟ تواصل معنا ونضبط لك كلمة جديدة.
         </p>
       </form>
     </AuthLayout>

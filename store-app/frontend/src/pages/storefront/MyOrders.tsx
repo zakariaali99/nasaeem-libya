@@ -29,9 +29,8 @@ export default function MyOrders() {
       <h1 className="mb-6 text-2xl font-bold">طلباتي</h1>
       {!user && orders.length > 0 && (
         <p className="mb-4 rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
-          هذه الطلبات التي أتممتها من هذا الجهاز.{' '}
-          <Link to="/login?next=%2Fme%2Forders" className="font-semibold text-primary underline">سجّل الدخول</Link>{' '}
-          لترى طلباتك من الأجهزة الأخرى.
+          هذه الطلبات التي أتممتها من هذا الجهاز. لطلبات من جهاز آخر{' '}
+          <Link to="/track" className="font-semibold text-primary underline">تتبّع برقم الهاتف</Link>.
         </p>
       )}
       {orders.length === 0 ? (
@@ -40,12 +39,12 @@ export default function MyOrders() {
           description={
             user
               ? 'عند إتمام أول طلب سيظهر هنا مع حالته وتفاصيله.'
-              : 'تظهر هنا الطلبات التي أتممتها من هذا الجهاز. إن طلبت من جهاز آخر فسجّل الدخول لترى طلباتك كلها.'
+              : 'تظهر هنا الطلبات التي أتممتها من هذا الجهاز. إن طلبت من جهاز آخر فابحث عنها برقم هاتفك.'
           }
           action={
             <div className="flex flex-wrap items-center justify-center gap-4">
               {!user && (
-                <Link to="/login?next=%2Fme%2Forders" className="font-semibold text-primary underline">تسجيل الدخول</Link>
+                <Link to="/track" className="font-semibold text-primary underline">تتبّع برقم الهاتف</Link>
               )}
               <Link to="/products" className="font-semibold text-primary underline">تصفّح المنتجات</Link>
             </div>

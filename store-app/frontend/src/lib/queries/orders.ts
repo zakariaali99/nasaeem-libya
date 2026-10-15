@@ -1,11 +1,32 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { api } from '@/lib/api'
-import type { Address, CartPromotion, CityAdmin, DashboardStats, Order, OrderStage, StagePreview } from '@/types/api'
+import type { Address, CartPromotion, CityAdmin, DashboardStats, Order, OrderStage, ProductImage, StagePreview } from '@/types/api'
 
 export const orderKeys = {
   list: (params?: Record<string, unknown>) => ['orders', params ?? {}] as const,
   detail: (lookup: string) => ['orders', 'detail', lookup] as const,
+}
+
+/** One order as public tracking shows it: no name, phone or address. */
+export interface TrackedOrder {
+  order_number: string
+  created_at: string
+  stage: OrderStage
+  stage_label: string
+  total: string
+  tracking_url: string
+  items: { product_name: string; variant_label: string; quantity: number; total_price: string; image: ProductImage | null }[]
+}
+
+/** Look orders up by phone, order number, or both. Idle until one is given. */
+export function useTrackOrders({ phone, number }: { phone: string; number: string }) {
+  return useQuery({
+    queryKey: ['orders', 'track', phone, number],
+    queryFn: async () => (await api.post<TrackedOrder[]>('/orders/track/', { phone, number })).data,
+    enabled: Boolean(phone || number),
+    retry: false,
+  })
 }
 
 type QueryParams = Record<string, string | number | boolean | null | undefined>

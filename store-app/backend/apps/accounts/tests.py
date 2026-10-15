@@ -2,8 +2,7 @@
 
 Every bullet in `09-phases.md` Phase 2 appears here as a test that fails if the
 behaviour breaks. Nothing in this file uses a bypass: there is no test phone
-number and no fixed code. The OTP double is injected into the view, not reachable
-from any request path.
+number and no fixed code.
 """
 
 from datetime import timedelta
@@ -13,8 +12,6 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.accounts.otp import DummyOtpProvider
-from apps.accounts.views import PasswordResetConfirmView, PasswordResetRequestView
 from apps.core.models import Role, User
 
 pytestmark = pytest.mark.django_db
@@ -210,87 +207,7 @@ class TestSessionLifecycle:
         assert "csrftoken" in response.cookies
 
 
-class TestPasswordReset:
-    def _views_with_dummy(self):
-        provider = DummyOtpProvider()
-        PasswordResetRequestView.otp_provider = provider
-        PasswordResetConfirmView.otp_provider = provider
-        return provider
-
-    def teardown_method(self):
-        PasswordResetRequestView.otp_provider = None
-        PasswordResetConfirmView.otp_provider = None
-
-    def test_reset_works_end_to_end(self, client, account):
-        provider = self._views_with_dummy()
-
-        request = client.post(
-            reverse("auth-password-reset-request"),
-            {"phone_number": "0912345678"}, format="json",
-        )
-        assert request.status_code == 200
-        request_id = request.json()["data"]["request_id"]
-        code = provider.sent[-1]["code"]
-
-        confirm = client.post(
-            reverse("auth-password-reset-confirm"),
-            {"request_id": request_id, "code": code, "password": "BrandNewPass9"},
-            format="json",
-        )
-        assert confirm.status_code == 200
-
-        # The new password works, the old one does not, and no session was
-        # handed out by the reset itself.
-        assert "sessionid" not in confirm.cookies
-        assert login(APIClient(), "0912345678", "BrandNewPass9").status_code == 200
-        assert login(APIClient(), "0912345678", GOOD_PASSWORD).status_code == 400
-
-    def test_an_unknown_number_answers_identically(self, client, account):
-        self._views_with_dummy()
-        known = client.post(
-            reverse("auth-password-reset-request"), {"phone_number": "0912345678"}, format="json",
-        )
-        unknown = APIClient().post(
-            reverse("auth-password-reset-request"), {"phone_number": "0919999999"}, format="json",
-        )
-        assert known.status_code == unknown.status_code == 200
-        assert known.json()["message"] == unknown.json()["message"]
-
-    def test_a_wrong_code_does_not_change_the_password(self, client, account):
-        self._views_with_dummy()
-        request_id = client.post(
-            reverse("auth-password-reset-request"), {"phone_number": "0912345678"}, format="json",
-        ).json()["data"]["request_id"]
-
-        response = client.post(
-            reverse("auth-password-reset-confirm"),
-            {"request_id": request_id, "code": "000000", "password": "BrandNewPass9"},
-            format="json",
-        )
-        assert response.status_code == 400
-        assert login(APIClient(), "0912345678", GOOD_PASSWORD).status_code == 200
-
-    def test_an_unknown_request_id_is_rejected(self, client, account):
-        self._views_with_dummy()
-        response = client.post(
-            reverse("auth-password-reset-confirm"),
-            {"request_id": "made-up", "code": "123456", "password": "BrandNewPass9"},
-            format="json",
-        )
-        assert response.status_code == 400
-
-    def test_a_weak_new_password_is_rejected(self, client, account):
-        provider = self._views_with_dummy()
-        request_id = client.post(
-            reverse("auth-password-reset-request"), {"phone_number": "0912345678"}, format="json",
-        ).json()["data"]["request_id"]
-        response = client.post(
-            reverse("auth-password-reset-confirm"),
-            {"request_id": request_id, "code": provider.sent[-1]["code"], "password": "abcd"},
-            format="json",
-        )
-        assert response.status_code == 400
-
+class TestNoBackdoors:
     def test_no_hardcoded_test_number_exists_anywhere(self):
         """The reference shipped `PHONE_NUMBER = "0920010991"` and
         `VERIFICATION = "111111"`, which bypassed OTP entirely.
@@ -382,13 +299,6 @@ class TestCsrf:
         )
         assert response.status_code == 403
         assert not User.objects.filter(phone_number="0918888888").exists()
-
-    def test_password_reset_without_a_csrf_token_is_rejected(self, csrf_client, account):
-        response = csrf_client.post(
-            reverse("auth-password-reset-request"),
-            {"phone_number": "0912345678"}, format="json",
-        )
-        assert response.status_code == 403
 
     def test_a_csrf_failure_answers_in_json_not_html(self, csrf_client, account):
         """The SPA parses {message, errors} for every failure; Django's HTML

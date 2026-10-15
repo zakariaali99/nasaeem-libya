@@ -13,6 +13,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.throttling import SimpleRateThrottle
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -44,6 +45,7 @@ from .serializers import (
     DashboardStatsSerializer,
     ExecutiveAnalyticsSerializer,
     OrderSerializer,
+    OrderTrackSerializer,
 )
 
 DETAILS_SESSION_KEY = "checkout_details"
@@ -1340,3 +1342,47 @@ class AdminMarkAbandonedCartRecoveredView(APIView):
         cart.save(update_fields=["is_recovered", "updated_at"])
         return Response({"message": "تم تحديث حالة السلة إلى مسترجعة بنجاح"})
 
+
+
+class OrderTrackThrottle(SimpleRateThrottle):
+    """Per address, signed in or not."""
+
+    scope = "order_track"
+
+    def get_cache_key(self, request, view):
+        return self.cache_format % {"scope": self.scope, "ident": self.get_ident(request)}
+
+
+class OrderTrackView(APIView):
+    """Public order tracking by phone number, order number, or both.
+
+    Anyone may look an order up (store decision), so the answer carries only
+    what tracking needs: number, date, stage, items and total. No name,
+    phone, address, notes or payment details ever leave through here, and
+    the lookup is rate-limited so numbers cannot be walked in bulk.
+    """
+
+    permission_classes = [AllowAny]
+    throttle_classes = [OrderTrackThrottle]
+    LIMIT = 20
+
+    # POST, so a phone number never lands in a URL or an access log.
+    def post(self, request):
+        from apps.accounts.phone import normalise_phone
+
+        raw_phone = str(request.data.get("phone") or "").strip()
+        number = str(request.data.get("number") or "").strip().lstrip("#").upper()
+        if not raw_phone and not number:
+            return Response({"message": "أدخل رقم الهاتف أو رقم الطلب"}, status=status.HTTP_400_BAD_REQUEST)
+
+        queryset = order_queryset().placed()
+        if raw_phone:
+            phone = normalise_phone(raw_phone)
+            if not phone:
+                return Response({"message": "رقم الهاتف غير صحيح"}, status=status.HTTP_400_BAD_REQUEST)
+            queryset = queryset.filter(user__phone_number=phone)
+        if number:
+            queryset = queryset.filter(order_number__iexact=number)
+
+        orders = list(queryset.order_by("-created_at")[: self.LIMIT])
+        return Response({"data": OrderTrackSerializer(orders, many=True, context={"request": request}).data})

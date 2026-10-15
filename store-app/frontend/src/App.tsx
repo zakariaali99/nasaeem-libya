@@ -30,7 +30,6 @@ import { ThemeProvider } from '@/lib/theme'
 // customer must never download the operator's 26 screens.
 const LoginPage = lazy(() => import('@/pages/auth/Login'))
 const RegisterPage = lazy(() => import('@/pages/auth/Register'))
-const ForgotPasswordPage = lazy(() => import('@/pages/auth/ForgotPassword'))
 const AccountPage = lazy(() => import('@/pages/storefront/Account'))
 // Cart and checkout are lazy too: they are navigated TO, never the first paint
 // whose LCP is being measured, and they pull in the delivery queries.
@@ -40,6 +39,7 @@ const CheckoutPage = lazy(() => import('@/pages/storefront/Checkout'))
 const NotFoundPage = lazy(() => import('@/pages/storefront/NotFound'))
 const CheckoutCompletePage = lazy(() => import('@/pages/storefront/CheckoutComplete'))
 const CheckoutRedirectPage = lazy(() => import('@/pages/storefront/CheckoutRedirect'))
+const TrackOrderPage = lazy(() => import('@/pages/storefront/TrackOrder'))
 const MyOrdersPage = lazy(() => import('@/pages/storefront/MyOrders'))
 const MyOrderDetailPage = lazy(() => import('@/pages/storefront/MyOrderDetail'))
 const MyAddressesPage = lazy(() => import('@/pages/storefront/MyAddresses'))
@@ -140,6 +140,7 @@ const router = createBrowserRouter([
           { path: '/checkout/:orderId', element: withSuspense(<CheckoutPage />) },
           // A customer who bought on this device sees those orders without
           // signing in; the server lists only the orders this device placed.
+          { path: '/track', element: withSuspense(<TrackOrderPage />) },
           { path: '/me/orders', element: withSuspense(<MyOrdersPage />) },
           { path: '/me/orders/:orderId', element: withSuspense(<MyOrderDetailPage />) },
           {
@@ -155,7 +156,6 @@ const router = createBrowserRouter([
       },
       { path: '/login', element: withSuspense(<LoginPage />) },
       { path: '/register', element: withSuspense(<RegisterPage />) },
-      { path: '/forgot-password', element: withSuspense(<ForgotPasswordPage />) },
       {
         element: <RequireAuth admin />,
         children: [

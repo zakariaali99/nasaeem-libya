@@ -31,6 +31,3 @@ class LoginThrottle(PhoneScopedThrottle):
 class RegisterThrottle(PhoneScopedThrottle):
     scope = "register"
 
-
-class PasswordResetThrottle(PhoneScopedThrottle):
-    scope = "password_reset"

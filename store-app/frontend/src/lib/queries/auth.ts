@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { ApiError, api } from '@/lib/api'
-import type { LoginInput, RegisterInput, ResetConfirmInput, ResetRequestInput } from '@/lib/schemas/auth'
+import type { LoginInput, RegisterInput } from '@/lib/schemas/auth'
 import type { User } from '@/types/api'
 
 export const authKeys = {
@@ -58,21 +58,6 @@ export function useLogout() {
     onSuccess: () => {
       queryClient.setQueryData(authKeys.me, null)
       queryClient.clear()
-    },
-  })
-}
-
-export function useRequestPasswordReset() {
-  return useMutation({
-    mutationFn: async (input: ResetRequestInput) =>
-      (await api.post<{ request_id: string | null }>('/auth/password-reset/request/', input)).data,
-  })
-}
-
-export function useConfirmPasswordReset() {
-  return useMutation({
-    mutationFn: async (input: ResetConfirmInput & { request_id: string }) => {
-      await api.post('/auth/password-reset/confirm/', input)
     },
   })
 }

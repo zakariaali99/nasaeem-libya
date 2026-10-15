@@ -33,17 +33,5 @@ export const registerSchema = z.object({
     .refine((v) => !/^\d+$/.test(v), 'كلمة المرور لا يمكن أن تكون أرقاماً فقط'),
 })
 
-export const resetRequestSchema = z.object({ phone_number: phoneSchema })
-
-export const resetConfirmSchema = z.object({
-  code: z.string().min(4, 'رمز التحقق مطلوب').max(12),
-  password: z
-    .string()
-    .min(8, 'كلمة المرور يجب أن تتكوّن من 8 أحرف على الأقل')
-    .refine((v) => !/^\d+$/.test(v), 'كلمة المرور لا يمكن أن تكون أرقاماً فقط'),
-})
-
 export type LoginInput = z.infer<typeof loginSchema>
 export type RegisterInput = z.infer<typeof registerSchema>
-export type ResetRequestInput = z.infer<typeof resetRequestSchema>
-export type ResetConfirmInput = z.infer<typeof resetConfirmSchema>

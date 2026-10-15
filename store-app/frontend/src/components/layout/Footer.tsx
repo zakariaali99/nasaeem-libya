@@ -19,7 +19,8 @@ const STORE_LINKS = [
 ]
 
 const ACCOUNT_LINKS = [
-  { to: '/me/orders', label: 'تتبع طلباتي السابقة' },
+  { to: '/track', label: 'تتبّع طلب' },
+  { to: '/me/orders', label: 'طلباتي' },
   { to: '/me/addresses', label: 'عناويني المحفوظة' },
   { to: '/me', label: 'الملف الشخصي' },
 ]

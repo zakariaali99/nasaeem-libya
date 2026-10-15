@@ -97,23 +97,6 @@ class LoginSerializer(serializers.Serializer):
         return attrs
 
 
-class PasswordResetRequestSerializer(serializers.Serializer):
-    phone_number = serializers.CharField(max_length=32)
-
-
-class PasswordResetConfirmSerializer(serializers.Serializer):
-    request_id = serializers.CharField(max_length=128)
-    code = serializers.CharField(max_length=12)
-    password = serializers.CharField(write_only=True, max_length=128)
-
-    def validate_password(self, value):
-        try:
-            validate_password(value)
-        except DjangoValidationError as exc:
-            raise serializers.ValidationError(list(exc.messages)) from exc
-        return value
-
-
 class AdminUserUpdateSerializer(serializers.ModelSerializer):
     """Role, ban and activation. Password is deliberately absent: an operator
     cannot set another user's password through this endpoint."""

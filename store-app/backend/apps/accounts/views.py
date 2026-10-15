@@ -22,27 +22,22 @@ from apps.core.models import User, Role
 from apps.core.pagination import StandardPagination
 from apps.core.views import CsrfProtectedAPIView
 
-from . import otp as otp_module
 from .permissions import IsAdminRole
 from .phone import normalise_phone
 from .serializers import (
     AdminUserUpdateSerializer,
     LoginSerializer,
-    PasswordResetConfirmSerializer,
-    PasswordResetRequestSerializer,
     RegisterSerializer,
     UserSerializer,
     AddressSerializer,
     ProfileUpdateSerializer,
 )
-from .throttling import LoginThrottle, PasswordResetThrottle, RegisterThrottle
+from .throttling import LoginThrottle, RegisterThrottle
 
 logger = logging.getLogger(__name__)
 
 # Sent whether or not the phone belongs to an account. Telling the caller that a
 # number is unknown is the same oracle the login endpoint refuses to be.
-RESET_SENT = "إذا كان الرقم مسجّلاً لدينا فسيصلك رمز التحقق برسالة نصية"
-RESET_INVALID = "رمز التحقق غير صحيح أو منتهي الصلاحية"
 
 
 @api_view(["GET"])
@@ -130,77 +125,6 @@ class MeView(APIView):
         serializer.save()
         return Response({"data": UserSerializer(request.user).data,
                          "message": "تم تحديث الملف الشخصي"})
-
-
-class PasswordResetRequestView(CsrfProtectedAPIView):
-    """Sends an OTP for password reset. Always answers the same way."""
-
-    permission_classes = [AllowAny]
-    throttle_classes = [PasswordResetThrottle]
-    otp_provider = None  # tests inject a provider here
-
-    def get_provider(self):
-        return self.otp_provider or otp_module.get_provider()
-
-    def post(self, request):
-        serializer = PasswordResetRequestSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        phone = normalise_phone(serializer.validated_data["phone_number"])
-
-        request_id = None
-        if phone and User.objects.filter(phone_number=phone, is_active=True).exists():
-            try:
-                provider = self.get_provider()
-                request_id = provider.send(phone)
-                otp_module.remember_reset(request_id, phone)
-            except otp_module.OtpError:
-                logger.warning("otp send failed phone=%s", phone)
-                # Still answer identically: a provider outage must not become an
-                # oracle either.
-                request_id = None
-
-        return Response({"data": {"request_id": request_id}, "message": RESET_SENT})
-
-
-class PasswordResetConfirmView(CsrfProtectedAPIView):
-    permission_classes = [AllowAny]
-    throttle_classes = [PasswordResetThrottle]
-    otp_provider = None
-
-    def get_provider(self):
-        return self.otp_provider or otp_module.get_provider()
-
-    def post(self, request):
-        serializer = PasswordResetConfirmSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        request_id = serializer.validated_data["request_id"]
-        code = serializer.validated_data["code"]
-
-        expected_phone = otp_module.recall_reset(request_id)
-        if not expected_phone:
-            return Response({"message": RESET_INVALID}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            verified_phone = self.get_provider().verify(request_id, code)
-        except otp_module.OtpError:
-            return Response({"message": RESET_INVALID}, status=status.HTTP_400_BAD_REQUEST)
-
-        # The provider must confirm the SAME number the reset was opened for.
-        if not verified_phone or normalise_phone(verified_phone) != expected_phone:
-            return Response({"message": RESET_INVALID}, status=status.HTTP_400_BAD_REQUEST)
-
-        user = User.objects.filter(phone_number=expected_phone, is_active=True).first()
-        if user is None:
-            return Response({"message": RESET_INVALID}, status=status.HTTP_400_BAD_REQUEST)
-
-        user.set_password(serializer.validated_data["password"])
-        user.save(update_fields=["password", "updated_at"])
-        otp_module.forget_reset(request_id)
-        logger.info("password reset completed phone=%s", user.phone_number)
-
-        # No session is issued here. The user signs in with the new password,
-        # which keeps "a session only ever follows authenticate()" true.
-        return Response({"data": None, "message": "تم تغيير كلمة المرور، يمكنك تسجيل الدخول الآن"})
 
 
 class AdminUserDetailView(APIView):

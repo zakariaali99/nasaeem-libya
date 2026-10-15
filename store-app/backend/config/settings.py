@@ -181,7 +181,7 @@ REST_FRAMEWORK = {
         "user": "5000/min" if DEBUG else "240/min",
         "login": "5/min",
         "register": "5/min",
-        "password_reset": "3/min",
+        "order_track": "20/min",
     },
     "EXCEPTION_HANDLER": "apps.core.exceptions.api_exception_handler",
     "UNAUTHENTICATED_USER": "django.contrib.auth.models.AnonymousUser",

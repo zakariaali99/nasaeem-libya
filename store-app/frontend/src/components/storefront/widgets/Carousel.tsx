@@ -24,7 +24,9 @@ export interface CarouselProps {
  */
 const FRAME: Record<Exclude<BannerHeight, 'auto'>, Record<BannerVariant | 'responsive', string>> = {
   band: {
-    responsive: 'aspect-[4/5] sm:aspect-[3/1] sm:max-h-[520px]',
+    // Exactly 3:1 at every width, so a 1920×640 picture is never cut; past
+    // 1920px the band stops growing instead of getting taller.
+    responsive: 'aspect-[4/5] sm:aspect-[3/1] sm:mx-auto sm:max-w-[1920px]',
     mobile: 'aspect-[4/5]',
     desktop: 'aspect-[3/1]',
   },
@@ -32,8 +34,10 @@ const FRAME: Record<Exclude<BannerHeight, 'auto'>, Record<BannerVariant | 'respo
     // The screen between the sticky header and, below `lg`, the fixed bottom
     // navigation (4rem each); from `lg` only the header (4.5rem).
     responsive: 'h-[calc(100svh-8rem)] min-h-[26rem] lg:h-[calc(100svh-4.5rem)] lg:min-h-[30rem]',
-    mobile: 'aspect-[9/16]',
-    desktop: 'aspect-[16/9]',
+    // Previews only: the shape of the screen below the header on a typical
+    // phone (1080×1700) and computer (1920×880), as in lib/bannerSizes.ts.
+    mobile: 'aspect-[54/85]',
+    desktop: 'aspect-[24/11]',
   },
 }
 

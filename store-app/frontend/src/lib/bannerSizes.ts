@@ -4,12 +4,19 @@ export interface BannerSize {
   width: number
   /** null = any height (the picture keeps its own shape). */
   height: number | null
+  /** Shown under the size when the frame is not one fixed shape. */
+  note?: string
 }
 
 /**
  * The picture sizes a designer should deliver for each banner height, desktop
- * and phone. They match the frames in `Carousel.tsx`: a `band` is 3:1 on a
- * computer and 4:5 on a phone, `full` is the screen (16:9 / 9:16).
+ * and phone. They are the real frames in `Carousel.tsx` — change one, change
+ * the other:
+ * - `band`: exactly 3:1 on a computer (never taller than 640px) and 4:5 on a phone.
+ * - `full`: the screen below the header (and the phone's bottom bar), which is
+ *   1920×880 on a typical computer (2.0–2.4:1 measured) and 1080×1700 on a
+ *   typical phone (0.55–0.70 measured); the edges vary, the middle is safe.
+ * - `auto`: the picture's own shape, up to 85% of the screen's height.
  */
 export const BANNER_SIZES: Record<BannerHeight, { desktop: BannerSize; mobile: BannerSize; label: string }> = {
   band: {
@@ -19,13 +26,13 @@ export const BANNER_SIZES: Record<BannerHeight, { desktop: BannerSize; mobile: B
   },
   full: {
     label: 'ملء الشاشة',
-    desktop: { width: 1920, height: 1080 },
-    mobile: { width: 1080, height: 1920 },
+    desktop: { width: 1920, height: 880, note: 'يختلف حسب الشاشة، فقد يُقص حتى 10% من الأطراف: اجعل النص والمنتج في الوسط' },
+    mobile: { width: 1080, height: 1700, note: 'يختلف حسب الهاتف، فقد يُقص حتى 15% من الأطراف: اجعل النص والمنتج في الوسط' },
   },
   auto: {
     label: 'بأبعاد الصورة',
-    desktop: { width: 1920, height: null },
-    mobile: { width: 1080, height: null },
+    desktop: { width: 1920, height: null, note: 'الصورة الأطول من 85% من ارتفاع الشاشة تُقص' },
+    mobile: { width: 1080, height: null, note: 'الصورة الأطول من 85% من ارتفاع الشاشة تُقص' },
   },
 }
 

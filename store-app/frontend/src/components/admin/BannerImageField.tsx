@@ -75,9 +75,10 @@ export function BannerImageField({
           {optional ? <span className="text-xs font-normal text-muted-foreground">(موصى بها بشدة)</span> : null}
         </span>
         <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
-          المقاس المطلوب: <bdi dir="ltr" className="font-mono">{sizeNumbers(required)}</bdi> {sizeUnit(required)}
+          المقاس المطلوب: <bdi dir="ltr" className="whitespace-nowrap font-mono">{sizeNumbers(required)}</bdi> {sizeUnit(required)}
         </span>
       </div>
+      {required.note ? <p className="text-xs text-muted-foreground">{required.note}</p> : null}
 
       <ImageUploadField label="" purpose="banner" aspectRatio="auto" value={value} onChange={onChange} />
 

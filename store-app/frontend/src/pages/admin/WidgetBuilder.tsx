@@ -769,10 +769,10 @@ function WidgetFields({ type, data, patch }: FieldsProps) {
                     <span className="block text-sm font-bold">{option.label}</span>
                     <span className="block text-muted-foreground">{option.note}</span>
                     <span className="block">
-                      حاسوب: <bdi dir="ltr" className="font-mono font-bold text-foreground">{sizeNumbers(option.desktop)}</bdi> {sizeUnit(option.desktop)}
+                      حاسوب: <bdi dir="ltr" className="whitespace-nowrap font-mono font-bold text-foreground">{sizeNumbers(option.desktop)}</bdi> {sizeUnit(option.desktop)}
                     </span>
                     <span className="block">
-                      هاتف: <bdi dir="ltr" className="font-mono font-bold text-foreground">{sizeNumbers(option.mobile)}</bdi> {sizeUnit(option.mobile)}
+                      هاتف: <bdi dir="ltr" className="whitespace-nowrap font-mono font-bold text-foreground">{sizeNumbers(option.mobile)}</bdi> {sizeUnit(option.mobile)}
                     </span>
                   </button>
                 )
@@ -1104,11 +1104,12 @@ function BannerHeightChoice({ value, onChange }: { value: BannerHeight; onChange
                 {key === 'band' ? 'شريط يترك المنتجات ظاهرة تحته' : key === 'full' ? 'يملأ الشاشة كلها، للحملات' : 'الإطار يأخذ شكل صورتك'}
               </span>
               <span className="block">
-                حاسوب: <bdi dir="ltr" className="font-mono font-bold text-foreground">{sizeNumbers(option.desktop)}</bdi> {sizeUnit(option.desktop)}
+                حاسوب: <bdi dir="ltr" className="whitespace-nowrap font-mono font-bold text-foreground">{sizeNumbers(option.desktop)}</bdi> {sizeUnit(option.desktop)}
               </span>
               <span className="block">
-                هاتف: <bdi dir="ltr" className="font-mono font-bold text-foreground">{sizeNumbers(option.mobile)}</bdi> {sizeUnit(option.mobile)}
+                هاتف: <bdi dir="ltr" className="whitespace-nowrap font-mono font-bold text-foreground">{sizeNumbers(option.mobile)}</bdi> {sizeUnit(option.mobile)}
               </span>
+              {option.desktop.note ? <span className="block text-muted-foreground">{option.desktop.note}</span> : null}
             </button>
           )
         })}

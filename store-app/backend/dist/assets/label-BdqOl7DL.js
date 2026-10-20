@@ -1,0 +1,1 @@
+import{r as s,j as a}from"./react-BIH3SDKl.js";import{R as e}from"./radix-C-ZkR6da.js";import{w as m}from"./index-CSO5MonA.js";const f=s.forwardRef(({className:o,...r},t)=>a.jsx(e,{ref:t,className:m("block text-sm font-medium text-foreground",o),...r}));f.displayName="Label";export{f as L};

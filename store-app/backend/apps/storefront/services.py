@@ -182,6 +182,21 @@ def _percent(value, default=50) -> int:
     return _int(value, default, 0, 100)
 
 
+IMAGE_MODES = ("smart", "fill", "whole")
+
+
+def _image_mode(data: dict) -> str:
+    """How a banner picture sits in its frame. `smart` (the default) fills
+    the frame unless that would cut off more than about a third of the
+    picture, then shows it whole over a blurred copy of itself; `fill` always
+    fills (crops); `whole` always shows all of it. Older layouts stored
+    `imageFit`: contain → whole, and cover (the old default) → smart."""
+    value = data.get("imageMode")
+    if value in IMAGE_MODES:
+        return value
+    return "whole" if data.get("imageFit") == "contain" else "smart"
+
+
 def mobile_rendition_src(url: str) -> str:
     """The 1080px phone copy of an uploaded banner when it exists on disk,
     otherwise "" (banners uploaded before the copy was made, external urls)."""
@@ -241,9 +256,7 @@ def normalise_widget_data(widget_type: str, data: dict | None) -> dict:
         return {
             "slides": slides,
             "bannerHeight": _banner_height(data),
-            # `cover` fills the frame edge to edge; `contain` shows the whole
-            # picture and leaves bars where its shape differs from the frame.
-            "imageFit": "contain" if data.get("imageFit") == "contain" else "cover",
+            "imageMode": _image_mode(data),
             "interval": _int(data.get("interval", 6), 6, 0, 30),
         }
 
@@ -304,6 +317,7 @@ def normalise_widget_data(widget_type: str, data: dict | None) -> dict:
             "buttonLabel": str(data.get("buttonLabel") or ""),
             "buttonUrl": _first(data, "buttonUrl", "button_url"),
             "imageSide": "end" if data.get("imageSide") == "end" else "start",
+            "imageMode": _image_mode(data),
         }
 
     if widget_type == WidgetType.PHOTO_LINK_GRID:
@@ -362,6 +376,7 @@ def normalise_widget_data(widget_type: str, data: dict | None) -> dict:
             "focusY": _percent(data.get("focusY")),
             "mobileFocusX": _percent(data.get("mobileFocusX")),
             "mobileFocusY": _percent(data.get("mobileFocusY")),
+            "imageMode": _image_mode(data),
         }
 
     if widget_type == WidgetType.ANNOUNCEMENT_BAR:

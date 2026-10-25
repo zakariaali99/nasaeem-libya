@@ -295,3 +295,20 @@ def test_saving_a_widget_invalidates_the_cached_layout(layout, client):
 
     widgets = client.get(reverse("storefront-layout")).json()["data"]["widgets"]
     assert len(widgets) == 1
+
+
+# --------------------------------------------------------------------------
+# Picture mode («طريقة عرض الصورة»)
+# --------------------------------------------------------------------------
+
+@pytest.mark.parametrize("widget_type", [WidgetType.CAROUSEL, WidgetType.HERO_CTA, WidgetType.PROMO_BANNERS])
+@pytest.mark.parametrize("stored, expected", [
+    ({}, "smart"),                       # new banners
+    ({"imageFit": "cover"}, "smart"),    # the old default turns smart
+    ({"imageFit": "contain"}, "whole"),  # the old «show it whole» stays whole
+    ({"imageMode": "fill"}, "fill"),
+    ({"imageMode": "whole", "imageFit": "cover"}, "whole"),
+    ({"imageMode": "nonsense"}, "smart"),
+])
+def test_banner_picture_mode(widget_type, stored, expected):
+    assert services.normalise_widget_data(widget_type, stored)["imageMode"] == expected

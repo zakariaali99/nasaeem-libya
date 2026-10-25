@@ -3,7 +3,7 @@ import * as React from 'react'
 import { Link, useBlocker, useParams } from 'react-router-dom'
 
 import { BannerImageField } from '@/components/admin/BannerImageField'
-import { ImageUploadField } from '@/components/admin/ImageUploadField'
+import { imageModeOf } from '@/components/storefront/widgets/Carousel'
 import { WidgetRenderer } from '@/components/storefront/widgets'
 import { Alert } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -14,13 +14,13 @@ import { LineThumb } from '@/components/ui/line-thumb'
 import { Select } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ApiError } from '@/lib/api'
-import { BANNER_SIZES, PROMO_SIZES, sizeNumbers, sizeUnit } from '@/lib/bannerSizes'
+import { BANNER_SIZES, PICTURE_SIZES, PROMO_SIZES, sizeNumbers, sizeUnit } from '@/lib/bannerSizes'
 import { formatPrice } from '@/lib/format'
 import { useCategories, useCollections, useProducts } from '@/lib/queries/catalog'
 import { useLayout, useSaveLayout, type Layout, type LayoutDraft } from '@/lib/queries/customization'
 import { usePageTitle } from '@/lib/usePageTitle'
 import { cn } from '@/lib/utils'
-import type { BannerHeight, Category, Collection, Product, Widget, WidgetStyle } from '@/types/api'
+import type { BannerHeight, Category, Collection, ImageMode, Product, Widget, WidgetData, WidgetStyle } from '@/types/api'
 
 // --------------------------------------------------------------------------
 // What the operator can add. `free_shipping_bar` and `gift_wrap_upsell` are
@@ -557,6 +557,20 @@ function WidgetFields({ type, data, patch }: FieldsProps) {
     </Field>
   )
   const layoutChoice = choice('layout', 'طريقة العرض', LAYOUT_OPTIONS)
+  // «طريقة عرض الصورة» for every framed banner; older layouts stored `imageFit`.
+  const heroMode = imageModeOf(data as Pick<WidgetData, 'imageMode' | 'imageFit'>)
+  const imageModeChoice = (
+    <Field key="imageMode" label="طريقة عرض الصورة" id="f-imageMode"
+      hint="«ذكية» تملأ الإطار، إلا إن كان سيُقص أكثر من ثلث الصورة، فتعرضها كاملة فوق نسخة مموّهة منها.">
+      {(props) => (
+        <Select {...props} value={heroMode} onChange={(e) => patch({ imageMode: e.target.value as ImageMode, imageFit: undefined })}>
+          <option value="smart">ذكية (موصى بها)</option>
+          <option value="fill">املأ الإطار دائماً (يُقص الزائد حسب نقطة التركيز)</option>
+          <option value="whole">الصورة كاملة دائماً (فوق نسخة مموّهة منها)</option>
+        </Select>
+      )}
+    </Field>
+  )
   /** The heading row: title on one side, an optional "see all" link on the other. */
   const heading = (titleLabel = 'العنوان (اختياري)') => (
     <div key="heading" className="grid gap-3 sm:grid-cols-3">
@@ -581,8 +595,10 @@ function WidgetFields({ type, data, patch }: FieldsProps) {
                 value={(data.bannerHeight as BannerHeight) ?? 'auto'}
                 onChange={(value) => patch({ bannerHeight: value })}
               />
+              {((data.bannerHeight as BannerHeight) ?? 'auto') !== 'auto' ? imageModeChoice : null}
               <BannerImageField
                 device="desktop"
+                mode={heroMode}
                 height={(data.bannerHeight as BannerHeight) ?? 'auto'}
                 value={String(data.desktopImageUrl ?? '')}
                 onChange={(url) => patch({ desktopImageUrl: url, backgroundImageUrl: url })}
@@ -593,6 +609,7 @@ function WidgetFields({ type, data, patch }: FieldsProps) {
               <BannerImageField
                 device="mobile"
                 optional
+                mode={heroMode}
                 height={(data.bannerHeight as BannerHeight) ?? 'auto'}
                 value={String(data.mobileImageUrl ?? '')}
                 onChange={(url) => patch({ mobileImageUrl: url })}
@@ -602,14 +619,23 @@ function WidgetFields({ type, data, patch }: FieldsProps) {
               />
             </>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
-              <ImageUploadField label="صورة الخلفية للحاسوب" purpose="banner" aspectRatio="auto"
-                hint="المقاس المطلوب 1920 × 640 بكسل" value={String(data.desktopImageUrl ?? '')}
-                onChange={(url) => patch({ desktopImageUrl: url, backgroundImageUrl: url })} />
-              <ImageUploadField label="صورة الخلفية للهاتف (موصى بها)" purpose="banner" aspectRatio="auto"
-                hint="المقاس المطلوب 1080 × 1350 بكسل" value={String(data.mobileImageUrl ?? '')}
-                onChange={(url) => patch({ mobileImageUrl: url })} />
-            </div>
+            <>
+              <BannerImageField
+                device="desktop"
+                label="صورة الخلفية للحاسوب"
+                required={PICTURE_SIZES.heroTextDesktop}
+                value={String(data.desktopImageUrl ?? '')}
+                onChange={(url) => patch({ desktopImageUrl: url, backgroundImageUrl: url })}
+              />
+              <BannerImageField
+                device="mobile"
+                optional
+                label="صورة الخلفية للهاتف"
+                required={PICTURE_SIZES.heroTextMobile}
+                value={String(data.mobileImageUrl ?? '')}
+                onChange={(url) => patch({ mobileImageUrl: url })}
+              />
+            </>
           )}
           {imageOnly ? (
             link('linkUrl', 'الرابط عند النقر على الصورة (اختياري)')
@@ -647,12 +673,7 @@ function WidgetFields({ type, data, patch }: FieldsProps) {
         <>
           <BannerHeightChoice value={height} onChange={(value) => patch({ bannerHeight: value, carouselStyle: undefined })} />
           <div className="grid gap-3 sm:grid-cols-2">
-            {height !== 'auto'
-              ? choice('imageFit', 'الصورة داخل الإطار', [
-                  { value: 'cover', label: 'تملأ الإطار (يُقص الزائد حسب نقطة التركيز)' },
-                  { value: 'contain', label: 'تظهر كاملة (قد يبقى فراغ على الجانبين)' },
-                ])
-              : null}
+            {height !== 'auto' ? imageModeChoice : null}
             {choice('interval', 'التقليب التلقائي', [
               { value: '6', label: 'كل 6 ثوانٍ' },
               { value: '4', label: 'كل 4 ثوانٍ' },
@@ -666,7 +687,9 @@ function WidgetFields({ type, data, patch }: FieldsProps) {
             items={(data.slides as Data[]) ?? []}
             blank={{ imageUrl: '', mobileImageUrl: '', title: '', subtitle: '', linkUrl: '' }}
             onChange={(slides) => patch({ slides })}
-            render={(slide, update) => <SlideFields slide={slide} update={update} height={height} />}
+            render={(slide, update) => (
+              <SlideFields slide={slide} update={update} height={height} mode={height === 'auto' ? 'fill' : heroMode} />
+            )}
           />
         </>
       )
@@ -675,8 +698,13 @@ function WidgetFields({ type, data, patch }: FieldsProps) {
     case 'image':
       return (
         <>
-          <ImageUploadField label="الصورة" purpose="banner" hint="تظهر بعرض الصفحة كاملاً وبأبعادها الأصلية"
-            value={String(data.imageUrl ?? '')} onChange={(url) => patch({ imageUrl: url })} />
+          <BannerImageField
+            device="desktop"
+            label="الصورة"
+            required={PICTURE_SIZES.image}
+            value={String(data.imageUrl ?? '')}
+            onChange={(url) => patch({ imageUrl: url })}
+          />
           {link('linkUrl', 'الرابط عند النقر (اختياري)')}
           {text('altText', 'وصف الصورة لمحركات البحث (اختياري)')}
         </>
@@ -723,9 +751,6 @@ function WidgetFields({ type, data, patch }: FieldsProps) {
               { value: 'image', label: 'الصورة تملأ البطاقة والاسم فوقها (لصور الأقسام)' },
             ])}
           </div>
-          {data.tileStyle === 'image' ? (
-            <p className="text-xs text-muted-foreground">المقاس المطلوب لكل صورة: 1080 × 1350 بكسل (طولية 4:5).</p>
-          ) : null}
           <Repeater
             title="الصور"
             addLabel="إضافة صورة"
@@ -734,7 +759,14 @@ function WidgetFields({ type, data, patch }: FieldsProps) {
             onChange={(items) => patch({ items })}
             render={(item, update) => (
               <>
-                <ImageUploadField label="الصورة أو الشعار" value={String(item.imageUrl ?? '')} onChange={(url) => update({ imageUrl: url })} />
+                <BannerImageField
+                  device="desktop"
+                  label={data.tileStyle === 'image' ? 'الصورة' : 'الشعار أو صورة العبوة'}
+                  required={data.tileStyle === 'image' ? PICTURE_SIZES.tileImage : PICTURE_SIZES.tileLogo}
+                  contain={data.tileStyle !== 'image'}
+                  value={String(item.imageUrl ?? '')}
+                  onChange={(url) => update({ imageUrl: url })}
+                />
                 <div className="grid gap-3 sm:grid-cols-2">
                   <TextInput label="الاسم تحت الصورة (اختياري)" value={String(item.label ?? '')} onChange={(v) => update({ label: v })} />
                   <TextInput label="الرابط عند النقر" dir="ltr" list="link-suggestions" value={String(item.linkUrl ?? '')} onChange={(v) => update({ linkUrl: v })} />
@@ -800,6 +832,7 @@ function WidgetFields({ type, data, patch }: FieldsProps) {
           ) : (
             text('title', 'عنوان فوق البانرات (اختياري)')
           )}
+          {imageModeChoice}
           <Repeater
             title={shape === 'editorial' ? 'الصورة' : 'البانرات'}
             addLabel="إضافة بانر"
@@ -810,6 +843,7 @@ function WidgetFields({ type, data, patch }: FieldsProps) {
               <>
                 <BannerImageField
                   device="desktop"
+                  mode={heroMode}
                   required={sizes.desktop}
                   value={String(item.imageUrl ?? '')}
                   onChange={(url) => update({ imageUrl: url })}
@@ -820,6 +854,7 @@ function WidgetFields({ type, data, patch }: FieldsProps) {
                 <BannerImageField
                   device="mobile"
                   optional
+                  mode={heroMode}
                   required={sizes.mobile}
                   value={String(item.mobileImageUrl ?? '')}
                   onChange={(url) => update({ mobileImageUrl: url })}
@@ -1120,7 +1155,9 @@ function BannerHeightChoice({ value, onChange }: { value: BannerHeight; onChange
 
 /** One slide: a desktop and a phone picture, each with a focus point, and
  * optional words over the picture. */
-function SlideFields({ slide, update, height }: { slide: Data; update: (patch: Data) => void; height: BannerHeight }) {
+function SlideFields({
+  slide, update, height, mode,
+}: { slide: Data; update: (patch: Data) => void; height: BannerHeight; mode: ImageMode }) {
   const value = (key: string) => String(slide[key] ?? '')
   const num = (key: string, fallback: number) => Number(slide[key] ?? fallback)
   const select = (key: string, label: string, options: [string, string][], fallback: string) => (
@@ -1138,6 +1175,7 @@ function SlideFields({ slide, update, height }: { slide: Data; update: (patch: D
       <BannerImageField
         device="desktop"
         height={height}
+        mode={mode}
         value={value('imageUrl')}
         onChange={(url) => update({ imageUrl: url })}
         focusX={num('focusX', 50)}
@@ -1148,6 +1186,7 @@ function SlideFields({ slide, update, height }: { slide: Data; update: (patch: D
         device="mobile"
         optional
         height={height}
+        mode={mode}
         value={value('mobileImageUrl')}
         onChange={(url) => update({ mobileImageUrl: url })}
         focusX={num('mobileFocusX', 50)}

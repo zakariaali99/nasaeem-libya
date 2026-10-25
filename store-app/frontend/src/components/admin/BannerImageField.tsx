@@ -1,10 +1,11 @@
-import { AlertTriangle, Crosshair, Monitor, Smartphone } from 'lucide-react'
+import { AlertTriangle, Crosshair, Info, Monitor, Smartphone } from 'lucide-react'
 import * as React from 'react'
 
 import { ImageUploadField } from '@/components/admin/ImageUploadField'
 import { BANNER_SIZES, cropPercent, sizeNumbers, sizeUnit, type BannerSize } from '@/lib/bannerSizes'
+import { SMART_CROP_LIMIT } from '@/components/storefront/widgets/Carousel'
 import { cn } from '@/lib/utils'
-import type { BannerHeight } from '@/types/api'
+import type { BannerHeight, ImageMode } from '@/types/api'
 
 /** The natural size of an image url, once it has loaded. */
 function useImageSize(url: string | undefined) {
@@ -40,6 +41,9 @@ export function BannerImageField({
   onFocusChange,
   optional = false,
   required: requiredSize,
+  mode = 'fill',
+  label,
+  contain = false,
 }: {
   device: 'desktop' | 'mobile'
   /** The banner height the picture is for; or pass the size directly. */
@@ -49,13 +53,23 @@ export function BannerImageField({
   onChange: (url: string) => void
   focusX?: number
   focusY?: number
-  onFocusChange: (x: number, y: number) => void
+  /** Without it there is no focus point to pick (the store centres the picture). */
+  onFocusChange?: (x: number, y: number) => void
   optional?: boolean
+  /** The banner's «طريقة عرض الصورة», so the preview and the warning match the store. */
+  mode?: ImageMode
+  /** Replaces «صورة الحاسوب / الهاتف» for one-picture widgets. */
+  label?: string
+  /** The store fits the whole picture inside the frame (logos): nothing is
+   * cut, the rest of the frame stays empty. */
+  contain?: boolean
 }) {
   const required = requiredSize ?? BANNER_SIZES[height ?? 'band'][device]
   const actual = useImageSize(value || undefined)
   const crop = actual ? cropPercent(actual, required) : 0
   const tooSmall = actual ? actual.width < required.width * 0.7 : false
+  // What the store will do with this picture (see BannerPicture).
+  const shownWhole = !contain && (mode === 'whole' || (mode === 'smart' && crop > SMART_CROP_LIMIT * 100))
   const Icon = device === 'desktop' ? Monitor : Smartphone
   const frameRatio = required.height ? `${required.width} / ${required.height}` : actual ? `${actual.width} / ${actual.height}` : '16 / 9'
 
@@ -63,7 +77,7 @@ export function BannerImageField({
     const box = event.currentTarget.getBoundingClientRect()
     const x = Math.round(((event.clientX - box.left) / box.width) * 100)
     const y = Math.round(((event.clientY - box.top) / box.height) * 100)
-    onFocusChange(Math.min(Math.max(x, 0), 100), Math.min(Math.max(y, 0), 100))
+    onFocusChange?.(Math.min(Math.max(x, 0), 100), Math.min(Math.max(y, 0), 100))
   }
 
   return (
@@ -71,7 +85,7 @@ export function BannerImageField({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="inline-flex items-center gap-1.5 text-sm font-bold">
           <Icon className="size-4 text-primary" aria-hidden="true" />
-          {device === 'desktop' ? 'صورة الحاسوب' : 'صورة الهاتف'}
+          {label ?? (device === 'desktop' ? 'صورة الحاسوب' : 'صورة الهاتف')}
           {optional ? <span className="text-xs font-normal text-muted-foreground">(موصى بها بشدة)</span> : null}
         </span>
         <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
@@ -87,10 +101,23 @@ export function BannerImageField({
           <p className="text-muted-foreground">
             مقاس صورتك: <bdi dir="ltr" className="font-mono font-bold text-foreground">{actual.width} × {actual.height}</bdi> بكسل
           </p>
-          {crop >= 15 ? (
+          {contain && crop >= 15 ? (
             <p className="flex items-start gap-1.5 font-bold text-warning" role="alert">
               <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-              شكل الصورة مختلف عن الإطار: سيُقص نحو {crop}% منها. اختر أدناه الجزء الذي يجب أن يبقى ظاهراً، أو اطلب من المصمم المقاس المطلوب.
+              شكل الصورة مختلف عن الإطار: ستظهر كاملة لكن أصغر، ويبقى فراغ حولها.
+            </p>
+          ) : shownWhole && crop >= 5 ? (
+            <p className="flex items-start gap-1.5 font-bold text-info" role="status">
+              <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+              {mode === 'smart'
+                ? `شكل الصورة بعيد عن الإطار (كان سيُقص نحو ${crop}% منها)، فستظهر كاملة فوق نسخة مموّهة منها. للنتيجة الأفضل اطلب المقاس المطلوب.`
+                : 'ستظهر كاملة فوق نسخة مموّهة منها تملأ بقية الإطار.'}
+            </p>
+          ) : !contain && crop >= 15 ? (
+            <p className="flex items-start gap-1.5 font-bold text-warning" role="alert">
+              <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+              شكل الصورة مختلف عن الإطار: سيُقص نحو {crop}% منها.{' '}
+              {onFocusChange ? 'اختر أدناه الجزء الذي يجب أن يبقى ظاهراً، أو اطلب من المصمم المقاس المطلوب.' : 'اطلب من المصمم المقاس المطلوب.'}
             </p>
           ) : null}
           {tooSmall ? (
@@ -101,7 +128,8 @@ export function BannerImageField({
           ) : null}
 
           {required.height ? (
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className={cn('grid gap-3', onFocusChange && !shownWhole && !contain && 'sm:grid-cols-2')}>
+              {onFocusChange && !shownWhole && !contain ? (
               <div className="space-y-1">
                 <span className="inline-flex items-center gap-1 font-bold">
                   <Crosshair className="size-3.5" aria-hidden="true" /> اضغط على ما يجب أن يبقى ظاهراً
@@ -120,14 +148,19 @@ export function BannerImageField({
                   />
                 </button>
               </div>
-              <div className="space-y-1">
+              ) : null}
+              <div className={cn('space-y-1', !(onFocusChange && !shownWhole && !contain) && 'max-w-sm')}>
                 <span className="font-bold">هكذا ستظهر داخل الإطار</span>
-                <div className="overflow-hidden rounded-lg border border-border bg-muted" style={{ aspectRatio: frameRatio }}>
+                <div className="relative overflow-hidden rounded-lg border border-border bg-muted" style={{ aspectRatio: frameRatio }}>
+                  {shownWhole ? (
+                    <img src={value} alt="" aria-hidden="true" draggable={false}
+                      className="absolute inset-0 size-full scale-110 object-cover blur-xl brightness-75" />
+                  ) : null}
                   <img
                     src={value}
                     alt=""
-                    className={cn('size-full object-cover')}
-                    style={{ objectPosition: `${focusX}% ${focusY}%` }}
+                    className={cn('relative size-full', shownWhole || contain ? 'object-contain' : 'object-cover', contain && 'p-2')}
+                    style={shownWhole || contain ? undefined : { objectPosition: `${focusX}% ${focusY}%` }}
                     draggable={false}
                   />
                 </div>

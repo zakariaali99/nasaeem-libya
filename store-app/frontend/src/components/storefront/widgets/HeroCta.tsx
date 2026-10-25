@@ -1,7 +1,7 @@
 import { ArrowLeft, ShoppingBag, Sparkles } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
-import { Carousel, type BannerVariant } from '@/components/storefront/widgets/Carousel'
+import { Carousel, imageModeOf, type BannerVariant } from '@/components/storefront/widgets/Carousel'
 import { Button } from '@/components/ui/button'
 import { renditionUrl } from '@/lib/images'
 import { cn } from '@/lib/utils'
@@ -91,7 +91,15 @@ export function HeroCta({
     }
     return (
       <Carousel
-        widget={{ ...widget, data: { slides: [slide], bannerHeight: widget.data.bannerHeight ?? 'auto', interval: 0 } }}
+        widget={{
+          ...widget,
+          data: {
+            slides: [slide],
+            bannerHeight: widget.data.bannerHeight ?? 'auto',
+            imageMode: imageModeOf(widget.data),
+            interval: 0,
+          },
+        }}
         priority={priority}
         variant={variant}
       />

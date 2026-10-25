@@ -58,6 +58,44 @@ export const PROMO_SIZES: Record<'strip' | 'grid' | 'editorial', { desktop: Bann
   },
 }
 
+/**
+ * The other pictures the builder takes, measured in the store (1920, 1440 and
+ * 375px screens) on 25 Oct 2026:
+ * - `image` («صورة منفردة»): the page width (1120px in the page, 1920px edge
+ *   to edge), its own height, never cut; the same file on a phone.
+ * - photo tiles: about 270px wide on a computer and 165px on a phone; the
+ *   picture tile is 4:5, the logo box 4:3 (236×183) with the logo fitted inside.
+ * - the text hero: as wide as the page, as tall as its words — about 320px on
+ *   a computer and 256px or more on a phone — so its picture is cut to fit.
+ */
+export const PICTURE_SIZES = {
+  image: {
+    width: 1920,
+    height: null,
+    note: 'تظهر كاملة بأبعادها بلا قص، بعرض الصفحة. على الهاتف تُصغَّر الصورة نفسها بعرض الشاشة، فاجعل أي كتابة فيها كبيرة.',
+  },
+  tileImage: {
+    width: 800,
+    height: 1000,
+    note: 'طولية 4:5. تظهر البطاقة بعرض نحو 270 بكسل على الحاسوب و165 على الهاتف.',
+  },
+  tileLogo: {
+    width: 600,
+    height: 450,
+    note: 'PNG بخلفية شفافة. يظهر الشعار كاملاً داخل إطار 4:3 دون قص.',
+  },
+  heroTextDesktop: {
+    width: 1920,
+    height: 640,
+    note: 'الارتفاع يتبع طول النص (نحو 320 بكسل على الشاشة)، فيُقص من الأعلى والأسفل: اجعل المهم في الوسط.',
+  },
+  heroTextMobile: {
+    width: 1080,
+    height: 1080,
+    note: 'الارتفاع يتبع طول النص، فقد يُقص من الجوانب أو الأعلى: اجعل المهم في الوسط.',
+  },
+} satisfies Record<string, BannerSize>
+
 /** "1920 × 640" — the numbers only, for a left-to-right <bdi>. */
 export function sizeNumbers(size: BannerSize): string {
   return size.height ? `${size.width} × ${size.height}` : `${size.width} × —`

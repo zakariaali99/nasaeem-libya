@@ -1,9 +1,9 @@
 import { Link } from 'react-router-dom'
 
-import { BannerPicture, type BannerVariant } from '@/components/storefront/widgets/Carousel'
+import { BannerPicture, imageModeOf, type BannerVariant } from '@/components/storefront/widgets/Carousel'
 import { WidgetHeading } from '@/components/storefront/widgets/WidgetShell'
 import { cn } from '@/lib/utils'
-import type { CarouselSlide, Widget } from '@/types/api'
+import type { CarouselSlide, ImageMode, Widget } from '@/types/api'
 
 /**
  * Offer banners between the product rows, in one of three shapes the
@@ -17,6 +17,7 @@ export function PromoBanners({ widget, variant }: { widget: Widget; variant?: Ba
   const items = (widget.data.items ?? []) as unknown as CarouselSlide[]
   const shape = widget.data.shape ?? 'strip'
   const fullBleed = widget.style?.width === 'full'
+  const mode = imageModeOf(widget.data)
   if (items.length === 0) return null
 
   const pick = (mobile: string, desktop: string, responsive: string) =>
@@ -36,6 +37,7 @@ export function PromoBanners({ widget, variant }: { widget: Widget; variant?: Ba
           className={cn('aspect-[4/5]', widget.data.imageSide === 'end' && pick('', 'order-last', 'sm:order-last'))}
           rounded={!fullBleed}
           variant={variant}
+          mode={mode}
         />
         <div className="space-y-4 px-4">
           {widget.data.title ? <h2 className="text-2xl font-black leading-tight sm:text-4xl">{widget.data.title}</h2> : null}
@@ -73,7 +75,7 @@ export function PromoBanners({ widget, variant }: { widget: Widget; variant?: Ba
         >
           {items.slice(0, 3).map((item, i) => (
             <li key={`${item.imageUrl}-${i}`} className={pick('w-[80%] shrink-0 snap-start', '', 'w-[80%] shrink-0 snap-start sm:w-auto')}>
-              <Tile item={item} className="aspect-[4/5]" rounded={!fullBleed || items.length > 1} variant={variant} />
+              <Tile item={item} className="aspect-[4/5]" rounded={!fullBleed || items.length > 1} variant={variant} mode={mode} />
             </li>
           ))}
         </ul>
@@ -91,6 +93,7 @@ export function PromoBanners({ widget, variant }: { widget: Widget; variant?: Ba
           className={pick('aspect-[3/1]', 'aspect-[6/1]', 'aspect-[3/1] sm:aspect-[6/1]')}
           rounded={!fullBleed}
           variant={variant}
+          mode={mode}
         />
       ))}
     </div>
@@ -103,15 +106,22 @@ function Tile({
   className,
   rounded,
   variant,
+  mode,
 }: {
   item: CarouselSlide
   className?: string
   rounded: boolean
   variant?: BannerVariant
+  mode: ImageMode
 }) {
   const body = (
     <div className={cn('relative overflow-hidden bg-muted', rounded && 'rounded-2xl', className)}>
-      <BannerPicture slide={item} variant={variant} className="size-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
+      <BannerPicture
+        slide={item}
+        variant={variant}
+        mode={mode}
+        className="size-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+      />
       {item.title ? (
         <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-4 pt-10 text-white">
           <p className="text-lg font-black leading-tight">{item.title}</p>

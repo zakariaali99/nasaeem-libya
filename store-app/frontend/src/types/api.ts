@@ -276,6 +276,8 @@ export interface CarouselSlide {
  * `auto`: the first picture's own shape. */
 export type BannerHeight = 'band' | 'full' | 'auto'
 
+export type ImageMode = 'smart' | 'fill' | 'whole'
+
 export interface PhotoLinkItem {
   imageUrl: string
   linkUrl: string
@@ -293,6 +295,11 @@ export interface WidgetData {
   // carousel
   slides?: CarouselSlide[]
   bannerHeight?: BannerHeight
+  /** How banner pictures sit in their frame (carousel, image hero, offer
+   * banners): `smart` fills unless that cuts too much, then shows the whole
+   * picture over a blurred copy; `fill` always fills; `whole` never crops. */
+  imageMode?: ImageMode
+  /** Older layouts only: contain → whole, cover → smart. */
   imageFit?: 'cover' | 'contain'
   /** Seconds between slides; 0 = no automatic change. */
   interval?: number

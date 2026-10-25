@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 
 import { renditionUrl } from '@/lib/images'
 import { cn } from '@/lib/utils'
-import type { BannerHeight, CarouselSlide, Widget } from '@/types/api'
+import type { BannerHeight, CarouselSlide, ImageMode, Widget, WidgetData } from '@/types/api'
 
 /** Render one layout regardless of the screen — the builder's phone and
  * desktop previews. Unset on the storefront, where the screen decides. */
@@ -41,6 +41,23 @@ const FRAME: Record<Exclude<BannerHeight, 'auto'>, Record<BannerVariant | 'respo
   },
 }
 
+/** More than this share of the picture cut off, and `smart` shows it whole. */
+export const SMART_CROP_LIMIT = 0.35
+
+/** A widget's picture mode, reading older layouts' `imageFit` too. */
+export function imageModeOf(data: Pick<WidgetData, 'imageMode' | 'imageFit'>): ImageMode {
+  if (data.imageMode) return data.imageMode
+  return data.imageFit === 'contain' ? 'whole' : 'smart'
+}
+
+/** The share of a picture a frame cuts off, 0–1. */
+export function cropShare(picture: { width: number; height: number }, frame: { width: number; height: number }) {
+  if (!picture.width || !picture.height || !frame.width || !frame.height) return 0
+  const pictureRatio = picture.width / picture.height
+  const frameRatio = frame.width / frame.height
+  return 1 - (pictureRatio > frameRatio ? frameRatio / pictureRatio : pictureRatio / frameRatio)
+}
+
 /** The phone picture: the server's 1080px copy when it exists, else the
  * picture itself. `spa._hero_preload_tags` preloads the same url. */
 export function phoneSrc(slide: Pick<CarouselSlide, 'imageUrl' | 'mobileImageUrl' | 'mobileSrc'>): string {
@@ -50,7 +67,8 @@ export function phoneSrc(slide: Pick<CarouselSlide, 'imageUrl' | 'mobileImageUrl
 export function Carousel({ widget, priority = false, variant }: CarouselProps) {
   const slides = widget.data.slides ?? []
   const height: BannerHeight = widget.data.bannerHeight ?? 'band'
-  const contain = widget.data.imageFit === 'contain' && height !== 'auto'
+  // `auto` takes the picture's own shape, so there is nothing to fit.
+  const mode: ImageMode = height === 'auto' ? 'fill' : imageModeOf(widget.data)
   // Edge to edge means square corners; inside the page width it is a card.
   const fullBleed = widget.style?.width === 'full'
   const interval = (widget.data.interval ?? 6) * 1000
@@ -95,7 +113,7 @@ export function Carousel({ widget, priority = false, variant }: CarouselProps) {
 
   return (
     <div
-      className={cn('group relative overflow-hidden select-none', !fullBleed && 'rounded-2xl', contain && 'bg-muted')}
+      className={cn('group relative overflow-hidden select-none bg-muted', !fullBleed && 'rounded-2xl')}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onPointerDown={onPointerDown}
@@ -113,7 +131,7 @@ export function Carousel({ widget, priority = false, variant }: CarouselProps) {
             // its height; the rest are laid over it.
             sizer={height === 'auto' && slideIndex === 0}
             eager={priority && slideIndex === 0}
-            contain={contain}
+            mode={mode}
             variant={variant}
             label={count > 1 ? `${slideIndex + 1} من ${count}` : undefined}
           />
@@ -163,7 +181,7 @@ function Slide({
   active,
   sizer,
   eager,
-  contain,
+  mode,
   variant,
   label,
 }: {
@@ -171,7 +189,7 @@ function Slide({
   active: boolean
   sizer: boolean
   eager: boolean
-  contain: boolean
+  mode: ImageMode
   variant?: BannerVariant
   label?: string
 }) {
@@ -180,7 +198,8 @@ function Slide({
       slide={slide}
       variant={variant}
       eager={eager}
-      className={sizer ? 'h-auto max-h-[85dvh] object-cover' : cn('size-full', contain ? 'object-contain' : 'object-cover')}
+      mode={sizer ? 'fill' : mode}
+      className={sizer ? 'h-auto max-h-[85dvh] object-cover' : 'size-full object-cover'}
     />
   )
 
@@ -216,18 +235,57 @@ function Slide({
  * A banner picture: the phone picture (or the server's 1080px copy) on small
  * screens, the desktop one above, each cropped around its own focus point.
  * `variant` pins one of the two for the builder's previews.
+ *
+ * `mode` decides what happens when the picture's shape is not the frame's:
+ * `fill` crops, `whole` shows all of it over a blurred, darker copy of
+ * itself, and `smart` picks `whole` only when filling would cut off more than
+ * `SMART_CROP_LIMIT` of it. The blurred copy is the same file, so nothing
+ * extra is downloaded, and the frame keeps its size, so the page never jumps.
  */
 export function BannerPicture({
   slide,
   variant,
   eager = false,
   className,
+  mode = 'fill',
 }: {
   slide: CarouselSlide
   variant?: BannerVariant
   eager?: boolean
   className?: string
+  mode?: ImageMode
 }) {
+  const imgRef = React.useRef<HTMLImageElement>(null)
+  const [whole, setWhole] = React.useState(mode === 'whole')
+  const [shownSrc, setShownSrc] = React.useState('')
+
+  const measure = React.useCallback(() => {
+    const img = imgRef.current
+    if (!img || !img.naturalWidth || !img.clientHeight) return
+    setShownSrc(img.currentSrc || img.src)
+    if (mode !== 'smart') {
+      setWhole(mode === 'whole')
+      return
+    }
+    // The <img> fills the frame, so its box is the frame.
+    const cut = cropShare(
+      { width: img.naturalWidth, height: img.naturalHeight },
+      { width: img.clientWidth, height: img.clientHeight },
+    )
+    setWhole(cut > SMART_CROP_LIMIT)
+  }, [mode])
+
+  React.useEffect(() => {
+    const img = imgRef.current
+    if (!img) return
+    if (img.complete) measure()
+    // The frame changes shape with the screen (a phone turned sideways, a
+    // resized window): decide again.
+    const observer = new ResizeObserver(measure)
+    observer.observe(img)
+    return () => observer.disconnect()
+  }, [measure])
+
   const desktopSrc = slide.imageUrl || slide.mobileImageUrl || ''
   const mobileSrc = phoneSrc(slide)
   // The phone picture has its own focus point; without one, the desktop
@@ -243,20 +301,49 @@ export function BannerPicture({
         ? '[object-position:var(--focus-d)]'
         : '[object-position:var(--focus-m)] sm:[object-position:var(--focus-d)]'
 
-  return (
-    <picture className="block size-full">
-      {variant === undefined ? <source media="(max-width: 640px)" srcSet={mobileSrc} /> : null}
+  const picture = (
+    <picture className="relative block size-full">
+      {variant === undefined ? (
+        <>
+          <source media="(max-width: 640px)" srcSet={mobileSrc} />
+          <source media="(min-width: 641px)" srcSet={desktopSrc} />
+        </>
+      ) : null}
+      {/* React sets `src` before the <img> sits inside <picture>, and the
+          browser starts that download at once. With both sizes in <source>,
+          `src` is the small phone file, so a phone never fetches the desktop
+          banner. `loading` comes first so a lazy picture waits too. */}
       <img
-        src={variant === 'mobile' ? mobileSrc : desktopSrc}
-        alt={slide.title || ''}
+        ref={imgRef}
         loading={eager ? 'eager' : 'lazy'}
+        src={variant === 'desktop' ? desktopSrc : mobileSrc}
+        alt={slide.title || ''}
         fetchPriority={eager ? 'high' : undefined}
         decoding="async"
         draggable={false}
+        onLoad={measure}
         style={{ '--focus-m': mobileFocus, '--focus-d': desktopFocus } as React.CSSProperties}
-        className={cn('block w-full', className, focusClass)}
+        className={cn('block w-full', className, focusClass, whole && 'object-contain!')}
+        data-fit={whole ? 'whole' : 'fill'}
       />
     </picture>
+  )
+
+  // One tree in both states: re-parenting the <img> would remount it and
+  // leave the observer watching a detached element.
+  return (
+    <div className="relative size-full overflow-hidden">
+      {whole && shownSrc ? (
+        <img
+          src={shownSrc}
+          alt=""
+          aria-hidden="true"
+          draggable={false}
+          className="absolute inset-0 size-full scale-110 object-cover blur-2xl brightness-75"
+        />
+      ) : null}
+      {picture}
+    </div>
   )
 }
 

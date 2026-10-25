@@ -26,6 +26,8 @@ class Category(TimestampedModel):
         "المعرّف", max_length=100, unique=True, allow_unicode=True, db_index=True
     )
     description = models.TextField("الوصف", blank=True)
+    name_en = models.CharField("الاسم بالإنجليزية", max_length=100, blank=True, default="")
+    description_en = models.TextField("الوصف بالإنجليزية", blank=True, default="")
     image_url = models.CharField("الصورة", max_length=255, blank=True)
     parent = models.ForeignKey(
         "self",
@@ -53,6 +55,8 @@ class Collection(TimestampedModel):
         "المعرّف", max_length=100, unique=True, allow_unicode=True, db_index=True
     )
     description = models.TextField("الوصف", blank=True)
+    name_en = models.CharField("الاسم بالإنجليزية", max_length=100, blank=True, default="")
+    description_en = models.TextField("الوصف بالإنجليزية", blank=True, default="")
     is_active = models.BooleanField("نشط", default=True, db_index=True)
 
     class Meta:
@@ -90,6 +94,11 @@ class Product(TimestampedModel):
     reserved_stock = models.IntegerField("المخزون المحجوز", default=0)
     meta_title = models.CharField("عنوان SEO", max_length=255, blank=True)
     meta_description = models.TextField("وصف SEO", blank=True)
+    # English twins: optional; an empty one shows the Arabic on the English store.
+    name_en = models.CharField("الاسم بالإنجليزية", max_length=100, blank=True, default="")
+    description_en = models.TextField("الوصف بالإنجليزية", blank=True, default="")
+    meta_title_en = models.CharField("عنوان SEO بالإنجليزية", max_length=255, blank=True, default="")
+    meta_description_en = models.TextField("وصف SEO بالإنجليزية", blank=True, default="")
     width = models.IntegerField("العرض", null=True, blank=True)
     length = models.IntegerField("الطول", null=True, blank=True)
     height = models.IntegerField("الارتفاع", null=True, blank=True)
@@ -157,6 +166,7 @@ class VariantOption(TimestampedModel):
     """An option axis — الحجم, اللون."""
 
     name = models.CharField("اسم الخيار", max_length=100)
+    name_en = models.CharField("اسم الخيار بالإنجليزية", max_length=100, blank=True, default="")
 
     class Meta:
         verbose_name = "خيار"
@@ -172,6 +182,7 @@ class VariantValue(TimestampedModel):
         VariantOption, on_delete=models.CASCADE, related_name="values", verbose_name="الخيار"
     )
     value = models.CharField("القيمة", max_length=100)
+    value_en = models.CharField("القيمة بالإنجليزية", max_length=100, blank=True, default="")
 
     class Meta:
         verbose_name = "قيمة خيار"
@@ -340,6 +351,12 @@ class PerfumeAttribute(TimestampedModel):
     top_notes = models.JSONField("قمة العطر (Top Notes)", default=list, blank=True)
     heart_notes = models.JSONField("قلب العطر (Heart Notes)", default=list, blank=True)
     base_notes = models.JSONField("قاعدة العطر (Base Notes)", default=list, blank=True)
+    # English lists for the English store; an empty list shows the Arabic one.
+    top_notes_en = models.JSONField("قمة العطر بالإنجليزية", default=list, blank=True)
+    heart_notes_en = models.JSONField("قلب العطر بالإنجليزية", default=list, blank=True)
+    base_notes_en = models.JSONField("قاعدة العطر بالإنجليزية", default=list, blank=True)
+    fragrance_family_en = models.CharField("العائلة العطرية بالإنجليزية", max_length=100, blank=True, default="")
+    origin_country_en = models.CharField("بلد المنشأ بالإنجليزية", max_length=100, blank=True, default="")
 
     # Sensory Performance (1 to 5)
     longevity_score = models.PositiveSmallIntegerField("مؤشر الثبات والدوام", default=5)
@@ -364,6 +381,8 @@ class ProductBundle(TimestampedModel):
     name = models.CharField("اسم الحزمة", max_length=200)
     slug = models.SlugField("الرمز اللطيف", max_length=200, unique=True, allow_unicode=True)
     description = models.TextField("وصف الحزمة وميزاتها", blank=True)
+    name_en = models.CharField("اسم الحزمة بالإنجليزية", max_length=200, blank=True, default="")
+    description_en = models.TextField("وصف الحزمة بالإنجليزية", blank=True, default="")
     main_product = models.ForeignKey(
         Product,
         on_delete=models.CASCADE,
@@ -379,6 +398,7 @@ class ProductBundle(TimestampedModel):
     bundle_price = models.DecimalField("سعر الحزمة المخفض (د.ل)", max_digits=10, decimal_places=2)
     original_price = models.DecimalField("السعر الأصلي قبل الخصم (د.ل)", max_digits=10, decimal_places=2)
     badge_text = models.CharField("شارة التوفير", max_length=100, default="وفر حتى 20%")
+    badge_text_en = models.CharField("شارة التوفير بالإنجليزية", max_length=100, blank=True, default="")
     is_active = models.BooleanField("مفعل ومعروض", default=True, db_index=True)
 
     class Meta:

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 
 import { api } from '@/lib/api'
+import { isEnglish } from '@/lib/i18n'
 import { recentlyViewed } from '@/lib/recentlyViewed'
 import type { StorefrontLayoutResponse } from '@/types/api'
 
@@ -17,7 +18,8 @@ export function useStorefrontLayout() {
   const recent = recentlyViewed().join(',')
 
   const initialData = (() => {
-    if (!recent && typeof window !== 'undefined') {
+    // The bootstrap copy is the Arabic homepage; English pages ask for theirs.
+    if (!recent && !isEnglish() && typeof window !== 'undefined') {
       const win = window as unknown as { __BOOTSTRAP__?: { layout?: StorefrontLayoutResponse } }
       if (win.__BOOTSTRAP__?.layout) {
         const layout = win.__BOOTSTRAP__.layout

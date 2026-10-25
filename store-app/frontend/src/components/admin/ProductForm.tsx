@@ -40,6 +40,10 @@ const schema = z
     barcode: z.string().max(50).optional(),
     meta_title: z.string().max(255).optional(),
     meta_description: z.string().max(500).optional(),
+    name_en: z.string().trim().max(100).optional(),
+    description_en: z.string().max(5000).optional(),
+    meta_title_en: z.string().max(255).optional(),
+    meta_description_en: z.string().max(500).optional(),
     is_active: z.boolean(),
     track_quantity: z.boolean(),
   })
@@ -106,6 +110,13 @@ export function ProductForm({
   const [perfumeOrigin, setPerfumeOrigin] = useState<string>(
     product?.perfume_details?.origin_country ?? 'فرنسا'
   )
+  // The English store's perfume wording: notes typed as one comma-separated
+  // line each, in the same order as the Arabic notes (they share their icons).
+  const [perfumeFamilyEn, setPerfumeFamilyEn] = useState(product?.perfume_details?.fragrance_family_en ?? '')
+  const [perfumeOriginEn, setPerfumeOriginEn] = useState(product?.perfume_details?.origin_country_en ?? '')
+  const [topNotesEn, setTopNotesEn] = useState(noteLine(product?.perfume_details?.top_notes_en))
+  const [heartNotesEn, setHeartNotesEn] = useState(noteLine(product?.perfume_details?.heart_notes_en))
+  const [baseNotesEn, setBaseNotesEn] = useState(noteLine(product?.perfume_details?.base_notes_en))
   const [topNotes, setTopNotes] = useState<PerfumeNote[]>(
     product?.perfume_details?.top_notes ?? []
   )
@@ -231,6 +242,10 @@ export function ProductForm({
       barcode: product?.barcode ?? '',
       meta_title: product?.meta_title ?? '',
       meta_description: product?.meta_description ?? '',
+      name_en: product?.name_en ?? '',
+      description_en: product?.description_en ?? '',
+      meta_title_en: product?.meta_title_en ?? '',
+      meta_description_en: product?.meta_description_en ?? '',
       is_active: product?.is_active ?? true,
       track_quantity: product?.track_quantity ?? true,
     },
@@ -249,6 +264,10 @@ export function ProductForm({
         barcode: product.barcode ?? '',
         meta_title: product.meta_title ?? '',
         meta_description: product.meta_description ?? '',
+        name_en: product.name_en ?? '',
+        description_en: product.description_en ?? '',
+        meta_title_en: product.meta_title_en ?? '',
+        meta_description_en: product.meta_description_en ?? '',
         is_active: product.is_active ?? true,
         track_quantity: product.track_quantity ?? true,
       })
@@ -266,6 +285,11 @@ export function ProductForm({
         setTopNotes(product.perfume_details.top_notes ?? [])
         setHeartNotes(product.perfume_details.heart_notes ?? [])
         setBaseNotes(product.perfume_details.base_notes ?? [])
+        setPerfumeFamilyEn(product.perfume_details.fragrance_family_en ?? '')
+        setPerfumeOriginEn(product.perfume_details.origin_country_en ?? '')
+        setTopNotesEn(noteLine(product.perfume_details.top_notes_en))
+        setHeartNotesEn(noteLine(product.perfume_details.heart_notes_en))
+        setBaseNotesEn(noteLine(product.perfume_details.base_notes_en))
         setLongevityScore(product.perfume_details.longevity_score ?? 4)
         setLongevityHours(product.perfume_details.longevity_hours ?? '12 إلى 18 ساعة')
         setSillageScore(product.perfume_details.sillage_score ?? 4)
@@ -426,6 +450,11 @@ export function ProductForm({
             top_notes: topNotes,
             heart_notes: heartNotes,
             base_notes: baseNotes,
+            fragrance_family_en: perfumeFamilyEn.trim(),
+            origin_country_en: perfumeOriginEn.trim(),
+            top_notes_en: englishNotes(topNotesEn, topNotes),
+            heart_notes_en: englishNotes(heartNotesEn, heartNotes),
+            base_notes_en: englishNotes(baseNotesEn, baseNotes),
             longevity_score: longevityScore,
             longevity_hours: longevityHours,
             sillage_score: sillageScore,
@@ -1348,6 +1377,41 @@ export function ProductForm({
               )}
             </Field>
           </Section>
+
+          <Section title="النسخة الإنجليزية (اختياري)">
+            <p className="text-xs text-muted-foreground">
+              تظهر في المتجر الإنجليزي (/en). أي حقل تتركه فارغاً يظهر فيه النص العربي.
+            </p>
+            <Field id="name_en" label="اسم المنتج بالإنجليزية" error={errors.name_en?.message}>
+              {(field) => (
+                <Input {...field} {...form.register('name_en')} dir="ltr" placeholder={watchedName} className="h-10 rounded-xl" />
+              )}
+            </Field>
+            <Field id="description_en" label="الوصف بالإنجليزية" error={errors.description_en?.message}>
+              {(field) => (
+                <Textarea {...field} {...form.register('description_en')} dir="ltr" rows={4} className="rounded-xl text-sm" />
+              )}
+            </Field>
+            {hasPerfumeDetails && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <EnglishLine id="fragrance_family_en" label="العائلة العطرية" value={perfumeFamilyEn} onChange={setPerfumeFamilyEn} placeholder={perfumeFamily} />
+                <EnglishLine id="origin_country_en" label="بلد المنشأ" value={perfumeOriginEn} onChange={setPerfumeOriginEn} placeholder={perfumeOrigin} />
+                <EnglishLine id="top_notes_en" label="النفحات العليا (افصل بفاصلة)" value={topNotesEn} onChange={setTopNotesEn} placeholder={noteLine(topNotes)} />
+                <EnglishLine id="heart_notes_en" label="نفحات القلب (افصل بفاصلة)" value={heartNotesEn} onChange={setHeartNotesEn} placeholder={noteLine(heartNotes)} />
+                <EnglishLine id="base_notes_en" label="النفحات الأساسية (افصل بفاصلة)" value={baseNotesEn} onChange={setBaseNotesEn} placeholder={noteLine(baseNotes)} />
+              </div>
+            )}
+            <Field id="meta_title_en" label="عنوان الصفحة في جوجل (إنجليزي)" error={errors.meta_title_en?.message}>
+              {(field) => (
+                <Input {...field} {...form.register('meta_title_en')} dir="ltr" className="h-10 rounded-xl text-xs" />
+              )}
+            </Field>
+            <Field id="meta_description_en" label="الوصف التعريفي للبحث (إنجليزي)" error={errors.meta_description_en?.message}>
+              {(field) => (
+                <Textarea {...field} {...form.register('meta_description_en')} dir="ltr" rows={2} className="rounded-xl text-xs" />
+              )}
+            </Field>
+          </Section>
         </div>
 
         {/* Sidebar (1 Column) */}
@@ -1474,6 +1538,33 @@ export function ProductForm({
         </Button>
       </div>
     </form>
+  )
+}
+
+/** `[{name: 'Oud'}, {name: 'Rose'}]` → `'Oud, Rose'`. */
+function noteLine(notes?: PerfumeNote[]): string {
+  return (notes ?? []).map((n) => n.name).join(', ')
+}
+
+/** The typed English line as notes, each keeping the icon of the Arabic note
+ * in the same place. Empty → `[]`, and the Arabic notes show. */
+function englishNotes(line: string, arabic: PerfumeNote[]): PerfumeNote[] {
+  const names = line.split(/[,،]/).map((n) => n.trim()).filter(Boolean)
+  return names.map((name, i) => ({ ...(arabic[i] ?? {}), name, desc: undefined }))
+}
+
+function EnglishLine({ id, label, value, onChange, placeholder }: {
+  id: string
+  label: string
+  value: string
+  onChange: (value: string) => void
+  placeholder?: string
+}) {
+  return (
+    <div className="space-y-1.5">
+      <label htmlFor={id} className="text-xs font-bold text-foreground block">{label}</label>
+      <Input id={id} dir="ltr" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="h-10 rounded-xl text-sm" />
+    </div>
   )
 }
 

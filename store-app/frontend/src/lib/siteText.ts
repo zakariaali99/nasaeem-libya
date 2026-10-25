@@ -11,6 +11,8 @@ import { useStoreSettings } from '@/lib/queries/storeSettings'
  * - key absent  → the `fallback` below is shown;
  * - empty string → the line is hidden (components skip empty text).
  *
+ * The English wording of a line is stored under `en:<key>`, with the same rules.
+ *
  * To make another line editable: add it here and read it with `useSiteText()`.
  */
 export interface SiteTextEntry {
@@ -70,15 +72,20 @@ const FALLBACKS_EN: Record<string, string> = Object.fromEntries(SITE_TEXTS.map((
 
 /**
  * `t('footer.about')` → the operator's wording, or the built-in one. On an
- * English page the operator's Arabic wording is not shown: the built-in
- * English line is, except that a line the operator hid stays hidden.
+ * English page the operator's English wording wins; without one the Arabic
+ * wording is not shown but the built-in English line is, except that a line
+ * the operator hid stays hidden.
  */
 export function useSiteText(): (key: string) => string {
   const { data } = useStoreSettings()
   const overrides = data?.texts
   return (key) => {
     const value = overrides?.[key]
-    if (isEnglish()) return value === '' ? '' : (FALLBACKS_EN[key] ?? '')
+    if (isEnglish()) {
+      const english = overrides?.[`en:${key}`]
+      if (typeof english === 'string') return english
+      return value === '' ? '' : (FALLBACKS_EN[key] ?? '')
+    }
     return typeof value === 'string' ? value : (FALLBACKS[key] ?? '')
   }
 }

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { api } from '@/lib/api'
+import { isEnglish } from '@/lib/i18n'
 import type {
   Category,
   Collection,
@@ -60,7 +61,7 @@ export function useProductBySlug(slug: string | undefined) {
  * takes the storefront's bootstrap tree, which leaves hidden ones out. */
 export function useCategories({ admin = false }: { admin?: boolean } = {}) {
   const initialData = (() => {
-    if (!admin && typeof window !== 'undefined') {
+    if (!admin && !isEnglish() && typeof window !== 'undefined') {
       const win = window as unknown as { __BOOTSTRAP__?: { categories?: Category[] } }
       if (win.__BOOTSTRAP__?.categories) {
         const categories = win.__BOOTSTRAP__.categories

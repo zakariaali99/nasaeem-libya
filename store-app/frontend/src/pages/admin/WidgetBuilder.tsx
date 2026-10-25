@@ -185,6 +185,7 @@ interface EditorProps {
 function Editor({ layout, notice, setNotice, lastIndex }: EditorProps) {
   usePageTitle(`${layout.name} — محرر الواجهة`)
   const save = useSaveLayout(layout.id)
+  const [writingEnglish, setWritingEnglish] = React.useState(false)
 
   const [widgets, setWidgetsState] = React.useState<DraftWidget[]>(() =>
     layout.widgets.map((w) => ({
@@ -447,7 +448,19 @@ function Editor({ layout, notice, setNotice, lastIndex }: EditorProps) {
                   </Button>
                 </div>
               </div>
-              <WidgetFields type={current.type} data={current.data} patch={patchCurrent} />
+              <div role="group" aria-label="لغة النصوص" className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="font-bold text-muted-foreground">النصوص:</span>
+                {([false, true] as const).map((en) => (
+                  <Button key={String(en)} type="button" size="sm" variant={writingEnglish === en ? 'default' : 'outline'}
+                    aria-pressed={writingEnglish === en} className="h-8 text-xs" onClick={() => setWritingEnglish(en)}>
+                    {en ? 'English (المتجر الإنجليزي)' : 'عربي'}
+                  </Button>
+                ))}
+                {writingEnglish && <span className="text-muted-foreground">الحقل الفارغ يظهر بالعربي في المتجر الإنجليزي.</span>}
+              </div>
+              <EnglishMode.Provider value={writingEnglish}>
+                <WidgetFields type={current.type} data={current.data} patch={patchCurrent} />
+              </EnglishMode.Provider>
               <AppearanceEditor widget={current} patch={patchWidget} />
             </section>
           ) : (
@@ -539,10 +552,43 @@ interface FieldsProps {
   patch: (patch: Data) => void
 }
 
+/** True while the operator writes the English store's wording: every text
+ * box then edits `<key>_en`, with the Arabic shown greyed as a reminder. */
+const EnglishMode = React.createContext(false)
+
+/** The value, change handler and hint of one wording box in the language
+ * being written. An emptied English line is removed (the Arabic then shows). */
+function wording(english: boolean, source: Data, key: string, update: (patch: Data) => void) {
+  if (!english) return { value: String(source[key] ?? ''), onChange: (v: string) => update({ [key]: v }) }
+  return {
+    value: String(source[`${key}_en`] ?? ''),
+    onChange: (v: string) => update({ [`${key}_en`]: v.trim() ? v : undefined }),
+    placeholder: String(source[key] ?? ''),
+    dir: 'ltr' as const,
+  }
+}
+
 function WidgetFields({ type, data, patch }: FieldsProps) {
+  const english = React.useContext(EnglishMode)
+  const say = (source: Data, key: string, update: (patch: Data) => void) => wording(english, source, key, update)
   const text = (key: string, label: string, hint?: string) => (
-    <TextInput key={key} id={`f-${key}`} label={label} hint={hint} value={String(data[key] ?? '')} onChange={(v) => patch({ [key]: v })} />
+    <TextInput key={key} id={`f-${key}`} label={label} hint={hint} {...say(data, key, patch)} />
   )
+  /** A multi-line wording box; `lines` stores one list entry per line. */
+  const area = (key: string, rows: number, className: string, lines = false) => (props: { id: string }) => {
+    if (lines) {
+      const k = english ? `${key}_en` : key
+      return (
+        <textarea {...props} rows={rows} className={className} dir={english ? 'ltr' : undefined}
+          placeholder={english ? ((data[key] as string[]) ?? []).join('\n') : undefined}
+          value={((data[k] as string[]) ?? []).join('\n')}
+          onChange={(e) => patch({ [k]: e.target.value.trim() || !english ? e.target.value.split('\n') : undefined })} />
+      )
+    }
+    const w = say(data, key, patch)
+    return <textarea {...props} rows={rows} className={className} dir={w.dir} placeholder={w.placeholder}
+      value={w.value} onChange={(e) => w.onChange(e.target.value)} />
+  }
   const link = (key: string, label: string) => (
     <TextInput key={key} id={`f-${key}`} label={label} dir="ltr" list="link-suggestions"
       hint="اختر من القائمة أو اكتب رابطاً مثل ‎/products" value={String(data[key] ?? '')} onChange={(v) => patch({ [key]: v })} />
@@ -768,7 +814,7 @@ function WidgetFields({ type, data, patch }: FieldsProps) {
                   onChange={(url) => update({ imageUrl: url })}
                 />
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <TextInput label="الاسم تحت الصورة (اختياري)" value={String(item.label ?? '')} onChange={(v) => update({ label: v })} />
+                  <TextInput label="الاسم تحت الصورة (اختياري)" {...say(item, 'label', update)} />
                   <TextInput label="الرابط عند النقر" dir="ltr" list="link-suggestions" value={String(item.linkUrl ?? '')} onChange={(v) => update({ linkUrl: v })} />
                 </div>
               </>
@@ -815,10 +861,7 @@ function WidgetFields({ type, data, patch }: FieldsProps) {
             <>
               {text('title', 'العنوان')}
               <Field label="النص" id="f-content">
-                {(props) => (
-                  <textarea {...props} rows={4} className="w-full rounded-md border border-input bg-background px-4 py-3 text-base"
-                    value={String(data.content ?? '')} onChange={(e) => patch({ content: e.target.value })} />
-                )}
+                {area('content', 4, 'w-full rounded-md border border-input bg-background px-4 py-3 text-base')}
               </Field>
               <div className="grid gap-3 sm:grid-cols-3">
                 {text('buttonLabel', 'نص الزر (اختياري)')}
@@ -865,7 +908,7 @@ function WidgetFields({ type, data, patch }: FieldsProps) {
                 <div className="grid gap-3 sm:grid-cols-2">
                   <TextInput label="الرابط عند النقر" dir="ltr" list="link-suggestions" value={String(item.linkUrl ?? '')} onChange={(v) => update({ linkUrl: v })} />
                   {shape !== 'editorial' ? (
-                    <TextInput label="اسم فوق الصورة (اختياري)" hint="اتركه فارغاً إن كان مكتوباً في الصورة" value={String(item.title ?? '')} onChange={(v) => update({ title: v })} />
+                    <TextInput label="اسم فوق الصورة (اختياري)" hint="اتركه فارغاً إن كان مكتوباً في الصورة" {...say(item, 'title', update)} />
                   ) : null}
                 </div>
               </>
@@ -917,8 +960,8 @@ function WidgetFields({ type, data, patch }: FieldsProps) {
                     {ICON_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </Select>
                 </Field>
-                <TextInput label="العنوان" value={String(item.title ?? '')} onChange={(v) => update({ title: v })} />
-                <TextInput label="سطر توضيحي (اختياري)" value={String(item.subtitle ?? '')} onChange={(v) => update({ subtitle: v })} />
+                <TextInput label="العنوان" {...say(item, 'title', update)} />
+                <TextInput label="سطر توضيحي (اختياري)" {...say(item, 'subtitle', update)} />
               </div>
             )}
           />
@@ -928,10 +971,7 @@ function WidgetFields({ type, data, patch }: FieldsProps) {
     case 'text_block':
       return (
         <Field label="النص" id="f-content" hint="كل سطر جديد يظهر كفقرة">
-          {(props) => (
-            <textarea {...props} rows={4} className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
-              value={String(data.content ?? '')} onChange={(e) => patch({ content: e.target.value })} />
-          )}
+          {area('content', 4, 'w-full rounded-xl border border-input bg-background px-3 py-2 text-sm')}
         </Field>
       )
 
@@ -950,17 +990,10 @@ function WidgetFields({ type, data, patch }: FieldsProps) {
             {text('badge', 'شارة صغيرة بجانب العنوان (اختياري)')}
           </div>
           <Field label="الوصف (اختياري)" id="f-description">
-            {(props) => (
-              <textarea {...props} rows={3} className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
-                value={String(data.description ?? '')} onChange={(e) => patch({ description: e.target.value })} />
-            )}
+            {area('description', 3, 'w-full rounded-xl border border-input bg-background px-3 py-2 text-sm')}
           </Field>
           <Field label="نقاط مختصرة (اختياري)" id="f-features" hint="كل سطر يظهر كنقطة بعلامة ✓ — حتى 6 نقاط">
-            {(props) => (
-              <textarea {...props} rows={3} className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
-                value={((data.features as string[]) ?? []).join('\n')}
-                onChange={(e) => patch({ features: e.target.value.split('\n') })} />
-            )}
+            {area('features', 3, 'w-full rounded-xl border border-input bg-background px-3 py-2 text-sm', true)}
           </Field>
           <div className="grid gap-3 sm:grid-cols-2">
             {text('buttonText', 'نص الزر (اختياري)')}
@@ -1078,12 +1111,13 @@ function AppearanceEditor({ widget, patch }: { widget: DraftWidget; patch: (patc
 // Small inputs
 // --------------------------------------------------------------------------
 
-function TextInput({ id, label, hint, value, onChange, dir, list }: {
+function TextInput({ id, label, hint, value, onChange, dir, list, placeholder }: {
   id?: string; label: string; hint?: string; value: string; onChange: (value: string) => void; dir?: 'ltr'; list?: string
+  placeholder?: string
 }) {
   return (
     <Field label={label} id={id} hint={hint}>
-      <Input id={id} value={value} dir={dir} list={list} onChange={(e) => onChange(e.target.value)} />
+      <Input id={id} value={value} dir={dir} list={list} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />
     </Field>
   )
 }
@@ -1158,6 +1192,7 @@ function BannerHeightChoice({ value, onChange }: { value: BannerHeight; onChange
 function SlideFields({
   slide, update, height, mode,
 }: { slide: Data; update: (patch: Data) => void; height: BannerHeight; mode: ImageMode }) {
+  const english = React.useContext(EnglishMode)
   const value = (key: string) => String(slide[key] ?? '')
   const num = (key: string, fallback: number) => Number(slide[key] ?? fallback)
   const select = (key: string, label: string, options: [string, string][], fallback: string) => (
@@ -1194,16 +1229,16 @@ function SlideFields({
         onFocusChange={(x, y) => update({ mobileFocusX: x, mobileFocusY: y })}
       />
       <TextInput label="الرابط عند النقر (اختياري)" dir="ltr" list="link-suggestions" value={value('linkUrl')} onChange={(v) => update({ linkUrl: v })} />
-      <details className="rounded-xl border border-border p-3" open={hasText}>
+      <details className="rounded-xl border border-border p-3" open={hasText || english}>
         <summary className="cursor-pointer text-sm font-bold">نص فوق الصورة (اختياري)</summary>
         <div className="mt-3 space-y-3">
           <p className="text-xs text-muted-foreground">
             اتركه فارغاً إن كان النص مكتوباً داخل الصورة نفسها.
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
-            <TextInput label="العنوان" value={value('title')} onChange={(v) => update({ title: v })} />
-            <TextInput label="سطر تحت العنوان" value={value('subtitle')} onChange={(v) => update({ subtitle: v })} />
-            <TextInput label="نص الزر" hint="يظهر الزر إن وُضع رابط أعلاه" value={value('buttonLabel')} onChange={(v) => update({ buttonLabel: v })} />
+            <TextInput label="العنوان" {...wording(english, slide, 'title', update)} />
+            <TextInput label="سطر تحت العنوان" {...wording(english, slide, 'subtitle', update)} />
+            <TextInput label="نص الزر" hint="يظهر الزر إن وُضع رابط أعلاه" {...wording(english, slide, 'buttonLabel', update)} />
             {select('textTone', 'لون النص', [['light', 'فاتح (على صورة داكنة)'], ['dark', 'داكن (على صورة فاتحة)']], 'light')}
             {select('textAlign', 'مكان النص أفقياً', [['start', 'يمين'], ['center', 'وسط'], ['end', 'يسار']], 'start')}
             {select('textVAlign', 'مكان النص عمودياً', [['bottom', 'أسفل'], ['middle', 'وسط'], ['top', 'أعلى']], 'bottom')}

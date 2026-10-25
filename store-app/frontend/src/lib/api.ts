@@ -5,7 +5,7 @@
  * session credentials, CSRF and Arabic error handling in a single place.
  */
 
-import { t } from '@/lib/i18n'
+import { isEnglish, t } from '@/lib/i18n'
 
 export interface ApiMeta {
   page: number
@@ -69,13 +69,15 @@ export interface RequestOptions extends Omit<RequestInit, 'body'> {
 
 function buildUrl(path: string, params?: RequestOptions['params']): string {
   const url = path.startsWith('/api') ? path : `/api${path.startsWith('/') ? path : `/${path}`}`
-  if (!params) return url
   const search = new URLSearchParams()
-  for (const [key, value] of Object.entries(params)) {
+  for (const [key, value] of Object.entries(params ?? {})) {
     if (value !== undefined && value !== null && value !== '') search.set(key, String(value))
   }
+  // An English page asks for English content. In the address, not a header,
+  // so the service worker and every cache keep the two languages apart.
+  if (isEnglish()) search.set('lang', 'en')
   const qs = search.toString()
-  return qs ? `${url}?${qs}` : url
+  return qs ? `${url}${url.includes('?') ? '&' : '?'}${qs}` : url
 }
 
 async function parseError(response: Response): Promise<ApiError> {

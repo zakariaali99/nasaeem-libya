@@ -12,7 +12,7 @@ small, so the tree is walked in Python — no recursive SQL, which SQLite on the
 live server would make awkward.
 """
 
-from django.core.cache import cache
+from apps.core.language import forget
 
 from .models import Category, Collection, Product
 
@@ -95,10 +95,9 @@ def hidden_by(product, categories=None, collections=None) -> list:
 def forget_product_pages():
     """Drop every cached product page. A product page is cached for hours, and
     hiding a brand changes what those pages may show (bundles, links)."""
-    keys = []
+    keys = ["store:categories:tree"]
     for pk, slug in Product.objects.values_list("id", "slug"):
         keys.append(f"store:product:{pk}")
         if slug:
             keys.append(f"store:product:{slug}")
-    cache.delete_many(keys)
-    cache.delete("store:categories:tree")
+    forget(*keys)  # both languages

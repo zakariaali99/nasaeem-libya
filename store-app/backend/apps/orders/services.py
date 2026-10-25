@@ -1397,7 +1397,15 @@ def build_order_invoice_data(order: Order) -> dict:
     city_name = order.shipping_city.name if order.shipping_city else "طرابلس"
     region_name = order.shipping_region.name if order.shipping_region else ""
 
-    tafqeet_text = tafqeet_libyan_dinars(order.total)
+    # With delivery arranged outside the system (FEATURE_SHIPPING_FEES off)
+    # the invoice is for the products only, so an order that was given a
+    # delivery price before the switch prints without it. The order itself
+    # keeps its figures.
+    shipping = order.shipping_total if settings.FEATURE_SHIPPING_FEES else Decimal("0.00")
+    delivery_discount = order.delivery_discount_amount if settings.FEATURE_SHIPPING_FEES else Decimal("0.00")
+    invoice_total = money(order.total - order.shipping_total + shipping)
+
+    tafqeet_text = tafqeet_libyan_dinars(invoice_total)
 
     from apps.core.store_settings import get_store_settings
 
@@ -1432,9 +1440,9 @@ def build_order_invoice_data(order: Order) -> dict:
         "financials": {
             "subtotal": str(order.subtotal),
             "discount_total": str(order.discount_total),
-            "shipping_total": str(order.shipping_total),
-            "delivery_discount_amount": str(order.delivery_discount_amount),
-            "total": str(order.total),
+            "shipping_total": str(money(shipping)),
+            "delivery_discount_amount": str(money(delivery_discount)),
+            "total": str(invoice_total),
             "tafqeet": tafqeet_text,
             "payment_method": order.payment_method,
             "payment_status": order.payment.status if hasattr(order, "payment") and order.payment else "pending",

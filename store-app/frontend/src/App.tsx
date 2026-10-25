@@ -1,4 +1,5 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider, hashKey } from '@tanstack/react-query'
+import { currentLang } from '@/lib/i18n'
 import { ApiError } from '@/lib/api'
 import { FEATURES } from '@/lib/features'
 import { lazy, Suspense } from 'react'
@@ -90,6 +91,9 @@ const AdminSiteTexts = lazy(() => import('@/pages/admin/SiteTexts'))
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
+      // Each language keeps its own cached answers: switching to /en/ must
+      // not show the Arabic product names fetched a moment ago.
+      queryKeyHashFn: (queryKey) => hashKey([currentLang(), ...queryKey]),
       staleTime: 30_000,
       // One retry for a dropped connection or a 5xx. A 4xx is an answer, not a
       // failure: retrying a 404 only kept "loading…" on screen for longer.

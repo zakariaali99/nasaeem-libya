@@ -24,6 +24,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.permissions import IsAdminRole
+from apps.core.language import forget, lang_key
 from apps.core.pagination import StandardPagination
 from apps.orders.models import Discount
 
@@ -220,7 +221,7 @@ class ProductDetailView(APIView):
         if product is None:
             return Response({"message": "المنتج غير موجود"}, status=status.HTTP_404_NOT_FOUND)
 
-        cache_key = f"store:product:{product.id}"
+        cache_key = lang_key(f"store:product:{product.id}", request)
         if not admin:
             cached_data = cache.get(cache_key)
             if cached_data is not None:
@@ -241,9 +242,9 @@ class ProductDetailView(APIView):
         )
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        cache.delete(f"store:product:{product.id}")
+        forget(f"store:product:{product.id}")
         if product.slug:
-            cache.delete(f"store:product:{product.slug}")
+            forget(f"store:product:{product.slug}")
         if product.is_active != was_active:
             # Other products' pages list this one in their bundles.
             visibility.forget_product_pages()
@@ -258,10 +259,10 @@ class ProductDetailView(APIView):
         product_name = product.name
 
         # Invalidate related product and storefront caches
-        cache.delete(f"store:product:{product.id}")
+        forget(f"store:product:{product.id}")
         if product_slug:
-            cache.delete(f"store:product:{product_slug}")
-        cache.delete("store:categories:tree")
+            forget(f"store:product:{product_slug}")
+        forget("store:categories:tree")
 
         # Clean any ephemeral cart items for this product
         try:
@@ -302,7 +303,7 @@ class ProductBySlugView(APIView):
         if product is None:
             return Response({"message": "المنتج غير موجود"}, status=status.HTTP_404_NOT_FOUND)
 
-        cache_key = f"store:product:{product.slug}"
+        cache_key = lang_key(f"store:product:{product.slug}", request)
         if not admin:
             cached_data = cache.get(cache_key)
             if cached_data is not None:
@@ -312,7 +313,7 @@ class ProductBySlugView(APIView):
         if not admin:
             cache.set(cache_key, serialized_data, 21600)
             if str(slug) != str(product.slug):
-                cache.set(f"store:product:{slug}", serialized_data, 21600)
+                cache.set(lang_key(f"store:product:{slug}", request), serialized_data, 21600)
         return Response({"data": serialized_data})
 
 
@@ -337,12 +338,12 @@ def category_tree(request=None, *, admin=False):
     roots = by_parent.get(None, [])
     data = CategorySerializer(roots, many=True, context={"request": request}).data
     if not admin:
-        cache.set("store:categories:tree", data, 86400)
+        cache.set(lang_key("store:categories:tree", request), data, 86400)
     return data, len(categories)
 
 
 def public_category_tree(request=None):
-    cached = cache.get("store:categories:tree")
+    cached = cache.get(lang_key("store:categories:tree", request))
     if cached is not None:
         return cached
     return category_tree(request)[0]
@@ -355,7 +356,7 @@ class CategoryListView(APIView):
     def get(self, request):
         admin = bool(request.user.is_authenticated and getattr(request.user, "is_admin_role", False))
         if not admin:
-            cached = cache.get("store:categories:tree")
+            cached = cache.get(lang_key("store:categories:tree", request))
             if cached is not None:
                 return Response({"data": cached, "meta": {"total": len(cached)}})
 
@@ -366,7 +367,7 @@ class CategoryListView(APIView):
         serializer = CategorySerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        cache.delete("store:categories:tree")
+        forget("store:categories:tree")
         return Response({"data": serializer.data, "message": "تم إنشاء التصنيف"},
                         status=status.HTTP_201_CREATED)
 
@@ -393,7 +394,7 @@ class CategoryDetailView(APIView):
                                         context={"request": request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        cache.delete("store:categories:tree")
+        forget("store:categories:tree")
         if category.is_active != was_active:
             visibility.forget_product_pages()
         return Response({"data": serializer.data, "message": "تم تحديث التصنيف"})
@@ -405,7 +406,7 @@ class CategoryDetailView(APIView):
         if category.is_system:
             return Response({"message": "لا يمكن حذف تصنيف نظامي"}, status=status.HTTP_400_BAD_REQUEST)
         category.delete()
-        cache.delete("store:categories:tree")
+        forget("store:categories:tree")
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -829,7 +830,7 @@ class WishlistListView(APIView):
             .select_related("product")
             .prefetch_related("product__images", "product__categories", "product__collections", "product__variants")
         )
-        return Response({"data": WishlistItemSerializer(items, many=True).data})
+        return Response({"data": WishlistItemSerializer(items, many=True, context={"request": request}).data})
 
 
 class WishlistToggleView(APIView):
@@ -882,7 +883,7 @@ class PredictiveSearchView(APIView):
     def get(self, request):
         from .search_service import perform_predictive_search
         query = request.query_params.get("q", "")
-        results = perform_predictive_search(query)
+        results = perform_predictive_search(query, request)
         return Response({"data": results})
 
 
@@ -904,6 +905,7 @@ class FragranceFinderView(APIView):
             vibe=vibe,
             occasion=occasion,
             max_budget=max_budget,
+            request=request,
         )
         return Response({"data": recommendations})
 

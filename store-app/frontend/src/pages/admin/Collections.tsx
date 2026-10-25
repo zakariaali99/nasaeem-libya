@@ -26,7 +26,7 @@ export default function AdminCollectionsPage() {
   const [editing, setEditing] = useState<Collection | null>(null)
   const [creating, setCreating] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<Collection | null>(null)
-  const [form, setForm] = useState({ name: '', description: '' })
+  const [form, setForm] = useState({ name: '', description: '', name_en: '', description_en: '' })
   const visibility = useStoreVisibilitySwitch('collections', (id, isActive) =>
     update.mutateAsync({ id, is_active: isActive }),
   )
@@ -50,7 +50,7 @@ export default function AdminCollectionsPage() {
         actions={
           <Button
             onClick={() => {
-              setForm({ name: '', description: '' })
+              setForm({ name: '', description: '', name_en: '', description_en: '' })
               setCreating(true)
             }}
           >
@@ -77,7 +77,7 @@ export default function AdminCollectionsPage() {
               size="icon"
               aria-label={`تعديل ${row.name}`}
               onClick={() => {
-                setForm({ name: row.name, description: row.description })
+                setForm({ name: row.name, description: row.description, name_en: row.name_en ?? '', description_en: row.description_en ?? '' })
                 setEditing(row)
               }}
             >
@@ -126,6 +126,30 @@ export default function AdminCollectionsPage() {
                 />
               )}
             </Field>
+            <div className="space-y-3 rounded-xl border border-dashed border-border p-3">
+              <p className="text-xs font-bold text-muted-foreground">للمتجر الإنجليزي (اختياري — الفارغ يظهر بالعربي)</p>
+              <Field id="col-name-en" label="الاسم بالإنجليزية">
+                {(field) => (
+                  <Input
+                    {...field}
+                    dir="ltr"
+                    value={form.name_en}
+                    onChange={(event) => setForm((f) => ({ ...f, name_en: event.target.value }))}
+                  />
+                )}
+              </Field>
+              <Field id="col-desc-en" label="الوصف بالإنجليزية">
+                {(field) => (
+                  <Textarea
+                    {...field}
+                    dir="ltr"
+                    rows={2}
+                    value={form.description_en}
+                    onChange={(event) => setForm((f) => ({ ...f, description_en: event.target.value }))}
+                  />
+                )}
+              </Field>
+            </div>
           </div>
           <div className="mt-6 flex justify-end gap-3">
             <Button

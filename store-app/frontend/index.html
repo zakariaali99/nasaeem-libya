@@ -40,7 +40,8 @@
       (function () {
         var match = location.pathname.match(/^(?:\/en)?\/products\/([^/]+)\/?$/)
         if (!match) return
-        var url = '/api/products/' + match[1] + '/'
+        // Same address lib/api.ts builds, so it adopts this response.
+        var url = '/api/products/' + match[1] + '/' + (/^\/en\//.test(location.pathname) ? '?lang=en' : '')
         window.__nasaimPreload = {
           url: url,
           promise: fetch(url, { credentials: 'include', headers: { Accept: 'application/json' } })

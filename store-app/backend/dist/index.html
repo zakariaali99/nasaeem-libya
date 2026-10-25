@@ -14,9 +14,9 @@
       href="/fonts/cairo-arabic.woff2"
       crossorigin
     />
-    <script type="module" crossorigin src="/assets/index-BJ8SwzF0.js"></script>
+    <script type="module" crossorigin src="/assets/index-BMZLWsNC.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/react-3y-dyNal.js">
-    <link rel="modulepreload" crossorigin href="/assets/query-CikOP4DV.js">
+    <link rel="modulepreload" crossorigin href="/assets/query-BTH4S3Yc.js">
     <link rel="modulepreload" crossorigin href="/assets/vendor-CVrvj3hB.js">
     <link rel="modulepreload" crossorigin href="/assets/radix-yHU08sg4.js">
     <link rel="modulepreload" crossorigin href="/assets/icons-BlVKNpVz.js">
@@ -47,7 +47,8 @@
       (function () {
         var match = location.pathname.match(/^(?:\/en)?\/products\/([^/]+)\/?$/)
         if (!match) return
-        var url = '/api/products/' + match[1] + '/'
+        // Same address lib/api.ts builds, so it adopts this response.
+        var url = '/api/products/' + match[1] + '/' + (/^\/en\//.test(location.pathname) ? '?lang=en' : '')
         window.__nasaimPreload = {
           url: url,
           promise: fetch(url, { credentials: 'include', headers: { Accept: 'application/json' } })

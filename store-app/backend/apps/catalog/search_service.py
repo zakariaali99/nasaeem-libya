@@ -75,7 +75,7 @@ def expand_search_terms(query: str) -> list[str]:
     return list(terms)
 
 
-def perform_predictive_search(query: str):
+def perform_predictive_search(query: str, request=None):
     """Execute predictive instant search returning products, categories, collections."""
     if not query or len(query.strip()) < 2:
         return {
@@ -97,6 +97,10 @@ def perform_predictive_search(query: str):
             | Q(sku__icontains=term)
             | Q(categories__name__icontains=term)
             | Q(collections__name__icontains=term)
+            # A product is found by its English name from either language.
+            | Q(name_en__icontains=term)
+            | Q(categories__name_en__icontains=term)
+            | Q(collections__name_en__icontains=term)
         )
     product_q &= sub_q
 
@@ -110,7 +114,7 @@ def perform_predictive_search(query: str):
     cat_q = Q(is_active=True)
     cat_sub = Q()
     for term in terms:
-        cat_sub |= Q(name__icontains=term) | Q(description__icontains=term)
+        cat_sub |= Q(name__icontains=term) | Q(description__icontains=term) | Q(name_en__icontains=term)
     cat_q &= cat_sub
     categories = visible_categories(Category.objects.filter(cat_q))[:4]
 
@@ -118,7 +122,7 @@ def perform_predictive_search(query: str):
     col_q = Q(is_active=True)
     col_sub = Q()
     for term in terms:
-        col_sub |= Q(name__icontains=term) | Q(description__icontains=term)
+        col_sub |= Q(name__icontains=term) | Q(description__icontains=term) | Q(name_en__icontains=term)
     col_q &= col_sub
     collections = Collection.objects.filter(col_q)[:3]
 
@@ -126,13 +130,13 @@ def perform_predictive_search(query: str):
 
     return {
         "trending_keywords": TRENDING_SEARCH_KEYWORDS,
-        "matched_categories": CategorySerializer(categories, many=True).data,
-        "matched_collections": CollectionSerializer(collections, many=True).data,
-        "products": ProductListSerializer(products, many=True).data,
+        "matched_categories": CategorySerializer(categories, many=True, context={"request": request}).data,
+        "matched_collections": CollectionSerializer(collections, many=True, context={"request": request}).data,
+        "products": ProductListSerializer(products, many=True, context={"request": request}).data,
     }
 
 
-def find_fragrance_recommendations(gender: str = "ALL", vibe: str = "ORIENTAL", occasion: str = "EVENING", max_budget: float = None):
+def find_fragrance_recommendations(gender: str = "ALL", vibe: str = "ORIENTAL", occasion: str = "EVENING", max_budget: float = None, request=None):
     """AI Fragrance Finder: Match the most suitable 3 perfumes with personalized justification."""
     queryset = (
         visible_products(Product.objects.all())
@@ -179,7 +183,7 @@ def find_fragrance_recommendations(gender: str = "ALL", vibe: str = "ORIENTAL", 
 
     from .serializers import ProductListSerializer
 
-    serialized_products = ProductListSerializer(matched, many=True).data
+    serialized_products = ProductListSerializer(matched, many=True, context={"request": request}).data
 
     # No score and no "why it suits you": both used to be fixed strings (97%,
     # 93%, 89% and one sentence per scent family), whatever was matched.

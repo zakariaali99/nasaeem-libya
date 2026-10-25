@@ -249,11 +249,12 @@ def test_store_texts_are_saved_cleaned_and_public(db):
 
     response = client.put(
         "/api/admin/store-settings/",
-        {"texts": {"footer.about": "  متجر عطور  ", "trust.1.title": "", "bad": 5, "x" * 80: "long key"}},
+        {"texts": {"footer.about": "  متجر عطور  ", "en:footer.about": " A perfume shop ", "trust.1.title": "",
+                   "bad": 5, "x" * 80: "long key"}},
         format="json",
     )
     assert response.status_code == 200, response.json()
 
     public = APIClient().get("/api/store-settings/").json()["data"]
     # Trimmed; an empty string is kept (it hides the line); junk is dropped.
-    assert public["texts"] == {"footer.about": "متجر عطور", "trust.1.title": ""}
+    assert public["texts"] == {"footer.about": "متجر عطور", "en:footer.about": "A perfume shop", "trust.1.title": ""}

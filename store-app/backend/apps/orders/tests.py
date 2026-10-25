@@ -398,7 +398,8 @@ class TestAdminWaybillsAndInvoices:
         assert data["packing_list"][0]["quantity"] == 2
         assert "بضاعة قابلة للكسر" in data["fragile_warning"]
 
-    def test_order_invoice_endpoint(self, admin_client, customer, product):
+    def test_order_invoice_endpoint(self, admin_client, customer, product, settings):
+        settings.FEATURE_SHIPPING_FEES = True
         order = Order.objects.create(
             order_number="202608MOA9902",
             user=customer,
@@ -425,6 +426,29 @@ class TestAdminWaybillsAndInvoices:
         assert "ثلاثمائة وعشرون ديناراً" in data["financials"]["tafqeet"]
         assert "شركة نسائم ليبيا" in data["company"]["name"]
         assert "100%" in data["terms"]
+
+    def test_the_invoice_never_adds_delivery_while_the_store_quotes_it(self, admin_client, customer, product, settings):
+        """An order given a delivery price before shipping was switched off
+        prints for its products only; the order keeps its own figures."""
+        settings.FEATURE_SHIPPING_FEES = False
+        order = Order.objects.create(
+            order_number="202610MAN9951",
+            user=customer,
+            status=OrderStatus.PROCESSING,
+            subtotal=Decimal("300.00"),
+            shipping_total=Decimal("20.00"),
+            total=Decimal("320.00"),
+            payment_method="manual_payment",
+        )
+        OrderItem.objects.create(
+            order=order, product=product, quantity=1, unit_price=Decimal("300.00"), total_price=Decimal("300.00")
+        )
+
+        money = admin_client.get(f"/api/admin/orders/{order.order_number}/invoice/").json()["data"]["financials"]
+        assert (money["shipping_total"], money["total"]) == ("0.00", "300.00")
+        assert "ثلاثمائة دينار" in money["tafqeet"] and "عشرون" not in money["tafqeet"]
+        order.refresh_from_db()
+        assert (order.shipping_total, order.total) == (Decimal("20.00"), Decimal("320.00"))
 
     def test_batch_waybills_endpoint(self, admin_client, customer):
         order1 = Order.objects.create(order_number="202608MOA9903", user=customer, total=Decimal("100.00"))

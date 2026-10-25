@@ -12,6 +12,7 @@ from django.db.models import Count
 from rest_framework import serializers
 
 from apps.catalog.serializers import ProductImageSerializer
+from apps.core.language import english_or, value_label, wants_english
 
 from .models import (
     Cart,
@@ -61,7 +62,7 @@ class CartItemSerializer(serializers.Serializer):
     id = serializers.UUIDField(source="line.id")
     product_id = serializers.UUIDField(source="line.product_id")
     variant_id = serializers.UUIDField(source="line.variant_id", allow_null=True)
-    name = serializers.CharField(source="line.product.name")
+    name = serializers.SerializerMethodField()
     slug = serializers.CharField(source="line.product.slug")
     quantity = serializers.IntegerField(source="line.quantity")
     unit_price = serializers.DecimalField(max_digits=10, decimal_places=2)
@@ -72,9 +73,13 @@ class CartItemSerializer(serializers.Serializer):
     # False once the product is hidden from the store; checkout refuses it.
     available = serializers.BooleanField(default=True)
 
+    def get_name(self, item):
+        return english_or(item["line"].product, "name", wants_english(self.context.get("request")))
+
     def get_variant_label(self, item):
         variant = item["line"].variant
-        return " / ".join(value.value for value in variant.values.all()) if variant else ""
+        english = wants_english(self.context.get("request"))
+        return " / ".join(value_label(value, english) for value in variant.values.all()) if variant else ""
 
     def get_available_stock(self, item):
         from . import services
@@ -165,6 +170,15 @@ class CheckoutSerializer(serializers.Serializer):
     # There is deliberately no `total` field. The reference accepted one.
 
 
+def english_line_name(serializer, item, data):
+    """An order line keeps the name it was bought under; an English page
+    shows the product's English name when it has one."""
+    product = item.product
+    if wants_english(serializer.context.get("request")) and product is not None and product.name_en:
+        data["product_name"] = product.name_en
+    return data
+
+
 class OrderItemSerializer(serializers.ModelSerializer):
     slug = serializers.CharField(source="product.slug", read_only=True, default="")
     image = serializers.SerializerMethodField()
@@ -182,7 +196,11 @@ class OrderItemSerializer(serializers.ModelSerializer):
         return ProductImageSerializer(image, context=self.context).data if image else None
 
     def get_variant_label(self, item):
-        return " / ".join(value.value for value in item.variant.values.all()) if item.variant else ""
+        english = wants_english(self.context.get("request"))
+        return " / ".join(value_label(v, english) for v in item.variant.values.all()) if item.variant else ""
+
+    def to_representation(self, item):
+        return english_line_name(self, item, super().to_representation(item))
 
 
 class OrderSerializer(serializers.ModelSerializer):
@@ -771,6 +789,9 @@ class OrderTrackItemSerializer(serializers.ModelSerializer):
 
     get_variant_label = OrderItemSerializer.get_variant_label
     get_image = OrderItemSerializer.get_image
+
+    def to_representation(self, item):
+        return english_line_name(self, item, super().to_representation(item))
 
 
 class OrderTrackSerializer(serializers.ModelSerializer):

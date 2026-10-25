@@ -1,18 +1,23 @@
 from rest_framework import serializers
 
+from apps.core.language import EnglishFieldsMixin, english_or, wants_english
 from apps.core.models import City, Region
 
 
-class RegionSerializer(serializers.ModelSerializer):
-    city_name = serializers.CharField(source="city.name", read_only=True)
+class RegionSerializer(EnglishFieldsMixin, serializers.ModelSerializer):
+    english_fields = ("name",)
+    city_name = serializers.SerializerMethodField()
     delivery_fee = serializers.SerializerMethodField()
 
     class Meta:
         model = Region
         fields = [
             "id", "name", "city", "city_name", "delivery_fee",
-            "estimated_delivery_days", "is_active",
+            "estimated_delivery_days", "is_active", "name_en",
         ]
+
+    def get_city_name(self, region):
+        return english_or(region.city, "name", wants_english(self.context.get("request")))
 
     def get_delivery_fee(self, region):
         """The fee the customer will actually be charged: the region's own, or
@@ -23,12 +28,13 @@ class RegionSerializer(serializers.ModelSerializer):
         return delivery_fee(region)
 
 
-class CitySerializer(serializers.ModelSerializer):
+class CitySerializer(EnglishFieldsMixin, serializers.ModelSerializer):
+    english_fields = ("name",)
     region_count = serializers.SerializerMethodField()
 
     class Meta:
         model = City
-        fields = ["id", "name", "code", "delivery_fee", "is_active", "region_count"]
+        fields = ["id", "name", "code", "delivery_fee", "is_active", "region_count", "name_en"]
 
     def get_region_count(self, city):
         return city.regions.filter(is_active=True).count()

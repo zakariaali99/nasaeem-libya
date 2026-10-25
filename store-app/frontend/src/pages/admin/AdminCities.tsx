@@ -102,6 +102,11 @@ export default function AdminCities() {
                     <p className="text-xs text-muted-foreground font-mono mt-0.5">
                       {city.regions.length} مناطق وأحياء
                     </p>
+                    <EnglishNameEditor
+                      value={city.name_en}
+                      disabled={updateCity.isPending}
+                      onSave={(name_en) => updateCity.mutate({ id: city.id, name_en })}
+                    />
                   </div>
                 </div>
 
@@ -149,6 +154,11 @@ export default function AdminCities() {
                             {!region.is_active && (
                               <span className="text-[10px] text-destructive font-medium">معطّلة</span>
                             )}
+                            <EnglishNameEditor
+                              value={region.name_en}
+                              disabled={updateRegion.isPending}
+                              onSave={(name_en) => updateRegion.mutate({ id: region.id, name_en })}
+                            />
                           </div>
                           {FEATURES.shipping && (
                             <FeeEditor
@@ -206,6 +216,38 @@ function FeeEditor({
           onClick={() => onSave(fee)}
           className="h-9 px-3 rounded-xl text-xs font-bold shadow-2xs"
         >
+          حفظ
+        </Button>
+      )}
+    </div>
+  )
+}
+
+/** The name the English store shows; empty → the Arabic name shows there. */
+function EnglishNameEditor({
+  value,
+  onSave,
+  disabled,
+}: {
+  value: string
+  onSave: (name: string) => void
+  disabled?: boolean
+}) {
+  const [name, setName] = useState(value)
+  const isChanged = name.trim() !== value
+
+  return (
+    <div className="mt-1.5 flex items-center gap-1.5">
+      <input
+        dir="ltr"
+        className="h-8 w-36 rounded-lg border border-input bg-background px-2 text-xs"
+        value={name}
+        placeholder="الاسم بالإنجليزية"
+        onChange={(event) => setName(event.target.value)}
+        aria-label="الاسم بالإنجليزية"
+      />
+      {isChanged && (
+        <Button size="sm" disabled={disabled} onClick={() => onSave(name.trim())} className="h-8 px-3 rounded-lg text-xs font-bold">
           حفظ
         </Button>
       )}

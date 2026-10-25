@@ -49,6 +49,9 @@ export interface Category {
   is_active: boolean
   is_system: boolean
   children: Category[]
+  /** The English store's wording; empty → the Arabic shows. */
+  name_en?: string
+  description_en?: string
 }
 
 export interface Collection {
@@ -57,6 +60,8 @@ export interface Collection {
   slug: string
   description: string
   is_active: boolean
+  name_en?: string
+  description_en?: string
 }
 
 export interface VariantValue {
@@ -116,6 +121,11 @@ export interface PerfumeDetails {
   sillage_score: number
   seasons: string[]
   occasions: string[]
+  fragrance_family_en?: string
+  origin_country_en?: string
+  top_notes_en?: PerfumeNote[]
+  heart_notes_en?: PerfumeNote[]
+  base_notes_en?: PerfumeNote[]
 }
 
 export interface ProductBundle {
@@ -163,6 +173,11 @@ export interface Product {
   bundles?: ProductBundle[]
   meta_title?: string
   meta_description?: string
+  /** The English store's wording (dashboard only sees these apart); empty → the Arabic shows. */
+  name_en?: string
+  description_en?: string
+  meta_title_en?: string
+  meta_description_en?: string
   created_at?: string
 }
 
@@ -430,6 +445,7 @@ export interface CartState {
 export interface City {
   id: string
   name: string
+  name_en?: string
   code: string
   delivery_fee: string
   is_active: boolean
@@ -610,10 +626,11 @@ export interface DashboardStats {
 export interface CityAdmin {
   id: string
   name: string
+  name_en: string
   code: string
   delivery_fee: string
   is_active: boolean
-  regions: { id: string; name: string; delivery_fee: string; is_active: boolean }[]
+  regions: { id: string; name: string; name_en: string; delivery_fee: string; is_active: boolean }[]
 }
 
 export interface CartPromotion {

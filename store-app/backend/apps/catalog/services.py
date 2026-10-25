@@ -390,10 +390,12 @@ def search_products(queryset, term):
             Q(name__icontains=term)
             | Q(description__icontains=term)
             | Q(sku__icontains=term)
+            | Q(name_en__icontains=term)
+            | Q(description_en__icontains=term)
         ).annotate(
             relevance=Case(
-                When(name__istartswith=term, then=Value(3.0)),
-                When(name__icontains=term, then=Value(2.0)),
+                When(Q(name__istartswith=term) | Q(name_en__istartswith=term), then=Value(3.0)),
+                When(Q(name__icontains=term) | Q(name_en__icontains=term), then=Value(2.0)),
                 default=Value(1.0),
                 output_field=FloatField(),
             )
@@ -435,6 +437,8 @@ def search_products(queryset, term):
             | Q(norm_name__icontains=term)
             | Q(norm_description__icontains=term)
             | Q(sku__icontains=term)
+            | Q(name_en__icontains=term)
+            | Q(description_en__icontains=term)
         )
         .annotate(relevance=Greatest("rank", "similarity"))
     )

@@ -9,6 +9,12 @@ from decimal import Decimal
 
 from rest_framework import serializers
 
+from apps.core.language import (
+    EnglishFieldsMixin,
+    option_label,
+    value_label,
+    wants_english,
+)
 from apps.orders.models import Discount
 
 from .models import (
@@ -37,7 +43,8 @@ class ProductImageSerializer(serializers.ModelSerializer):
         return rendition_urls(obj.url)
 
 
-class CategorySerializer(serializers.ModelSerializer):
+class CategorySerializer(EnglishFieldsMixin, serializers.ModelSerializer):
+    english_fields = ("name", "description")
     children = serializers.SerializerMethodField()
     product_count = serializers.IntegerField(read_only=True, required=False)
 
@@ -46,6 +53,7 @@ class CategorySerializer(serializers.ModelSerializer):
         fields = [
             "id", "name", "slug", "description", "image_url",
             "parent", "is_active", "is_system", "children", "product_count",
+            "name_en", "description_en",
         ]
         extra_kwargs = {"slug": {"required": False}}
 
@@ -61,12 +69,13 @@ class CategorySerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 
-class CollectionSerializer(serializers.ModelSerializer):
+class CollectionSerializer(EnglishFieldsMixin, serializers.ModelSerializer):
+    english_fields = ("name", "description")
     product_count = serializers.IntegerField(read_only=True, required=False)
 
     class Meta:
         model = Collection
-        fields = ["id", "name", "slug", "description", "is_active", "product_count"]
+        fields = ["id", "name", "slug", "description", "is_active", "product_count", "name_en", "description_en"]
         extra_kwargs = {"slug": {"required": False}}
 
     def create(self, validated_data):
@@ -79,7 +88,14 @@ class VariantValueSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = VariantValue
-        fields = ["id", "option", "option_name", "value"]
+        fields = ["id", "option", "option_name", "value", "value_en"]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if wants_english(self.context.get("request")):
+            data["value"] = value_label(instance, True)
+            data["option_name"] = option_label(instance.option, True)
+        return data
 
 
 class VariantOptionSerializer(serializers.ModelSerializer):
@@ -87,7 +103,13 @@ class VariantOptionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = VariantOption
-        fields = ["id", "name", "values"]
+        fields = ["id", "name", "name_en", "values"]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if wants_english(self.context.get("request")):
+            data["name"] = option_label(instance, True)
+        return data
 
 
 class ProductVariantSerializer(serializers.ModelSerializer):
@@ -123,7 +145,8 @@ class DiscountBadgeSerializer(serializers.ModelSerializer):
         fields = ["id", "code", "name", "type", "value", "percentage", "end_date"]
 
 
-class ProductListSerializer(serializers.ModelSerializer):
+class ProductListSerializer(EnglishFieldsMixin, serializers.ModelSerializer):
+    english_fields = ("name",)
     images = ProductImageSerializer(many=True, read_only=True)
     categories = CategorySerializer(many=True, read_only=True)
     collections = CollectionSerializer(many=True, read_only=True)
@@ -141,7 +164,7 @@ class ProductListSerializer(serializers.ModelSerializer):
             "images", "has_variants", "track_quantity", "stock", "reserved_stock",
             "available_stock", "in_stock", "is_active",
             "categories", "collections", "discounts", "discount_percent",
-            "variant_choices", "hidden_by",
+            "variant_choices", "hidden_by", "name_en",
         ]
 
     def get_hidden_by(self, obj):
@@ -169,13 +192,14 @@ class ProductListSerializer(serializers.ModelSerializer):
         a sold-out one stays listed (disabled on the card) rather than
         vanishing. Reads the prefetched variants, so no query per product."""
         choices = []
+        english = wants_english(self.context.get("request"))
         for variant in obj.variants.all():
             if not variant.is_active:
                 continue
             values = sorted(variant.values.all(), key=lambda v: (v.option.name, v.value))
             choices.append({
                 "id": str(variant.id),
-                "label": " / ".join(v.value for v in values) or variant.sku,
+                "label": " / ".join(value_label(v, english) for v in values) or variant.sku,
                 "price": str(variant.price if variant.price is not None else obj.price),
                 "compare_at_price": (
                     str(variant.compare_at_price) if variant.compare_at_price is not None else None
@@ -219,7 +243,10 @@ class ProductListSerializer(serializers.ModelSerializer):
         return round((Decimal(was) - Decimal(price)) / Decimal(was) * 100)
 
 
-class PerfumeAttributeSerializer(serializers.ModelSerializer):
+class PerfumeAttributeSerializer(EnglishFieldsMixin, serializers.ModelSerializer):
+    # An empty English list keeps the Arabic notes (the mixin skips empty twins).
+    english_fields = ("fragrance_family", "origin_country", "top_notes", "heart_notes", "base_notes")
+
     class Meta:
         from .models import PerfumeAttribute
         model = PerfumeAttribute
@@ -227,10 +254,12 @@ class PerfumeAttributeSerializer(serializers.ModelSerializer):
             "id", "fragrance_family", "gender", "concentration", "origin_country",
             "top_notes", "heart_notes", "base_notes", "longevity_score", "longevity_hours",
             "sillage_score", "seasons", "occasions",
+            "fragrance_family_en", "origin_country_en", "top_notes_en", "heart_notes_en", "base_notes_en",
         ]
 
 
-class ProductBundleSerializer(serializers.ModelSerializer):
+class ProductBundleSerializer(EnglishFieldsMixin, serializers.ModelSerializer):
+    english_fields = ("name", "description", "badge_text")
     included_products = ProductListSerializer(many=True, read_only=True)
     savings_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
 
@@ -240,6 +269,7 @@ class ProductBundleSerializer(serializers.ModelSerializer):
         fields = [
             "id", "name", "slug", "description", "bundle_price",
             "original_price", "savings_amount", "badge_text", "included_products",
+            "name_en", "description_en", "badge_text_en",
         ]
 
 
@@ -252,6 +282,7 @@ def staff_cost(context, value):
 
 
 class ProductDetailSerializer(ProductListSerializer):
+    english_fields = ("name", "description", "meta_title", "meta_description")
     variants = ProductVariantSerializer(many=True, read_only=True)
     cost_price = serializers.SerializerMethodField()
 
@@ -264,7 +295,7 @@ class ProductDetailSerializer(ProductListSerializer):
         fields = ProductListSerializer.Meta.fields + [
             "description", "barcode", "meta_title", "meta_description",
             "width", "length", "height", "weight", "variants", "perfume_details", "bundles", "created_at",
-            "cost_price",
+            "cost_price", "description_en", "meta_title_en", "meta_description_en",
         ]
 
     def get_bundles(self, obj):
@@ -283,7 +314,7 @@ class ProductDetailSerializer(ProductListSerializer):
 
     def get_perfume_details(self, obj):
         if hasattr(obj, "perfume_details") and obj.perfume_details is not None:
-            return PerfumeAttributeSerializer(obj.perfume_details).data
+            return PerfumeAttributeSerializer(obj.perfume_details, context=self.context).data
         return None
 
 
@@ -305,6 +336,7 @@ class ProductWriteSerializer(serializers.ModelSerializer):
             "sku", "barcode", "is_active", "has_variants", "track_quantity",
             "meta_title", "meta_description", "width", "length", "height", "weight",
             "category_ids", "collection_ids", "images", "perfume_details", "sizes",
+            "name_en", "description_en", "meta_title_en", "meta_description_en",
         ]
         extra_kwargs = {"slug": {"required": False}}
         # `stock` is deliberately absent: stock only ever moves through
@@ -377,6 +409,11 @@ class ProductWriteSerializer(serializers.ModelSerializer):
                 "sillage_score": int(perfume_details.get("sillage_score") or 4),
                 "seasons": perfume_details.get("seasons", []),
                 "occasions": perfume_details.get("occasions", []),
+                "fragrance_family_en": str(perfume_details.get("fragrance_family_en") or ""),
+                "origin_country_en": str(perfume_details.get("origin_country_en") or ""),
+                "top_notes_en": perfume_details.get("top_notes_en") or [],
+                "heart_notes_en": perfume_details.get("heart_notes_en") or [],
+                "base_notes_en": perfume_details.get("base_notes_en") or [],
             }
             PerfumeAttribute.objects.update_or_create(
                 product=product,

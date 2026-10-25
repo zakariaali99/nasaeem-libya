@@ -13,7 +13,7 @@ from apps.core.models import City, Region
 class RegionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Region
-        fields = ["id", "name", "city", "delivery_fee", "estimated_delivery_days", "is_active"]
+        fields = ["id", "name", "name_en", "city", "delivery_fee", "estimated_delivery_days", "is_active"]
 
 
 class CitySerializer(serializers.ModelSerializer):
@@ -21,7 +21,7 @@ class CitySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = City
-        fields = ["id", "name", "code", "delivery_fee", "is_active", "regions"]
+        fields = ["id", "name", "name_en", "code", "delivery_fee", "is_active", "regions"]
 
 
 class AdminCityListView(APIView):
@@ -39,8 +39,10 @@ class AdminCityDetailView(APIView):
         city = City.objects.filter(id=city_id).first()
         if city is None:
             return Response({"message": "المدينة غير موجودة"}, status=status.HTTP_404_NOT_FOUND)
-        allowed = {"delivery_fee", "is_active"}
+        allowed = {"delivery_fee", "is_active", "name_en"}
         data = {k: v for k, v in request.data.items() if k in allowed}
+        if "name_en" in data:
+            data["name_en"] = str(data["name_en"] or "").strip()[:100]
         for field, value in data.items():
             setattr(city, field, value)
         city.save(update_fields=[*data.keys(), "updated_at"])
@@ -75,8 +77,10 @@ class AdminRegionDetailView(APIView):
         region = self.get_object(region_id)
         if region is None:
             return Response({"message": "المنطقة غير موجودة"}, status=status.HTTP_404_NOT_FOUND)
-        allowed = {"delivery_fee", "is_active", "estimated_delivery_days"}
+        allowed = {"delivery_fee", "is_active", "estimated_delivery_days", "name_en"}
         data = {k: v for k, v in request.data.items() if k in allowed}
+        if "name_en" in data:
+            data["name_en"] = str(data["name_en"] or "").strip()[:100]
         for field, value in data.items():
             setattr(region, field, value)
         region.save(update_fields=[*data.keys(), "updated_at"])

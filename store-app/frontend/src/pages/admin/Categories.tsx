@@ -29,17 +29,23 @@ export default function AdminCategoriesPage() {
   const [editing, setEditing] = useState<Category | null>(null)
   const [creating, setCreating] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<Category | null>(null)
-  const [form, setForm] = useState({ name: '', description: '', image_url: '' })
+  const [form, setForm] = useState({ name: '', description: '', image_url: '', name_en: '', description_en: '' })
   const visibility = useStoreVisibilitySwitch('categories', (id, isActive) =>
     update.mutateAsync({ id, is_active: isActive }),
   )
 
   const openCreate = () => {
-    setForm({ name: '', description: '', image_url: '' })
+    setForm({ name: '', description: '', image_url: '', name_en: '', description_en: '' })
     setCreating(true)
   }
   const openEdit = (category: Category) => {
-    setForm({ name: category.name, description: category.description, image_url: category.image_url })
+    setForm({
+      name: category.name,
+      description: category.description,
+      image_url: category.image_url,
+      name_en: category.name_en ?? '',
+      description_en: category.description_en ?? '',
+    })
     setEditing(category)
   }
 
@@ -125,6 +131,30 @@ export default function AdminCategoriesPage() {
                 />
               )}
             </Field>
+            <div className="space-y-3 rounded-xl border border-dashed border-border p-3">
+              <p className="text-xs font-bold text-muted-foreground">للمتجر الإنجليزي (اختياري — الفارغ يظهر بالعربي)</p>
+              <Field id="cat-name-en" label="الاسم بالإنجليزية">
+                {(field) => (
+                  <Input
+                    {...field}
+                    dir="ltr"
+                    value={form.name_en}
+                    onChange={(event) => setForm((f) => ({ ...f, name_en: event.target.value }))}
+                  />
+                )}
+              </Field>
+              <Field id="cat-desc-en" label="الوصف بالإنجليزية">
+                {(field) => (
+                  <Textarea
+                    {...field}
+                    dir="ltr"
+                    rows={2}
+                    value={form.description_en}
+                    onChange={(event) => setForm((f) => ({ ...f, description_en: event.target.value }))}
+                  />
+                )}
+              </Field>
+            </div>
             <ImageUploadField
               label="شعار أو صورة التصنيف"
               hint="اختر ملف الصورة من جهازك (PNG, SVG, JPG, WebP)"

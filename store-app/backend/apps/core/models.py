@@ -182,6 +182,7 @@ class City(models.Model):
 
     id = models.CharField(primary_key=True, max_length=64)
     name = models.CharField("المدينة", max_length=100, unique=True, db_index=True)
+    name_en = models.CharField("المدينة بالإنجليزية", max_length=100, blank=True, default="")
     code = models.CharField("الرمز", max_length=50, unique=True)
     delivery_fee = models.DecimalField(
         "رسوم التوصيل", max_digits=10, decimal_places=2, default=Decimal("0.00")
@@ -205,6 +206,7 @@ class Region(models.Model):
 
     id = models.CharField(primary_key=True, max_length=64)
     name = models.CharField("المنطقة", max_length=100)
+    name_en = models.CharField("المنطقة بالإنجليزية", max_length=100, blank=True, default="")
     city = models.ForeignKey(
         City, on_delete=models.CASCADE, related_name="regions", verbose_name="المدينة"
     )

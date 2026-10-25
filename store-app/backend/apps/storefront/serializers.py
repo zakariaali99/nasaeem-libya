@@ -7,6 +7,8 @@ to guess between `imageUrl` / `image_url` / `url`.
 
 from rest_framework import serializers
 
+from apps.core.language import wants_english
+
 from apps.catalog.serializers import (
     CategorySerializer,
     CollectionSerializer,
@@ -30,6 +32,7 @@ class WidgetSerializer(serializers.ModelSerializer):
             widget,
             user=context.get("user"),
             recent_ids=context.get("recent_ids", ()),
+            english=wants_english(context.get("request")),
             serialize_product=lambda products: ProductListSerializer(
                 products, many=True, context=context
             ).data,

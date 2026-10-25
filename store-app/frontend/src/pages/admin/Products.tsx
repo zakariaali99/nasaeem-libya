@@ -141,6 +141,11 @@ export default function AdminProductsPage() {
                   {row.categories[0].name}
                 </span>
               )}
+              {!row.name_en && (
+                <span className="text-[10px] bg-warning/10 px-1.5 rounded text-warning font-semibold" title="المتجر الإنجليزي يعرض اسمه بالعربي">
+                  ينقصه الإنجليزي
+                </span>
+              )}
             </div>
           </div>
         </div>

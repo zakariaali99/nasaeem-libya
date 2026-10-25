@@ -15,6 +15,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.language import wants_english
 from apps.core.models import City, Region
 from apps.orders.models import DeliveryMethod, Order
 from apps.orders.serializers import DeliveryMethodSerializer
@@ -43,7 +44,10 @@ class CityListView(APIView):
 
     def get(self, request):
         cities = City.objects.filter(is_active=True).order_by("name")
-        body = {"data": CitySerializer(cities, many=True).data}
+        data = CitySerializer(cities, many=True, context={"request": request}).data
+        if wants_english(request):
+            data = sorted(data, key=lambda city: city["name"].lower())  # A–Z in English
+        body = {"data": data}
         if not cities:
             body["message"] = EMPTY_CITIES
         return Response(body)
@@ -56,7 +60,7 @@ class CityDetailView(APIView):
         city = City.objects.filter(pk=city_id, is_active=True).first()
         if city is None:
             return Response({"message": "المدينة غير موجودة"}, status=404)
-        return Response({"data": CitySerializer(city).data})
+        return Response({"data": CitySerializer(city, context={"request": request}).data})
 
 
 class CityRegionsView(APIView):
@@ -67,7 +71,10 @@ class CityRegionsView(APIView):
         if city is None:
             return Response({"message": "المدينة غير موجودة"}, status=404)
         regions = city.regions.filter(is_active=True).order_by("name")
-        body = {"data": RegionSerializer(regions, many=True).data}
+        data = RegionSerializer(regions, many=True, context={"request": request}).data
+        if wants_english(request):
+            data = sorted(data, key=lambda region: region["name"].lower())
+        body = {"data": data}
         if not regions:
             body["message"] = EMPTY_REGIONS
         return Response(body)
@@ -80,7 +87,7 @@ class RegionDetailView(APIView):
         region = Region.objects.select_related("city").filter(pk=region_id).first()
         if region is None:
             return Response({"message": "المنطقة غير موجودة"}, status=404)
-        return Response({"data": RegionSerializer(region).data})
+        return Response({"data": RegionSerializer(region, context={"request": request}).data})
 
 
 class GeoView(APIView):
@@ -105,8 +112,8 @@ class GeoView(APIView):
             return Response({"data": {"region": None, "city": None}})
         city = address.city or (address.region.city if address.region_id else None)
         return Response({"data": {
-            "region": RegionSerializer(address.region).data if address.region_id else None,
-            "city": CitySerializer(city).data if city else None,
+            "region": RegionSerializer(address.region, context={"request": request}).data if address.region_id else None,
+            "city": CitySerializer(city, context={"request": request}).data if city else None,
         }})
 
 

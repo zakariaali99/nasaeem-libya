@@ -16,7 +16,9 @@ import { usePageTitle } from '@/lib/usePageTitle'
  * Every fixed line of wording on the storefront, in one editable list.
  *
  * A line has three states: the built-in wording (no override stored), the
- * operator's own wording, or hidden (an empty override).
+ * operator's own wording, or hidden (an empty override). The English store's
+ * wording sits beside it under `en:<key>`; left empty, the built-in English
+ * line shows, and a hidden line is hidden in both languages.
  */
 export default function SiteTexts() {
   usePageTitle('نصوص المتجر — لوحة التحكم')
@@ -64,7 +66,7 @@ export default function SiteTexts() {
     <div className="space-y-6">
       <PageHeader
         title="نصوص المتجر"
-        description="كل العبارات الثابتة التي يراها العميل خارج الصفحة الرئيسية: أعلى الصفحة، التذييل، صفحة المنتج، السلة وإتمام الطلب. اكتب صيغتك، أو أخفِ السطر."
+        description="كل العبارات الثابتة التي يراها العميل خارج الصفحة الرئيسية: أعلى الصفحة، التذييل، صفحة المنتج، السلة وإتمام الطلب. اكتب صيغتك، أو أخفِ السطر. حقل «بالإنجليزية» للمتجر الإنجليزي؛ إن تركته فارغاً تظهر الصيغة الإنجليزية الرمادية."
         action={
           <Button onClick={save} loading={update.isPending} disabled={!dirty} className="rounded-xl font-bold">
             حفظ النصوص
@@ -123,6 +125,19 @@ export default function SiteTexts() {
                     />
                   ) : (
                     <Input id={inputId} value={value} onChange={(e) => change(entry.key, e.target.value)} />
+                  )}
+                  {!hidden && (
+                    <div className="flex items-center gap-2">
+                      <label htmlFor={`${inputId}-en`} className="shrink-0 text-xs font-bold text-muted-foreground">بالإنجليزية</label>
+                      <Input
+                        id={`${inputId}-en`}
+                        dir="ltr"
+                        className="h-9 text-sm"
+                        value={overrides[`en:${entry.key}`] ?? ''}
+                        placeholder={entry.fallbackEn || 'لا يظهر في المتجر الإنجليزي'}
+                        onChange={(e) => change(`en:${entry.key}`, e.target.value.trim() ? e.target.value : undefined)}
+                      />
+                    </div>
                   )}
                 </div>
               )

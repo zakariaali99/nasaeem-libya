@@ -250,7 +250,7 @@ export function useCitiesAdmin() {
 export function useUpdateCity() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ id, ...body }: { id: string; delivery_fee?: string; is_active?: boolean }) =>
+    mutationFn: async ({ id, ...body }: { id: string; delivery_fee?: string; is_active?: boolean; name_en?: string }) =>
       api.patch(`/admin/cities/${id}/`, body),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['cities-admin'] }),
   })
@@ -259,7 +259,7 @@ export function useUpdateCity() {
 export function useUpdateRegion() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ id, ...body }: { id: string; delivery_fee?: string; is_active?: boolean }) =>
+    mutationFn: async ({ id, ...body }: { id: string; delivery_fee?: string; is_active?: boolean; name_en?: string }) =>
       api.patch(`/admin/regions/${id}/`, body),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['cities-admin'] }),
   })

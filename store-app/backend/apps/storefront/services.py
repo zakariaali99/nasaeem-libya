@@ -19,6 +19,7 @@ from django.utils import timezone
 
 from apps.catalog.models import Category, Collection, Product
 from apps.catalog.visibility import visible_categories, visible_products
+from apps.core.language import localise_widget
 from apps.orders.models import Discount, OrderItem
 
 from .models import StorefrontLayout, Widget, WidgetType
@@ -213,12 +214,28 @@ def mobile_rendition_src(url: str) -> str:
     return candidate if path.exists() else ""
 
 
+def _keep_english(out: dict, source: dict) -> dict:
+    """Carry the English lines the builder saved beside the Arabic ones:
+    `title_en` next to `title`, `features_en` next to `features`. Only keys
+    the cleaned widget kept get a twin, and an empty English line is dropped
+    (the English store then shows the Arabic)."""
+    for key, value in list(out.items()):
+        twin = source.get(f"{key}_en")
+        if isinstance(value, str) and isinstance(twin, str) and twin.strip():
+            out[f"{key}_en"] = twin
+        elif isinstance(value, list) and isinstance(twin, list):
+            lines = [str(line).strip() for line in twin if str(line).strip()]
+            if lines:
+                out[f"{key}_en"] = lines[:6]
+    return out
+
+
 def _banner_slide(slide: dict, image: str, mobile: str) -> dict:
     """One banner picture: a desktop image, an optional phone image, a focus
     point for each (where to keep when the frame crops), and optional text."""
     align = slide.get("textAlign")
     valign = slide.get("textVAlign")
-    return {
+    return _keep_english({
         "imageUrl": image,
         "mobileImageUrl": mobile,
         "mobileSrc": mobile_rendition_src(mobile or image),
@@ -236,12 +253,17 @@ def _banner_slide(slide: dict, image: str, mobile: str) -> dict:
         "overlay": _int(slide.get("overlay", 35), 35, 0, 80),
         # False when the words are already drawn into the phone picture.
         "textOnMobile": slide.get("textOnMobile") is not False,
-    }
+    }, slide)
 
 
 def normalise_widget_data(widget_type: str, data: dict | None) -> dict:
-    """The canonical `data` for each of the 14 types, per `08-features.md`."""
+    """The canonical `data` for each of the 14 types, per `08-features.md`,
+    with the English lines kept beside the Arabic ones."""
     data = data if isinstance(data, dict) else {}
+    return _keep_english(_normalise(widget_type, data), data)
+
+
+def _normalise(widget_type: str, data: dict) -> dict:
 
     if widget_type == WidgetType.CAROUSEL:
         slides = []
@@ -328,13 +350,13 @@ def normalise_widget_data(widget_type: str, data: dict | None) -> dict:
             image = _first(item, "imageUrl", "image_url", "url")
             if not image:
                 continue
-            items.append({
+            items.append(_keep_english({
                 "imageUrl": image,
                 "linkUrl": _first(item, "linkUrl", "link_url", "href"),
                 # The reference called this `name` in the editor and `label` in
                 # the type. One name survives: `label`.
                 "label": _first(item, "label", "name", "title"),
-            })
+            }, item))
         return {
             "title": data.get("title", "") or "",
             "items": items,
@@ -413,11 +435,11 @@ def normalise_widget_data(widget_type: str, data: dict | None) -> dict:
         items = []
         for item in data.get("items") or []:
             if isinstance(item, dict) and str(item.get("title") or "").strip():
-                items.append({
+                items.append(_keep_english({
                     "icon": str(item.get("icon") or "sparkles"),
                     "title": str(item.get("title") or ""),
                     "subtitle": str(item.get("subtitle") or ""),
-                })
+                }, item))
         return {
             "title": data.get("title", "") or "",
             "items": items,
@@ -606,13 +628,14 @@ def _personalised_products(widget_type, limit, *, user, recent_ids=()):
 
 
 def populate(widget: Widget, *, user=None, recent_ids=(), serialize_product, serialize_category,
-             serialize_collection) -> dict:
-    """Return the widget's `data` with its referenced objects attached.
+             serialize_collection, english=False) -> dict:
+    """Return the widget's `data` with its referenced objects attached, its
+    text in English when `english` (lines left untranslated stay Arabic).
 
     The serializers are injected so this module never imports a serializer that
     imports it back.
     """
-    data = dict(widget.data or {})
+    data = localise_widget(dict(widget.data or {}), english)
 
     if widget.type == WidgetType.PRODUCT_LIST:
         data["products"] = serialize_product(_ordered_by_ids(data.get("productIds") or []))

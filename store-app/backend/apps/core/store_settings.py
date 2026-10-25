@@ -28,11 +28,12 @@ def get_store_settings() -> StoreSettings:
 
 
 def clean_texts(value) -> dict:
-    """`{key: text}` with short string keys and bounded string values."""
+    """`{key: text}` with short string keys and bounded string values.
+    The English wording of a line is kept under `en:<key>`."""
     if not isinstance(value, dict):
         return {}
     clean = {}
-    for key, text in list(value.items())[:200]:
+    for key, text in list(value.items())[:400]:
         if isinstance(key, str) and 0 < len(key) <= 60 and isinstance(text, str):
             clean[key] = text.strip()[:600]
     return clean

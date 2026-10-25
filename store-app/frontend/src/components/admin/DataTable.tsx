@@ -281,7 +281,7 @@ export function DataTable<T>({
       ) : (
         <>
           {/* Desktop Table View */}
-          <TableWrapper className="hidden md:block rounded-2xl border border-border bg-card shadow-2xs overflow-hidden">
+          <TableWrapper className="hidden md:block rounded-2xl border border-border bg-card shadow-2xs">
             <Table>
               {caption ? <caption className="p-3 text-xs text-muted-foreground">{caption}</caption> : null}
               <THead className="bg-muted/40 border-b border-border">

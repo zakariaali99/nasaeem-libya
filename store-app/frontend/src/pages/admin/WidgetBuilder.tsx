@@ -1307,21 +1307,27 @@ function ProductPicker({ selected, onChange }: { selected: Product[]; onChange: 
   )
 }
 
-function flattenCategories(categories: Category[] | undefined): Category[] {
-  const out: Category[] = []
-  const walk = (list: Category[]) => {
+/** Every category, with `hidden` set when it — or a parent above it — is
+ * switched off: the store leaves those out of the widget. */
+function flattenCategories(categories: Category[] | undefined): (Category & { hidden: boolean })[] {
+  const out: (Category & { hidden: boolean })[] = []
+  const walk = (list: Category[], parentHidden: boolean) => {
     for (const category of list) {
-      out.push(category)
-      if (category.children?.length) walk(category.children)
+      const hidden = parentHidden || !category.is_active
+      out.push({ ...category, hidden })
+      if (category.children?.length) walk(category.children, hidden)
     }
   }
-  walk(categories ?? [])
+  walk(categories ?? [], false)
   return out
 }
 
 function CategoryPicker({ selected, onChange }: { selected: Category[]; onChange: (categories: Category[]) => void }) {
-  const { data } = useCategories()
-  const all = flattenCategories(data).filter((c) => c.is_active)
+  const { data } = useCategories({ admin: true })
+  const everything = flattenCategories(data)
+  const all = everything.filter((c) => !c.hidden)
+  const hiddenIds = new Set(everything.filter((c) => c.hidden).map((c) => c.id))
+  const chosenHidden = selected.filter((c) => hiddenIds.has(c.id))
   const chosen = new Set(selected.map((c) => c.id))
   const toggle = (category: Category) =>
     onChange(chosen.has(category.id) ? selected.filter((c) => c.id !== category.id) : [...selected, category])
@@ -1336,6 +1342,11 @@ function CategoryPicker({ selected, onChange }: { selected: Category[]; onChange
         </div>
       </div>
       <p className="text-xs text-muted-foreground">تظهر بترتيب اختيارك. صورة كل تصنيف تُضبط من صفحة «الأقسام والتصنيفات».</p>
+      {chosenHidden.length > 0 ? (
+        <Alert tone="info">
+          {chosenHidden.map((c) => `«${c.name}»`).join('، ')} مخفي من المتجر، فلن يظهر للعملاء في هذه الأداة.
+        </Alert>
+      ) : null}
       {all.length === 0 ? (
         <p className="rounded-xl border border-dashed border-border p-4 text-center text-xs text-muted-foreground">لا توجد تصنيفات في المتجر بعد.</p>
       ) : (
@@ -1365,15 +1376,24 @@ function CategoryPicker({ selected, onChange }: { selected: Category[]; onChange
 }
 
 function CollectionPicker({ value, onChange }: { value: string; onChange: (collection: Collection | null) => void }) {
-  const { data } = useCollections()
+  const { data } = useCollections({ admin: true })
   const collections = data ?? []
+  const picked = collections.find((c) => c.id === value)
   return (
     <Field label="المجموعة" id="f-collection"
-      hint={collections.length === 0 ? 'لا توجد مجموعات بعد — أنشئ مجموعة من صفحة «المجموعات المميزة» أولاً' : 'تُعرض أول 12 منتجاً من المجموعة'}>
+      hint={
+        collections.length === 0
+          ? 'لا توجد مجموعات بعد — أنشئ مجموعة من صفحة «المجموعات المميزة» أولاً'
+          : picked && !picked.is_active
+            ? 'هذه المجموعة مخفية من المتجر، فلن تظهر هذه الأداة للعملاء حتى تُظهرها.'
+            : 'تُعرض أول 12 منتجاً من المجموعة'
+      }>
       {(props) => (
         <Select {...props} value={value} onChange={(e) => onChange(collections.find((c) => c.id === e.target.value) ?? null)}>
           <option value="">— اختر مجموعة —</option>
-          {collections.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          {collections.map((c) => (
+            <option key={c.id} value={c.id}>{c.is_active ? c.name : `${c.name} (مخفية من المتجر)`}</option>
+          ))}
         </Select>
       )}
     </Field>
@@ -1383,8 +1403,8 @@ function CollectionPicker({ value, onChange }: { value: string; onChange: (colle
 /** One `<datalist>` behind every link field: the operator picks a real page
  * instead of guessing a URL. */
 function LinkSuggestions() {
-  const { data: categories } = useCategories()
-  const { data: collections } = useCollections()
+  const { data: categories } = useCategories({ admin: true })
+  const { data: collections } = useCollections({ admin: true })
   return (
     <datalist id="link-suggestions">
       <option value="/products">كل المنتجات</option>

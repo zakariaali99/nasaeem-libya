@@ -27,6 +27,7 @@ from django.db.models.functions import Greatest
 from django.utils import timezone
 
 from apps.catalog.models import Product, ProductVariant
+from apps.catalog.visibility import visible_products
 from apps.core.models import City, Region
 
 from .notifications import dispatch_realtime_order_alert
@@ -422,12 +423,19 @@ def checkout(
     }
 
     # ---- re-read every price and every stock level from the database --------
+    # Hidden after it went into the basket (on its own, or with its brand,
+    # category or collection) — not for sale any more.
+    on_sale = {
+        pk for pk in visible_products(Product.objects.filter(id__in=product_ids)).values_list("id", flat=True)
+    }
     subtotal = Decimal("0.00")
     priced_lines = []
     for line in lines:
         product = locked_products.get(line.product_id)
-        if product is None or not product.is_active:
-            raise CheckoutError(f"المنتج «{line.product.name}» لم يعد متاحاً")
+        if product is None or product.id not in on_sale:
+            raise CheckoutError(
+                f"المنتج «{line.product.name}» لم يعد متاحاً، احذفه من السلة لإكمال الطلب"
+            )
 
         variant = locked_variants.get(line.variant_id) if line.variant_id else None
         if line.variant_id and (variant is None or not variant.is_active):
@@ -567,13 +575,23 @@ def cart_summary(
         else []
     )
 
+    # A line whose product was hidden after it was added stays on screen,
+    # marked unavailable, so the customer sees why checkout refuses it.
+    on_sale = set(
+        visible_products(Product.objects.filter(id__in={line.product_id for line in lines}))
+        .values_list("id", flat=True)
+    ) if lines else set()
+
     items = []
     subtotal = Decimal("0.00")
     for line in lines:
         price = unit_price(line.product, line.variant)
         line_total = money(price * line.quantity)
         subtotal += line_total
-        items.append({"line": line, "unit_price": price, "total_price": line_total})
+        items.append({
+            "line": line, "unit_price": price, "total_price": line_total,
+            "available": line.product_id in on_sale,
+        })
     subtotal = money(subtotal)
 
     discount_total = Decimal("0.00")

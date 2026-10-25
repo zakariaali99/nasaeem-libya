@@ -7,6 +7,7 @@ from decimal import Decimal
 from django.db.models import Q
 
 from .models import Category, Collection, Product
+from .visibility import visible_categories, visible_products
 
 # Bilingual dictionary mapping Arabic <-> Latin perfume brand and olfactory terms
 TRANSLITERATION_MAP = {
@@ -100,7 +101,7 @@ def perform_predictive_search(query: str):
     product_q &= sub_q
 
     products = (
-        Product.objects.filter(product_q)
+        visible_products(Product.objects.filter(product_q))
         .prefetch_related("images", "categories", "collections", "discounts", "variants")
         .distinct()[:8]
     )
@@ -111,7 +112,7 @@ def perform_predictive_search(query: str):
     for term in terms:
         cat_sub |= Q(name__icontains=term) | Q(description__icontains=term)
     cat_q &= cat_sub
-    categories = Category.objects.filter(cat_q)[:4]
+    categories = visible_categories(Category.objects.filter(cat_q))[:4]
 
     # Collections
     col_q = Q(is_active=True)
@@ -134,7 +135,7 @@ def perform_predictive_search(query: str):
 def find_fragrance_recommendations(gender: str = "ALL", vibe: str = "ORIENTAL", occasion: str = "EVENING", max_budget: float = None):
     """AI Fragrance Finder: Match the most suitable 3 perfumes with personalized justification."""
     queryset = (
-        Product.objects.filter(is_active=True)
+        visible_products(Product.objects.all())
         .prefetch_related("images", "categories", "collections", "discounts", "variants")
     )
 

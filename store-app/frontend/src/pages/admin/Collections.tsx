@@ -3,8 +3,8 @@ import { useState } from 'react'
 
 import { ConfirmDialog } from '@/components/admin/ConfirmDialog'
 import { DataTable, type Column } from '@/components/admin/DataTable'
+import { StoreVisibilityBadge, useStoreVisibilitySwitch } from '@/components/admin/StoreVisibility'
 import { PageHeader } from '@/components/layout/AdminLayout'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Field } from '@/components/ui/field'
@@ -18,7 +18,7 @@ import type { Collection } from '@/types/api'
 
 export default function AdminCollectionsPage() {
   usePageTitle('المجموعات — لوحة التحكم')
-  const query = useCollections()
+  const query = useCollections({ admin: true })
   const create = useCreateCollection()
   const update = useUpdateCollection()
   const remove = useDeleteCollection()
@@ -27,6 +27,9 @@ export default function AdminCollectionsPage() {
   const [creating, setCreating] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<Collection | null>(null)
   const [form, setForm] = useState({ name: '', description: '' })
+  const visibility = useStoreVisibilitySwitch('collections', (id, isActive) =>
+    update.mutateAsync({ id, is_active: isActive }),
+  )
 
   const columns: Column<Collection>[] = [
     { key: 'name', header: 'المجموعة', cell: (row) => <span className="font-medium text-foreground">{row.name}</span> },
@@ -34,8 +37,8 @@ export default function AdminCollectionsPage() {
     { key: 'description', header: 'الوصف', cell: (row) => row.description || '—' },
     {
       key: 'is_active',
-      header: 'الحالة',
-      cell: (row) => (row.is_active ? <Badge tone="success">مفعّلة</Badge> : <Badge tone="neutral">موقوفة</Badge>),
+      header: 'في المتجر',
+      cell: (row) => <StoreVisibilityBadge hidden={!row.is_active} />,
     },
   ]
 
@@ -43,7 +46,7 @@ export default function AdminCollectionsPage() {
     <>
       <PageHeader
         title="المجموعات"
-        description="مجموعات مختارة مثل «الأكثر مبيعاً» أو «عروض الموسم»."
+        description="مجموعات مختارة مثل «الأكثر مبيعاً» أو «عروض الموسم». زر العين يخفي المجموعة ومنتجاتها من المتجر دون حذف شيء."
         actions={
           <Button
             onClick={() => {
@@ -68,6 +71,7 @@ export default function AdminCollectionsPage() {
         emptyDescription="أنشئ مجموعة لتجميع منتجات مختارة وعرضها في الصفحة الرئيسية."
         rowActions={(row) => (
           <div className="flex justify-end">
+            {visibility.button(row)}
             <Button
               variant="ghost"
               size="icon"
@@ -148,6 +152,8 @@ export default function AdminCollectionsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {visibility.dialog}
 
       <ConfirmDialog
         open={pendingDelete !== null}

@@ -18,6 +18,7 @@ from django.db.models import Prefetch, Q
 from django.utils import timezone
 
 from apps.catalog.models import Category, Collection, Product
+from apps.catalog.visibility import visible_categories, visible_products
 from apps.orders.models import Discount, OrderItem
 
 from .models import StorefrontLayout, Widget, WidgetType
@@ -497,7 +498,7 @@ def _user_region_id(user):
 # --------------------------------------------------------------------------
 
 def _product_queryset():
-    return Product.objects.filter(is_active=True).prefetch_related(
+    return visible_products(Product.objects.all()).prefetch_related(
         "images",
         "categories",
         "collections",
@@ -603,7 +604,7 @@ def populate(widget: Widget, *, user=None, recent_ids=(), serialize_product, ser
 
     elif widget.type == WidgetType.CATEGORY_LIST:
         ids = data.get("categoryIds") or []
-        found = {str(c.id): c for c in Category.objects.filter(id__in=ids, is_active=True)}
+        found = {str(c.id): c for c in visible_categories(Category.objects.filter(id__in=ids))}
         data["categories"] = serialize_category([found[i] for i in ids if i in found])
 
     elif widget.type == WidgetType.COLLECTION_SHOWCASE:

@@ -12,10 +12,12 @@ urlpatterns = [
     path("categories/", views.CategoryListView.as_view(), name="category-list"),
     path("categories/<uuid:pk>/", views.CategoryDetailView.as_view(), name="category-detail"),
     path("categories/<uuid:pk>/products/", views.CategoryProductsView.as_view(), name="category-products"),
+    path("categories/<uuid:pk>/hide-impact/", views.CategoryHideImpactView.as_view(), name="category-hide-impact"),
 
     path("collections/", views.CollectionListView.as_view(), name="collection-list"),
     path("collections/<uuid:pk>/", views.CollectionDetailView.as_view(), name="collection-detail"),
     path("collections/<uuid:pk>/products/", views.CollectionProductsView.as_view(), name="collection-products"),
+    path("collections/<uuid:pk>/hide-impact/", views.CollectionHideImpactView.as_view(), name="collection-hide-impact"),
 
     # Public Storefront read-by-slug (GET only)
     path("products/by-slug/<str:slug>/", views.ProductBySlugView.as_view(), name="product-by-slug"),

@@ -19,6 +19,7 @@ from rest_framework.views import APIView
 
 from apps.accounts.permissions import IsAdminRole
 from apps.catalog.models import Product, ProductVariant
+from apps.catalog.visibility import visible_products
 from apps.core.pagination import StandardPagination
 from apps.core.store_settings import get_store_settings
 from apps.core.views import CsrfProtectedAPIView
@@ -104,7 +105,7 @@ class CartView(CsrfProtectedAPIView):
         serializer.is_valid(raise_exception=True)
         payload = serializer.validated_data
 
-        product = Product.objects.filter(id=payload["product_id"], is_active=True).first()
+        product = visible_products(Product.objects.filter(id=payload["product_id"])).first()
         if product is None:
             return Response({"message": "المنتج غير موجود"}, status=status.HTTP_404_NOT_FOUND)
 

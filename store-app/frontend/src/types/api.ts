@@ -149,6 +149,9 @@ export interface Product {
   available_stock: number
   in_stock: boolean
   is_active: boolean
+  /** Staff only: why the product is off the store — «المنتج نفسه» and/or the
+   * brand, category or collection hiding it. Empty when it is on the store. */
+  hidden_by?: string[]
   categories: Category[]
   collections: Collection[]
   discounts: DiscountBadge[]
@@ -400,6 +403,8 @@ export interface CartLine {
   variant_label: string
   available_stock: number | null
   image: ProductImage | null
+  /** False once the product is hidden from the store; checkout refuses it. */
+  available?: boolean
 }
 
 export interface CartState {

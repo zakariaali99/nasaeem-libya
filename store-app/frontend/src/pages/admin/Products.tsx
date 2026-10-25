@@ -19,7 +19,7 @@ import { PageHeader } from '@/components/layout/AdminLayout'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { formatNumber, formatPrice } from '@/lib/format'
-import { useDeleteProduct, useProducts } from '@/lib/queries/catalog'
+import { useDeleteProduct, useProducts, useUpdateProduct } from '@/lib/queries/catalog'
 import { usePageTitle } from '@/lib/usePageTitle'
 import { useUrlState } from '@/lib/useUrlState'
 import type { Product } from '@/types/api'
@@ -27,31 +27,44 @@ import type { Product } from '@/types/api'
 export default function AdminProductsPage() {
   usePageTitle('كتالوج المنتجات والعطور — لوحة التحكم')
   const navigate = useNavigate()
-  const { get, set } = useUrlState({ sort: 'newest', stock_filter: '' })
+  const { get, set } = useUrlState({ sort: 'newest', stock_filter: '', visibility: '' })
   const [pendingDelete, setPendingDelete] = useState<Product | null>(null)
 
   const page = Number(get('page') || 1)
   const search = get('search')
   const sort = get('sort')
   const stockFilter = get('stock_filter')
+  const visibility = get('visibility')
 
-  const query = useProducts({ page, search: search || undefined, sort, limit: 20 })
+  const query = useProducts({
+    page, search: search || undefined, sort, limit: 20, visibility: visibility || undefined,
+  })
   const remove = useDeleteProduct()
+  const update = useUpdateProduct()
+  const [switchingId, setSwitchingId] = useState<string | null>(null)
+  const toggleShown = async (row: Product) => {
+    setSwitchingId(row.id)
+    try {
+      await update.mutateAsync({ id: row.id, is_active: !row.is_active })
+    } finally {
+      setSwitchingId(null)
+    }
+  }
 
   const allItems = query.data?.items ?? []
   const totalProducts = query.data?.meta?.total ?? 0
 
   // Calculate metrics
-  const activeCount = allItems.filter((i) => i.is_active).length
+  const activeCount = allItems.filter((i) => (i.hidden_by ?? []).length === 0).length
   const lowStockCount = allItems.filter((i) => i.available_stock > 0 && i.available_stock <= 5 && i.track_quantity).length
   const outOfStockCount = allItems.filter((i) => i.available_stock <= 0 && i.track_quantity && !i.has_variants).length
 
   const filterChips = [
     {
       id: 'all',
-      label: `كل المنتجات (${totalProducts})`,
-      active: !stockFilter,
-      onClick: () => set({ stock_filter: '', page: 1 }),
+      label: visibility ? 'كل المنتجات' : `كل المنتجات (${totalProducts})`,
+      active: !stockFilter && !visibility,
+      onClick: () => set({ stock_filter: '', visibility: '', page: 1 }),
     },
     {
       id: 'in_stock',
@@ -70,6 +83,18 @@ export default function AdminProductsPage() {
       label: 'نفد من المخزون (0)',
       active: stockFilter === 'out_of_stock',
       onClick: () => set({ stock_filter: 'out_of_stock', page: 1 }),
+    },
+    {
+      id: 'visible',
+      label: 'الظاهرة في المتجر',
+      active: visibility === 'visible',
+      onClick: () => set({ visibility: visibility === 'visible' ? '' : 'visible', page: 1 }),
+    },
+    {
+      id: 'hidden',
+      label: 'المخفية من المتجر',
+      active: visibility === 'hidden',
+      onClick: () => set({ visibility: visibility === 'hidden' ? '' : 'hidden', page: 1 }),
     },
   ]
 
@@ -164,19 +189,30 @@ export default function AdminProductsPage() {
     },
     {
       key: 'is_active',
-      header: 'حالة النشر بالمتجر',
-      cell: (row) =>
-        row.is_active ? (
-          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
-            <Eye className="size-3.5" />
-            <span>منشور بالمتجر</span>
+      header: 'في المتجر',
+      cell: (row) => {
+        const reasons = row.hidden_by ?? []
+        const others = reasons.filter((r) => r !== 'المنتج نفسه')
+        if (reasons.length === 0) {
+          return (
+            <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+              <Eye className="size-3.5" aria-hidden="true" />
+              <span>ظاهر</span>
+            </span>
+          )
+        }
+        return (
+          <span className="inline-flex flex-col items-start gap-1">
+            <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-semibold text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
+              <EyeOff className="size-3.5" aria-hidden="true" />
+              <span>مخفي</span>
+            </span>
+            {others.length > 0 ? (
+              <span className="text-[11px] text-warning">بسبب: {others.join('، ')}</span>
+            ) : null}
           </span>
-        ) : (
-          <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
-            <EyeOff className="size-3.5" />
-            <span>مخفي (مسودة)</span>
-          </span>
-        ),
+        )
+      },
     },
   ]
 
@@ -208,7 +244,7 @@ export default function AdminProductsPage() {
 
         <div className="rounded-2xl border border-border bg-card p-4 shadow-2xs space-y-1">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>منشور ومعروض</span>
+            <span>ظاهر في المتجر</span>
             <Eye className="size-4 text-emerald-500" />
           </div>
           <p className="font-mono text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400">{formatNumber(activeCount)}</p>
@@ -252,11 +288,11 @@ export default function AdminProductsPage() {
         sort={sort}
         onSortChange={(value) => set({ sort: value })}
         toolbar={
-          stockFilter || search ? (
+          stockFilter || search || visibility ? (
             <Button
               variant="outline"
               size="sm"
-              onClick={() => set({ stock_filter: '', search: '', page: 1 })}
+              onClick={() => set({ stock_filter: '', search: '', visibility: '', page: 1 })}
               className="h-10 rounded-xl text-xs font-bold text-destructive hover:bg-destructive/10 border-destructive/30 gap-1.5"
             >
               <FilterX className="size-3.5" />
@@ -277,6 +313,24 @@ export default function AdminProductsPage() {
         }
         rowActions={(row) => (
           <div className="flex justify-end gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8 rounded-lg"
+              loading={switchingId === row.id}
+              aria-label={row.is_active ? `إخفاء ${row.name} من المتجر` : `إظهار ${row.name} في المتجر`}
+              title={row.is_active ? 'إخفاء من المتجر' : 'إظهار في المتجر'}
+              onClick={(event) => {
+                event.stopPropagation()
+                void toggleShown(row)
+              }}
+            >
+              {switchingId === row.id ? null : row.is_active ? (
+                <Eye className="size-3.5" aria-hidden="true" />
+              ) : (
+                <EyeOff className="size-3.5" aria-hidden="true" />
+              )}
+            </Button>
             <Button asChild variant="ghost" size="icon" className="size-8 rounded-lg" aria-label={`تعديل ${row.name}`}>
               <Link to={`/admin/products/${row.id}`}>
                 <Pencil className="size-3.5" aria-hidden="true" />

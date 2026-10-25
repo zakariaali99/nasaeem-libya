@@ -27,7 +27,7 @@ from apps.accounts.permissions import IsAdminRole
 from apps.core.pagination import StandardPagination
 from apps.orders.models import Discount
 
-from . import services
+from . import services, visibility
 from .models import (
     Category,
     Collection,
@@ -88,9 +88,18 @@ def _decimal(value):
 
 def filter_products(queryset, params, *, admin=False):
     if not admin:
-        queryset = queryset.filter(is_active=True)
+        queryset = visibility.visible_products(queryset)
     elif (is_active := params.get("is_active")) is not None:
         queryset = queryset.filter(is_active=is_active.lower() in ("1", "true", "yes"))
+    if admin and (shown := params.get("visibility")) in ("visible", "hidden"):
+        # The dashboard filter «الظاهرة / المخفية» — hidden by its own switch
+        # or by a brand, category or collection.
+        visible_ids = visibility.visible_products(Product.objects.all()).values("id")
+        queryset = (
+            queryset.filter(id__in=visible_ids)
+            if shown == "visible"
+            else queryset.exclude(id__in=visible_ids)
+        )
 
     searching = False
     if search := params.get("search"):
@@ -146,6 +155,14 @@ def _as_uuid_list(value):
         return []
 
 
+def _is_admin(request):
+    return bool(request.user.is_authenticated and getattr(request.user, "is_admin_role", False))
+
+
+def _category_hidden(category):
+    return category.id in visibility.hidden_categories()
+
+
 class ProductListView(APIView):
     permission_classes = [AllowAny]
 
@@ -194,7 +211,7 @@ class ProductDetailView(APIView):
     def get_object(self, pk, *, admin=False):
         queryset = product_queryset()
         if not admin:
-            queryset = queryset.filter(is_active=True)
+            queryset = visibility.visible_products(queryset)
         return queryset.filter(pk=pk).first()
 
     def get(self, request, pk):
@@ -218,6 +235,7 @@ class ProductDetailView(APIView):
         product = self.get_object(pk, admin=True)
         if product is None:
             return Response({"message": "المنتج غير موجود"}, status=status.HTTP_404_NOT_FOUND)
+        was_active = product.is_active
         serializer = ProductWriteSerializer(
             product, data=request.data, partial=True, context={"request": request}
         )
@@ -226,6 +244,9 @@ class ProductDetailView(APIView):
         cache.delete(f"store:product:{product.id}")
         if product.slug:
             cache.delete(f"store:product:{product.slug}")
+        if product.is_active != was_active:
+            # Other products' pages list this one in their bundles.
+            visibility.forget_product_pages()
         return Response({"data": serializer.data, "message": "تم تحديث المنتج"})
 
     def delete(self, request, pk):
@@ -272,7 +293,7 @@ class ProductBySlugView(APIView):
         admin = bool(request.user.is_authenticated and getattr(request.user, "is_admin_role", False))
         queryset = product_queryset()
         if not admin:
-            queryset = queryset.filter(is_active=True)
+            queryset = visibility.visible_products(queryset)
 
         product = queryset.filter(slug=decoded_slug).first()
         if product is None and decoded_slug != slug:
@@ -303,7 +324,8 @@ def category_tree(request=None, *, admin=False):
     """
     queryset = Category.objects.all()
     if not admin:
-        queryset = queryset.filter(is_active=True)
+        # Drops a switched-off category and everything below it.
+        queryset = visibility.visible_categories(queryset)
 
     categories = list(queryset.order_by("name"))
     by_parent = {}
@@ -358,7 +380,7 @@ class CategoryDetailView(APIView):
 
     def get(self, request, pk):
         category = self.get_object(pk)
-        if category is None:
+        if category is None or (not _is_admin(request) and _category_hidden(category)):
             return Response({"message": "التصنيف غير موجود"}, status=status.HTTP_404_NOT_FOUND)
         return Response({"data": CategorySerializer(category, context={"request": request}).data})
 
@@ -366,11 +388,14 @@ class CategoryDetailView(APIView):
         category = self.get_object(pk)
         if category is None:
             return Response({"message": "التصنيف غير موجود"}, status=status.HTTP_404_NOT_FOUND)
+        was_active = category.is_active
         serializer = CategorySerializer(category, data=request.data, partial=True,
                                         context={"request": request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
         cache.delete("store:categories:tree")
+        if category.is_active != was_active:
+            visibility.forget_product_pages()
         return Response({"data": serializer.data, "message": "تم تحديث التصنيف"})
 
     def delete(self, request, pk):
@@ -393,7 +418,7 @@ class CategoryBySlugView(APIView):
         if category is None and decoded_slug != slug:
             category = Category.objects.filter(slug=slug).first()
 
-        if category is None:
+        if category is None or (not _is_admin(request) and _category_hidden(category)):
             return Response({"message": "التصنيف غير موجود"}, status=status.HTTP_404_NOT_FOUND)
         return Response({"data": CategorySerializer(category, context={"request": request}).data})
 
@@ -403,7 +428,7 @@ class CategoryProductsView(APIView):
 
     def get(self, request, pk):
         category = CategoryDetailView().get_object(pk)
-        if category is None:
+        if category is None or _category_hidden(category):
             return Response({"message": "التصنيف غير موجود"}, status=status.HTTP_404_NOT_FOUND)
         queryset = filter_products(
             product_queryset().filter(categories=category), request.query_params
@@ -421,8 +446,8 @@ class CollectionListView(APIView):
 
     def get(self, request):
         queryset = Collection.objects.all()
-        if not (request.user.is_authenticated and getattr(request.user, "is_admin_role", False)):
-            queryset = queryset.filter(is_active=True)
+        if not _is_admin(request):
+            queryset = visibility.visible_collections(queryset)
         serializer = CollectionSerializer(queryset.order_by("name"), many=True,
                                           context={"request": request})
         return Response({"data": serializer.data, "meta": {"total": queryset.count()}})
@@ -444,7 +469,7 @@ class CollectionDetailView(APIView):
 
     def get(self, request, pk):
         collection = self.get_object(pk)
-        if collection is None:
+        if collection is None or (not _is_admin(request) and not collection.is_active):
             return Response({"message": "المجموعة غير موجودة"}, status=status.HTTP_404_NOT_FOUND)
         return Response({"data": CollectionSerializer(collection, context={"request": request}).data})
 
@@ -452,10 +477,13 @@ class CollectionDetailView(APIView):
         collection = self.get_object(pk)
         if collection is None:
             return Response({"message": "المجموعة غير موجودة"}, status=status.HTTP_404_NOT_FOUND)
+        was_active = collection.is_active
         serializer = CollectionSerializer(collection, data=request.data, partial=True,
                                           context={"request": request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        if collection.is_active != was_active:
+            visibility.forget_product_pages()
         return Response({"data": serializer.data, "message": "تم تحديث المجموعة"})
 
     def delete(self, request, pk):
@@ -475,7 +503,7 @@ class CollectionBySlugView(APIView):
         if collection is None and decoded_slug != slug:
             collection = Collection.objects.filter(slug=slug).first()
 
-        if collection is None:
+        if collection is None or (not _is_admin(request) and not collection.is_active):
             return Response({"message": "المجموعة غير موجودة"}, status=status.HTTP_404_NOT_FOUND)
         return Response({"data": CollectionSerializer(collection, context={"request": request}).data})
 
@@ -485,7 +513,7 @@ class CollectionProductsView(APIView):
 
     def get(self, request, pk):
         collection = CollectionDetailView().get_object(pk)
-        if collection is None:
+        if collection is None or not collection.is_active:
             return Response({"message": "المجموعة غير موجودة"}, status=status.HTTP_404_NOT_FOUND)
         queryset = filter_products(
             product_queryset().filter(collections=collection), request.query_params
@@ -495,6 +523,45 @@ class CollectionProductsView(APIView):
         return paginator.get_paginated_response(
             ProductListSerializer(page, many=True, context={"request": request}).data
         )
+
+
+class CategoryHideImpactView(APIView):
+    """How many products now on the store would go with this category (or
+    brand) — the number in «سيُخفى معه X منتجاً» before the switch is saved."""
+
+    permission_classes = [IsAdminRole]
+
+    def get(self, request, pk):
+        category = get_object_or_404(Category, pk=pk)
+        below = {category.id}
+        children = {}
+        for child_id, parent_id in Category.objects.values_list("id", "parent_id"):
+            children.setdefault(parent_id, []).append(child_id)
+        stack = [category.id]
+        while stack:
+            for child_id in children.get(stack.pop(), []):
+                if child_id not in below:
+                    below.add(child_id)
+                    stack.append(child_id)
+        count = (
+            visibility.visible_products(Product.objects.filter(categories__in=list(below)))
+            .distinct()
+            .count()
+        )
+        return Response({"data": {"products": count}})
+
+
+class CollectionHideImpactView(APIView):
+    permission_classes = [IsAdminRole]
+
+    def get(self, request, pk):
+        collection = get_object_or_404(Collection, pk=pk)
+        count = (
+            visibility.visible_products(Product.objects.filter(collections=collection))
+            .distinct()
+            .count()
+        )
+        return Response({"data": {"products": count}})
 
 
 # --------------------------------------------------------------------------
@@ -755,7 +822,10 @@ class WishlistListView(APIView):
 
     def get(self, request):
         items = (
-            WishlistItem.objects.filter(user=request.user)
+            WishlistItem.objects.filter(
+                user=request.user,
+                product__in=visibility.visible_products(Product.objects.all()),
+            )
             .select_related("product")
             .prefetch_related("product__images", "product__categories", "product__collections", "product__variants")
         )
@@ -769,7 +839,7 @@ class WishlistToggleView(APIView):
         product_id = request.data.get("product_id")
         if not product_id:
             return Response({"message": "معرّف المنتج مطلوب"}, status=status.HTTP_400_BAD_REQUEST)
-        product = Product.objects.filter(id=product_id, is_active=True).first()
+        product = visibility.visible_products(Product.objects.filter(id=product_id)).first()
         if not product:
             return Response({"message": "المنتج غير موجود"}, status=status.HTTP_404_NOT_FOUND)
 

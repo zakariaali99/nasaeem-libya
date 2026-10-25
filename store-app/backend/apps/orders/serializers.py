@@ -69,6 +69,8 @@ class CartItemSerializer(serializers.Serializer):
     variant_label = serializers.SerializerMethodField()
     available_stock = serializers.SerializerMethodField()
     image = serializers.SerializerMethodField()
+    # False once the product is hidden from the store; checkout refuses it.
+    available = serializers.BooleanField(default=True)
 
     def get_variant_label(self, item):
         variant = item["line"].variant

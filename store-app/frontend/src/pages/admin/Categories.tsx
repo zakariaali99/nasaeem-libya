@@ -1,8 +1,9 @@
 import { Pencil, Plus, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 
 import { ConfirmDialog } from '@/components/admin/ConfirmDialog'
 import { ImageUploadField } from '@/components/admin/ImageUploadField'
+import { StoreVisibilityBadge, useStoreVisibilitySwitch } from '@/components/admin/StoreVisibility'
 import { PageHeader } from '@/components/layout/AdminLayout'
 import { Alert } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -20,7 +21,7 @@ import type { Category } from '@/types/api'
 
 export default function AdminCategoriesPage() {
   usePageTitle('التصنيفات — لوحة التحكم')
-  const query = useCategories()
+  const query = useCategories({ admin: true })
   const create = useCreateCategory()
   const update = useUpdateCategory()
   const remove = useDeleteCategory()
@@ -29,6 +30,9 @@ export default function AdminCategoriesPage() {
   const [creating, setCreating] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<Category | null>(null)
   const [form, setForm] = useState({ name: '', description: '', image_url: '' })
+  const visibility = useStoreVisibilitySwitch('categories', (id, isActive) =>
+    update.mutateAsync({ id, is_active: isActive }),
+  )
 
   const openCreate = () => {
     setForm({ name: '', description: '', image_url: '' })
@@ -50,7 +54,7 @@ export default function AdminCategoriesPage() {
     <>
       <PageHeader
         title="التصنيفات"
-        description="التصنيفات هي الطريقة التي يتصفّح بها العميل المتجر — كل علامة تجارية تصنيف."
+        description="التصنيفات هي الطريقة التي يتصفّح بها العميل المتجر — كل علامة تجارية تصنيف. زر العين يخفي التصنيف ومنتجاته من المتجر دون حذف شيء."
         actions={
           <Button onClick={openCreate}>
             <Plus aria-hidden="true" />
@@ -84,6 +88,7 @@ export default function AdminCategoriesPage() {
               category={category}
               onEdit={openEdit}
               onDelete={setPendingDelete}
+              visibilityButton={visibility.button}
             />
           ))}
         </ul>
@@ -149,6 +154,8 @@ export default function AdminCategoriesPage() {
         </DialogContent>
       </Dialog>
 
+      {visibility.dialog}
+
       <ConfirmDialog
         open={pendingDelete !== null}
         onOpenChange={(open) => !open && setPendingDelete(null)}
@@ -167,15 +174,22 @@ export default function AdminCategoriesPage() {
 }
 
 function CategoryCard({
-  category, onEdit, onDelete, depth = 0,
+  category, onEdit, onDelete, visibilityButton, depth = 0, hiddenWith,
 }: {
   category: Category
   onEdit: (category: Category) => void
   onDelete: (category: Category) => void
+  visibilityButton: (category: Category) => ReactNode
   depth?: number
+  /** The switched-off parent (or brand) this category is hidden with. */
+  hiddenWith?: string
 }) {
+  const childrenHiddenWith = hiddenWith ?? (category.is_active ? undefined : category.name)
   return (
-    <li className="rounded-lg border border-border bg-card p-4" style={{ marginInlineStart: depth * 16 }}>
+    <li
+      className={`rounded-lg border border-border bg-card p-4 ${!category.is_active || hiddenWith ? 'opacity-75' : ''}`}
+      style={{ marginInlineStart: depth * 16 }}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           {category.image_url ? (
@@ -194,6 +208,7 @@ function CategoryCard({
           </div>
         </div>
         <div className="flex shrink-0">
+          {visibilityButton(category)}
           <Button variant="ghost" size="icon" aria-label={`تعديل ${category.name}`} onClick={() => onEdit(category)}>
             <Pencil aria-hidden="true" />
           </Button>
@@ -209,13 +224,21 @@ function CategoryCard({
         </div>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
-        {category.is_active ? <Badge tone="success">مفعّل</Badge> : <Badge tone="neutral">موقوف</Badge>}
+        <StoreVisibilityBadge hidden={!category.is_active} because={hiddenWith} />
         {category.is_system ? <Badge tone="primary">نظامي</Badge> : null}
       </div>
       {category.children.length > 0 ? (
         <ul className="mt-3 space-y-2">
           {category.children.map((child) => (
-            <CategoryCard key={child.id} category={child} onEdit={onEdit} onDelete={onDelete} depth={depth + 1} />
+            <CategoryCard
+              key={child.id}
+              category={child}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              visibilityButton={visibilityButton}
+              depth={depth + 1}
+              hiddenWith={childrenHiddenWith}
+            />
           ))}
         </ul>
       ) : null}

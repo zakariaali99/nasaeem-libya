@@ -56,9 +56,11 @@ export function useProductBySlug(slug: string | undefined) {
   })
 }
 
-export function useCategories() {
+/** `admin`: the dashboard's own copy, hidden categories included. It never
+ * takes the storefront's bootstrap tree, which leaves hidden ones out. */
+export function useCategories({ admin = false }: { admin?: boolean } = {}) {
   const initialData = (() => {
-    if (typeof window !== 'undefined') {
+    if (!admin && typeof window !== 'undefined') {
       const win = window as unknown as { __BOOTSTRAP__?: { categories?: Category[] } }
       if (win.__BOOTSTRAP__?.categories) {
         const categories = win.__BOOTSTRAP__.categories
@@ -70,10 +72,10 @@ export function useCategories() {
   })()
 
   return useQuery({
-    queryKey: catalogKeys.categories(),
+    queryKey: admin ? [...catalogKeys.categories(), 'admin'] : catalogKeys.categories(),
     queryFn: async () => (await api.get<Category[]>('/categories/')).data,
     initialData,
-    staleTime: 10 * 60_000,
+    staleTime: admin ? 0 : 10 * 60_000,
   })
 }
 
@@ -85,12 +87,18 @@ export function useCategoryBySlug(slug: string | undefined) {
   })
 }
 
-export function useCollections() {
+export function useCollections({ admin = false }: { admin?: boolean } = {}) {
   return useQuery({
-    queryKey: catalogKeys.collections(),
+    queryKey: admin ? [...catalogKeys.collections(), 'admin'] : catalogKeys.collections(),
     queryFn: async () => (await api.get<Collection[]>('/collections/')).data,
-    staleTime: 5 * 60_000,
+    staleTime: admin ? 0 : 5 * 60_000,
   })
+}
+
+/** How many products now on the store would go with this category or
+ * collection — the number in «سيُخفى معه X منتجاً». */
+export async function fetchHideImpact(kind: 'categories' | 'collections', id: string) {
+  return (await api.get<{ products: number }>(`/${kind}/${id}/hide-impact/`)).data.products
 }
 
 export function useCollectionBySlug(slug: string | undefined) {

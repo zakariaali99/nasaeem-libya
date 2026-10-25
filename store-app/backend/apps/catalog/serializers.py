@@ -132,6 +132,7 @@ class ProductListSerializer(serializers.ModelSerializer):
     in_stock = serializers.SerializerMethodField()
     discount_percent = serializers.SerializerMethodField()
     variant_choices = serializers.SerializerMethodField()
+    hidden_by = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -140,8 +141,27 @@ class ProductListSerializer(serializers.ModelSerializer):
             "images", "has_variants", "track_quantity", "stock", "reserved_stock",
             "available_stock", "in_stock", "is_active",
             "categories", "collections", "discounts", "discount_percent",
-            "variant_choices",
+            "variant_choices", "hidden_by",
         ]
+
+    def get_hidden_by(self, obj):
+        """Why the product is off the store, for the dashboard: «المنتج نفسه»
+        and/or the brand, category or collection that hides it. Staff only —
+        the store never shows a hidden product, so customers always get []."""
+        request = self.context.get("request")
+        if not request or not getattr(request.user, "is_admin_role", False):
+            return []
+        # One tree walk per response, not per product.
+        holder = self.parent if self.parent is not None else self
+        cached = getattr(holder, "_hidden_sets", None)
+        if cached is None:
+            from .visibility import hidden_categories, hidden_collections
+
+            cached = (hidden_categories(), hidden_collections())
+            holder._hidden_sets = cached
+        from .visibility import hidden_by
+
+        return hidden_by(obj, *cached)
 
     def get_variant_choices(self, obj):
         """The sizes a card can offer as buttons, so a customer adds straight
@@ -250,6 +270,13 @@ class ProductDetailSerializer(ProductListSerializer):
     def get_bundles(self, obj):
         from .models import ProductBundle
         db_bundles = obj.bundles_as_main.filter(is_active=True)
+        request = self.context.get("request")
+        if not (request and getattr(request.user, "is_admin_role", False)):
+            # A bundle that includes a hidden product is not offered.
+            from .visibility import visible_products
+
+            hidden = Product.objects.exclude(id__in=visible_products(Product.objects.all()).values("id"))
+            db_bundles = db_bundles.exclude(included_products__in=hidden)
         if db_bundles.exists():
             return ProductBundleSerializer(db_bundles, many=True, context=self.context).data
         return []

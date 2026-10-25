@@ -71,8 +71,8 @@ export function ProductForm({
   serverError,
   onSubmit,
 }: ProductFormProps) {
-  const categories = useCategories()
-  const collections = useCollections()
+  const categories = useCategories({ admin: true })
+  const collections = useCollections({ admin: true })
 
   const [images, setImages] = useState<
     Pick<ProductImage, 'url' | 'alt_text'>[]
@@ -1365,13 +1365,19 @@ export function ProductForm({
                 />
                 <div className="min-w-0">
                   <span className="block text-xs font-bold text-foreground">
-                    منشور في المتجر
+                    ظاهر في المتجر
                   </span>
                   <span className="block text-[11px] text-muted-foreground">
-                    عند التفعيل يظهر المنتج للعملاء في نتائج البحث والصفحة الرئيسية.
+                    عند الإيقاف يبقى المنتج هنا في لوحة التحكم، لكن العميل لا يراه ولا يجده بالبحث.
                   </span>
                 </div>
               </label>
+              {(product?.hidden_by ?? []).filter((r) => r !== 'المنتج نفسه').length > 0 ? (
+                <Alert tone="info">
+                  مخفي الآن من المتجر بسبب: {product!.hidden_by!.filter((r) => r !== 'المنتج نفسه').join('، ')}.
+                  يظهر عند إظهاره من صفحة التصنيفات أو المجموعات.
+                </Alert>
+              ) : null}
 
               <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-border p-3 hover:bg-muted/30 transition-colors">
                 <Checkbox

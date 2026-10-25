@@ -34,6 +34,7 @@ from django.utils.html import escape
 from django.views.decorators.cache import cache_control
 
 from apps.catalog.models import Product
+from apps.catalog.visibility import visible_products
 
 logger = logging.getLogger(__name__)
 
@@ -220,7 +221,7 @@ def sitemap_xml(request):
     not millions) fits one document comfortably under the 50k-URL limit."""
     urls = [(_absolute(request, p), None) for p in ("/", "/products")]
     for product in (
-        Product.objects.filter(is_active=True).order_by("-updated_at").only("slug", "updated_at")
+        visible_products(Product.objects.all()).order_by("-updated_at").only("slug", "updated_at")
     ):
         lastmod = product.updated_at.date().isoformat() if product.updated_at else None
         urls.append((_absolute(request, _product_path(product.slug)), lastmod))
@@ -342,7 +343,7 @@ def render_shell(request, path: str = ""):
             slug = raw_slug
 
         product = (
-            Product.objects.filter(Q(slug=slug) | Q(slug=raw_slug), is_active=True)
+            visible_products(Product.objects.filter(Q(slug=slug) | Q(slug=raw_slug)))
             .prefetch_related("images", "variants")
             .first()
         )

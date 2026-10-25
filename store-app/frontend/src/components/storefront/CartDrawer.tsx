@@ -173,6 +173,11 @@ export function CartDrawer({ children }: CartDrawerProps) {
                             {item.variant_label}
                           </span>
                         )}
+                        {item.available === false ? (
+                          <span className="block text-[11px] font-semibold text-destructive mt-0.5">
+                            لم يعد متاحاً، احذفه لإكمال الطلب
+                          </span>
+                        ) : null}
                       </div>
                       <button
                         type="button"

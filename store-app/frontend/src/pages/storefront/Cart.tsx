@@ -183,9 +183,14 @@ export default function CartPage() {
 function CartLineItem({ line }: { line: CartLine }) {
   const update = useUpdateCartItem()
   const remove = useRemoveCartItem()
+  const gone = line.available === false
 
   return (
-    <li className="flex gap-4 rounded-2xl border border-border bg-card p-4 shadow-2xs hover:border-primary/30 transition-all">
+    <li
+      className={`flex gap-4 rounded-2xl border bg-card p-4 shadow-2xs transition-all ${
+        gone ? 'border-destructive/40' : 'border-border hover:border-primary/30'
+      }`}
+    >
       <Link
         to={`/products/${encodeURIComponent(line.slug)}`}
         className="shrink-0 focus-visible:outline-2 focus-visible:outline-ring"
@@ -221,6 +226,11 @@ function CartLineItem({ line }: { line: CartLine }) {
             <p className="text-xs text-muted-foreground font-mono mt-0.5">
               سعر القطعة: {formatPrice(line.unit_price)}
             </p>
+            {gone ? (
+              <p className="mt-1 text-xs font-semibold text-destructive">
+                لم يعد متاحاً، احذفه من السلة لإكمال الطلب.
+              </p>
+            ) : null}
           </div>
 
           <button
@@ -236,7 +246,7 @@ function CartLineItem({ line }: { line: CartLine }) {
         <div className="flex items-center justify-between gap-3 pt-1">
           <QuantityStepper
             value={line.quantity}
-            max={line.available_stock ?? undefined}
+            max={gone ? line.quantity : line.available_stock ?? undefined}
             onChange={(quantity) => update.mutate({ id: line.id, quantity })}
             label={`كمية ${line.name}`}
           />

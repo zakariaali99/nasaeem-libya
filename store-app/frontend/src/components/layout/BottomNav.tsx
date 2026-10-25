@@ -1,17 +1,25 @@
-import { Heart, Home, LayoutGrid, ShoppingBag, User } from 'lucide-react'
-import { NavLink } from 'react-router-dom'
+import { Heart, Home, LayoutGrid, ShoppingBag, User, type LucideIcon } from 'lucide-react'
+import { NavLink } from '@/lib/i18nRouter'
 
 import { formatNumber } from '@/lib/format'
 import { useCart } from '@/lib/queries/cart'
 import { useWishlistIds } from '@/lib/queries/wishlist'
 import { cn } from '@/lib/utils'
+import { t, type MessageKey } from '@/lib/i18n'
 
-const ITEMS = [
-  { to: '/', label: 'الرئيسية', Icon: Home, end: true },
-  { to: '/products', label: 'المنتجات', Icon: LayoutGrid, end: false },
-  { to: '/wishlist', label: 'المفضلة', Icon: Heart, end: false, isWishlist: true },
-  { to: '/cart', label: 'السلة', Icon: ShoppingBag, end: false, isCart: true },
-  { to: '/me', label: 'حسابي', Icon: User, end: false },
+const ITEMS: {
+  to: string
+  label: MessageKey
+  Icon: LucideIcon
+  end: boolean
+  isCart?: boolean
+  isWishlist?: boolean
+}[] = [
+  { to: '/', label: 'nav.home', Icon: Home, end: true },
+  { to: '/products', label: 'nav.products', Icon: LayoutGrid, end: false },
+  { to: '/wishlist', label: 'nav.wishlist', Icon: Heart, end: false, isWishlist: true },
+  { to: '/cart', label: 'nav.cart', Icon: ShoppingBag, end: false, isCart: true },
+  { to: '/me', label: 'nav.account', Icon: User, end: false },
 ]
 
 /** Mobile-only bottom navigation */
@@ -24,7 +32,7 @@ export function BottomNav() {
 
   return (
     <nav
-      aria-label="التنقل السريع"
+      aria-label={t('nav.quick')}
       className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 backdrop-blur-lg lg:hidden shadow-lg pb-safe"
     >
       <ul className="mx-auto flex max-w-lg">
@@ -61,7 +69,7 @@ export function BottomNav() {
                       </span>
                     )}
                   </div>
-                  <span>{label}</span>
+                  <span>{t(label)}</span>
                 </>
               )}
             </NavLink>

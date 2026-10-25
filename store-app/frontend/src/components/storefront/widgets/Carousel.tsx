@@ -1,10 +1,11 @@
 import { ChevronRight } from 'lucide-react'
 import * as React from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from '@/lib/i18nRouter'
 
 import { renditionUrl } from '@/lib/images'
 import { cn } from '@/lib/utils'
 import type { BannerHeight, CarouselSlide, ImageMode, Widget, WidgetData } from '@/types/api'
+import { t } from '@/lib/i18n'
 
 /** Render one layout regardless of the screen — the builder's phone and
  * desktop previews. Unset on the storefront, where the screen decides. */
@@ -133,7 +134,7 @@ export function Carousel({ widget, priority = false, variant }: CarouselProps) {
             eager={priority && slideIndex === 0}
             mode={mode}
             variant={variant}
-            label={count > 1 ? `${slideIndex + 1} من ${count}` : undefined}
+            label={count > 1 ? t('carousel.position', { n: slideIndex + 1, count }) : undefined}
           />
         ))}
       </div>
@@ -143,8 +144,8 @@ export function Carousel({ widget, priority = false, variant }: CarouselProps) {
           {/* Arrows on a pointer screen only, shown on hover or keyboard
               focus; phones swipe. The chevron is mirrored with the document:
               "previous" points right in RTL. */}
-          <ControlButton className="start-3" label="الشريحة السابقة" onClick={() => go(-1)} towardsStart variant={variant} />
-          <ControlButton className="end-3" label="الشريحة التالية" onClick={() => go(1)} variant={variant} />
+          <ControlButton className="start-3" label={t('carousel.previous')} onClick={() => go(-1)} towardsStart variant={variant} />
+          <ControlButton className="end-3" label={t('carousel.next')} onClick={() => go(1)} variant={variant} />
           <div className="absolute inset-x-0 bottom-1 flex justify-center">
             {slides.map((_, dotIndex) => (
               <button
@@ -154,7 +155,7 @@ export function Carousel({ widget, priority = false, variant }: CarouselProps) {
                   setIndex(dotIndex)
                   setPaused(true)
                 }}
-                aria-label={`الشريحة ${dotIndex + 1}`}
+                aria-label={t('carousel.slide', { n: dotIndex + 1 })}
                 aria-current={dotIndex === index}
                 className="flex h-9 min-w-7 items-center justify-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               >

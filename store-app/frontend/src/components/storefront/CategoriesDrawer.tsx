@@ -18,8 +18,9 @@ import {
   User,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { Link, NavLink, useNavigate } from 'react-router-dom'
+import { Link, NavLink, useNavigate } from '@/lib/i18nRouter'
 
+import { LanguageSwitch } from '@/components/layout/LanguageSwitch'
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -39,6 +40,7 @@ import { useWishlistIds } from '@/lib/queries/wishlist'
 import { cn } from '@/lib/utils'
 import { useSiteText } from '@/lib/siteText'
 import { isAdminRole } from '@/types/api'
+import { t } from '@/lib/i18n'
 
 interface CategoriesDrawerProps {
   children?: React.ReactNode
@@ -82,7 +84,7 @@ export function CategoriesDrawer({ children }: CategoriesDrawerProps) {
           <button
             type="button"
             className="flex items-center gap-2 rounded-xl p-2 text-sm font-semibold transition-colors hover:bg-muted text-foreground"
-            aria-label="فتح القائمة الرئيسية"
+            aria-label={t('drawer.openMenu')}
           >
             <LayoutGrid className="size-5 text-primary" />
           </button>
@@ -90,7 +92,7 @@ export function CategoriesDrawer({ children }: CategoriesDrawerProps) {
       </SheetTrigger>
 
       <SheetContent
-        side="right"
+        side="start"
         className="w-[82vw] max-w-[340px] sm:max-w-md p-0 flex flex-col bg-card border-s border-border shadow-2xl z-50 overflow-hidden"
       >
         {/* Drawer Header */}
@@ -102,10 +104,10 @@ export function CategoriesDrawer({ children }: CategoriesDrawerProps) {
               </div>
               <div className="text-start">
                 <SheetTitle className="text-base font-extrabold text-foreground leading-tight">
-                  نسائم ليبيا
+                  {t('common.storeName')}
                 </SheetTitle>
                 <p className="text-[11px] text-muted-foreground font-semibold mt-0.5">
-                  دار العطور والجمال الفاخرة
+                  {t('drawer.tagline')}
                 </p>
               </div>
             </div>
@@ -117,7 +119,7 @@ export function CategoriesDrawer({ children }: CategoriesDrawerProps) {
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="ابحث عن عطر أو ماركة…"
+              placeholder={t('drawer.searchPlaceholder')}
               className="ps-10 h-10 rounded-xl bg-background border-border text-xs"
             />
           </form>
@@ -128,22 +130,22 @@ export function CategoriesDrawer({ children }: CategoriesDrawerProps) {
           {/* Main Primary Navigation Options */}
           <div className="space-y-1">
             <span className="text-[11px] font-bold text-muted-foreground px-3 uppercase tracking-wider block mb-1">
-              التسوق والاستكشاف
+              {t('drawer.shop')}
             </span>
 
-            <DrawerLink to="/" icon={Home} label="الرئيسية" onClick={() => setOpen(false)} />
-            <DrawerLink to="/products" icon={Sparkles} label="كل العطور والمنتجات" onClick={() => setOpen(false)} />
+            <DrawerLink to="/" icon={Home} label={t('drawer.home')} onClick={() => setOpen(false)} />
+            <DrawerLink to="/products" icon={Sparkles} label={t('drawer.allProducts')} onClick={() => setOpen(false)} />
             <DrawerLink
               to="/wishlist"
               icon={Heart}
-              label="قائمة المفضلة"
+              label={t('drawer.wishlist')}
               count={wishlistCount}
               onClick={() => setOpen(false)}
             />
             <DrawerLink
               to="/cart"
               icon={ShoppingBag}
-              label="سلة التسوّق"
+              label={t('drawer.cart')}
               count={cartCount}
               onClick={() => setOpen(false)}
             />
@@ -158,7 +160,7 @@ export function CategoriesDrawer({ children }: CategoriesDrawerProps) {
             >
               <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                 <Tag className="size-3.5 text-primary" />
-                <span>الماركات والعلامات التجارية ({categories.length})</span>
+                <span>{t('drawer.brandsCount', { n: categories.length })}</span>
               </span>
               <ChevronDown
                 className={cn('size-4 text-muted-foreground transition-transform duration-200', brandsOpen && 'rotate-180')}
@@ -173,7 +175,7 @@ export function CategoriesDrawer({ children }: CategoriesDrawerProps) {
                   ))
                 ) : filteredCategories.length === 0 ? (
                   <p className="col-span-2 text-xs text-muted-foreground text-center py-3">
-                    لا توجد ماركات مطابقة
+                    {t('drawer.noBrands')}
                   </p>
                 ) : (
                   filteredCategories.map((cat) => (
@@ -209,21 +211,21 @@ export function CategoriesDrawer({ children }: CategoriesDrawerProps) {
           {/* User Account & Orders Options */}
           <div className="space-y-1 border-t border-border/80 pt-4">
             <span className="text-[11px] font-bold text-muted-foreground px-3 uppercase tracking-wider block mb-1">
-              حسابي والطلبات
+              {t('drawer.account')}
             </span>
 
             {user ? (
               <>
-                <DrawerLink to="/me" icon={User} label={`حسابي (${user.name})`} onClick={() => setOpen(false)} />
-                <DrawerLink to="/me/orders" icon={Package} label="طلباتي ومشترياتي" onClick={() => setOpen(false)} />
-                <DrawerLink to="/me/addresses" icon={MapPin} label="عناويني المحفوظة" onClick={() => setOpen(false)} />
+                <DrawerLink to="/me" icon={User} label={t('drawer.accountName', { name: user.name })} onClick={() => setOpen(false)} />
+                <DrawerLink to="/me/orders" icon={Package} label={t('drawer.orders')} onClick={() => setOpen(false)} />
+                <DrawerLink to="/me/addresses" icon={MapPin} label={t('drawer.addresses')} onClick={() => setOpen(false)} />
               </>
             ) : (
               <DrawerLink
                 to="/login"
                 icon={LogIn}
-                label="تسجيل الدخول / إنشاء حساب"
-                badge="موصى به"
+                label={t('drawer.login')}
+                badge={t('drawer.recommended')}
                 badgeTone="primary"
                 onClick={() => setOpen(false)}
               />
@@ -233,21 +235,21 @@ export function CategoriesDrawer({ children }: CategoriesDrawerProps) {
           {/* Customer Service & WhatsApp */}
           <div className="space-y-2 border-t border-border/80 pt-4">
             <span className="text-[11px] font-bold text-muted-foreground px-3 uppercase tracking-wider block mb-1">
-              خدمة العملاء والتوصيل
+              {t('drawer.support')}
             </span>
 
             {storeSettings?.whatsapp ? (
               <a
-                href={whatsappUrl(storeSettings?.whatsapp, 'مرحباً، أود الاستفسار عن المنتجات والطلبات في نسائم ليبيا')}
+                href={whatsappUrl(storeSettings?.whatsapp, t('drawer.whatsappMessage'))}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center justify-between rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs font-bold text-emerald-800 dark:text-emerald-300 hover:bg-emerald-500/20 transition-all shadow-2xs"
               >
                 <div className="flex items-center gap-2.5">
                   <MessageCircle className="size-4 text-emerald-600 dark:text-emerald-400" />
-                  <span>تواصل مع الدعم عبر واتساب</span>
+                  <span>{t('drawer.whatsapp')}</span>
                 </div>
-                <ArrowLeft className="size-3.5 rtl:rotate-0" />
+                <ArrowLeft className="size-3.5 ltr:-scale-x-100" />
               </a>
             ) : null}
 
@@ -263,8 +265,9 @@ export function CategoriesDrawer({ children }: CategoriesDrawerProps) {
         {/* Drawer Footer & Theme Toggle */}
         <div className="border-t border-border p-4 bg-muted/20 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-muted-foreground">المظهر:</span>
+            <span className="text-xs font-semibold text-muted-foreground">{t('drawer.appearance')}</span>
             <ThemeToggle />
+            <LanguageSwitch onSwitched={() => setOpen(false)} />
           </div>
 
           {isAdminRole(user?.role) && (
@@ -274,7 +277,7 @@ export function CategoriesDrawer({ children }: CategoriesDrawerProps) {
               className="inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/20 transition-all shadow-2xs"
             >
               <LayoutDashboard className="size-3.5" />
-              <span>لوحة الإدارة</span>
+              <span>{t('drawer.dashboard')}</span>
             </Link>
           )}
         </div>
@@ -329,7 +332,7 @@ function DrawerLink({
             {badge}
           </Badge>
         )}
-        <ChevronLeft className="size-4 rtl:rotate-0 text-muted-foreground/60" />
+        <ChevronLeft className="size-4 ltr:-scale-x-100 text-muted-foreground/60" />
       </div>
     </NavLink>
   )

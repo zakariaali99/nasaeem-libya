@@ -14,15 +14,22 @@
       href="/fonts/cairo-arabic.woff2"
       crossorigin
     />
-    <script type="module" crossorigin src="/assets/index-BA9-9NXk.js"></script>
-    <link rel="modulepreload" crossorigin href="/assets/react-BIH3SDKl.js">
-    <link rel="modulepreload" crossorigin href="/assets/query-CSHf4M1E.js">
-    <link rel="modulepreload" crossorigin href="/assets/vendor-DM2CKYlk.js">
-    <link rel="modulepreload" crossorigin href="/assets/radix-C-ZkR6da.js">
-    <link rel="modulepreload" crossorigin href="/assets/icons-BXcXxnHg.js">
-    <link rel="stylesheet" crossorigin href="/assets/index-BFqdyLzB.css">
+    <script type="module" crossorigin src="/assets/index-BJ8SwzF0.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/react-3y-dyNal.js">
+    <link rel="modulepreload" crossorigin href="/assets/query-CikOP4DV.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-CVrvj3hB.js">
+    <link rel="modulepreload" crossorigin href="/assets/radix-yHU08sg4.js">
+    <link rel="modulepreload" crossorigin href="/assets/icons-BlVKNpVz.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-D50m100v.css">
   </head>
   <body>
+    <script>
+      // An English address is set left-to-right before anything paints.
+      if (/^\/en(\/|$)/.test(location.pathname)) {
+        document.documentElement.lang = 'en'
+        document.documentElement.dir = 'ltr'
+      }
+    </script>
     <script>
       /*
        * Product-page priming. Measured, not guessed: Lighthouse put 4,776 ms of
@@ -38,7 +45,7 @@
        * owns every response — it adopts this promise rather than re-requesting.
        */
       (function () {
-        var match = location.pathname.match(/^\/products\/([^/]+)\/?$/)
+        var match = location.pathname.match(/^(?:\/en)?\/products\/([^/]+)\/?$/)
         if (!match) return
         var url = '/api/products/' + match[1] + '/'
         window.__nasaimPreload = {

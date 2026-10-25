@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import type { ProductImage as ProductImageType } from '@/types/api'
+import { t } from '@/lib/i18n'
 
 export interface ProductGalleryProps {
   images: ProductImageType[]
@@ -89,7 +90,7 @@ export function ProductGallery({ images, productName }: ProductGalleryProps) {
     return (
       <div className="flex aspect-square w-full items-center justify-center rounded-lg bg-muted text-muted-foreground">
         <ImageOff className="size-12" aria-hidden="true" />
-        <span className="sr-only">لا توجد صور لهذا المنتج</span>
+        <span className="sr-only">{t('product.noImages')}</span>
       </div>
     )
   }
@@ -106,7 +107,7 @@ export function ProductGallery({ images, productName }: ProductGalleryProps) {
             className="flex w-full snap-x snap-mandatory overflow-x-auto overscroll-x-contain rounded-3xl bg-white dark:bg-card/40 border border-border/80 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             /* A listbox of images: arrow keys move it, and the label names it. */
             role="listbox"
-            aria-label={`صور ${productName}`}
+            aria-label={t('gallery.label', { name: productName })}
             tabIndex={0}
             onKeyDown={(event) => {
               if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
@@ -133,7 +134,7 @@ export function ProductGallery({ images, productName }: ProductGalleryProps) {
                   className="w-full shrink-0 snap-center flex items-center justify-center p-4 sm:p-6"
                   role="option"
                   aria-selected={index === selected}
-                  aria-label={`${image.alt_text || productName} — ${index + 1} من ${images.length}`}
+                  aria-label={t('gallery.position', { name: image.alt_text || productName, n: index + 1, count: images.length })}
                 >
                   <img
                     src={image.renditions?.medium || image.url}
@@ -157,7 +158,7 @@ export function ProductGallery({ images, productName }: ProductGalleryProps) {
           <DialogTrigger asChild>
             <button
               type="button"
-              aria-label="تكبير الصورة"
+              aria-label={t('gallery.zoom')}
               className="absolute end-3 bottom-3 inline-flex size-11 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             >
               <ZoomIn className="size-5" aria-hidden="true" />
@@ -197,7 +198,7 @@ export function ProductGallery({ images, productName }: ProductGalleryProps) {
               <button
                 type="button"
                 onClick={() => scrollTo(index)}
-                aria-label={`عرض الصورة ${index + 1}`}
+                aria-label={t('gallery.show', { n: index + 1 })}
                 aria-current={index === selected}
                 className={cn(
                   'block size-16 shrink-0 overflow-hidden rounded-xl border-2 bg-white dark:bg-card/40 p-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',

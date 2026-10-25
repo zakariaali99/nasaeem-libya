@@ -8,12 +8,14 @@ import {
   User,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
+import { Link, useNavigate } from '@/lib/i18nRouter'
 
 import { CartDrawer } from '@/components/storefront/CartDrawer'
 import { CategoriesDrawer } from '@/components/storefront/CategoriesDrawer'
 import { FragranceFinderQuizModal } from '@/components/storefront/FragranceFinderQuizModal'
 import { InstantSearchModal } from '@/components/storefront/InstantSearchModal'
+import { LanguageSwitch } from '@/components/layout/LanguageSwitch'
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
 import { formatNumber } from '@/lib/format'
 import { useMe } from '@/lib/queries/auth'
@@ -22,6 +24,7 @@ import { useWishlistIds } from '@/lib/queries/wishlist'
 import { cn } from '@/lib/utils'
 import { useSiteText } from '@/lib/siteText'
 import { isAdminRole } from '@/types/api'
+import { t } from '@/lib/i18n'
 
 export function Header() {
   const tagline = useSiteText()('header.tagline')
@@ -53,7 +56,9 @@ export function Header() {
         )}
       >
         {/* Main Top Header Bar */}
-        <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-2.5 sm:py-3">
+        {/* The English name is wider than the Arabic one: on an English phone the
+            row is a little tighter so the cart button keeps its place. */}
+        <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-2.5 sm:py-3 ltr:max-sm:gap-2">
           {/* Mobile Search Overlay */}
           {mobileSearchOpen ? (
             <div className="flex w-full items-center gap-2 lg:hidden animate-fade-rise">
@@ -65,7 +70,7 @@ export function Header() {
                 onClick={() => setMobileSearchOpen(false)}
                 className="px-3 py-2 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors"
               >
-                إلغاء
+                {t('common.cancel')}
               </button>
             </div>
           ) : (
@@ -74,7 +79,7 @@ export function Header() {
                 <button
                   type="button"
                   className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl text-foreground hover:bg-muted/70 focus-visible:outline-2 focus-visible:outline-ring transition-colors"
-                  aria-label="فتح قائمة التصنيفات"
+                  aria-label={t('header.openCategories')}
                 >
                   <Menu className="size-5" aria-hidden="true" />
                 </button>
@@ -84,17 +89,17 @@ export function Header() {
               <Link
                 to="/"
                 viewTransition
-                className="flex min-h-11 shrink-0 items-center gap-2.5 rounded-xl focus-visible:outline-2 focus-visible:outline-ring group"
+                className="flex min-h-11 min-w-0 items-center gap-2.5 ltr:max-sm:gap-2 rounded-xl focus-visible:outline-2 focus-visible:outline-ring group"
               >
                 <div className="flex size-9 items-center justify-center rounded-xl bg-primary/10 border border-primary/20 shadow-2xs group-hover:border-primary/50 transition-all">
                   <img src="/brand/logo.svg" alt="" width={24} height={24} className="size-6 transition-transform group-hover:scale-105" />
                 </div>
-                <div className="flex flex-col">
-                  <span className="font-display text-lg sm:text-xl font-extrabold tracking-wide text-foreground leading-none">
-                    نسائم ليبيا
+                <div className="flex min-w-0 flex-col">
+                  <span className="whitespace-nowrap font-display text-lg sm:text-xl ltr:max-sm:text-base font-extrabold tracking-wide ltr:max-sm:tracking-normal text-foreground leading-none">
+                    {t('common.storeName')}
                   </span>
                   {tagline && (
-                    <span className="text-[10px] text-muted-foreground font-semibold tracking-wider">{tagline}</span>
+                    <span className="truncate text-[10px] text-muted-foreground font-semibold tracking-wider">{tagline}</span>
                   )}
                 </div>
               </Link>
@@ -110,17 +115,17 @@ export function Header() {
               </div>
 
               {/* Right Action Icons */}
-              <nav className="ms-auto flex items-center gap-1 sm:gap-1.5" aria-label="حسابي وسلتي">
+              <nav className="ms-auto flex items-center gap-1 sm:gap-1.5" aria-label={t('header.accountNav')}>
                 {/* AI Fragrance Finder Trigger Button */}
                 <button
                   type="button"
                   onClick={() => setQuizOpen(true)}
                   className="inline-flex items-center gap-1 sm:gap-1.5 rounded-xl border border-primary/40 bg-primary/10 px-2.5 sm:px-3 py-1.5 text-xs font-black text-primary hover:bg-primary/20 transition-all shadow-2xs min-h-11"
-                  aria-label="مرشد العطور: ساعدني في اختيار عطر"
-                  title="مرشد العطور"
+                  aria-label={t('header.finderLabel')}
+                  title={t('header.finder')}
                 >
                   <Compass className="size-4" aria-hidden="true" />
-                  <span className="hidden sm:inline">مرشد العطور</span>
+                  <span className="hidden sm:inline">{t('header.finder')}</span>
                 </button>
 
                 {/* Admin quick switch if logged in as staff */}
@@ -128,12 +133,15 @@ export function Header() {
                   <Link
                     to="/admin"
                     className="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/20 transition-all shadow-2xs min-h-11"
-                    title="الانتقال للوحة التحكم"
+                    title={t('header.toDashboard')}
                   >
                     <LayoutDashboard className="size-3.5" />
-                    <span>لوحة الإدارة</span>
+                    <span>{t('header.dashboard')}</span>
                   </Link>
                 )}
+
+                {/* On phones the switch sits in the side menu: the header has no room. */}
+                <LanguageSwitch className="hidden sm:inline-flex" />
 
                 <div className="hidden sm:flex">
                   <ThemeToggle />
@@ -144,7 +152,7 @@ export function Header() {
                   type="button"
                   onClick={() => setSearchModalOpen(true)}
                   className="inline-flex size-11 items-center justify-center rounded-xl text-foreground hover:bg-muted/70 lg:hidden transition-colors"
-                  aria-label="البحث"
+                  aria-label={t('header.search')}
                 >
                   <Search className="size-5" aria-hidden="true" />
                 </button>
@@ -153,8 +161,8 @@ export function Header() {
               <Link
                 to="/wishlist"
                 viewTransition
-                aria-label={wishlistCount > 0 ? `المفضلة — ${wishlistCount} عنصر` : 'قائمة المفضلة'}
-                title="قائمة المفضلة"
+                aria-label={wishlistCount > 0 ? t('header.wishlistCount', { n: wishlistCount }) : t('header.wishlist')}
+                title={t('header.wishlist')}
                 className="relative hidden sm:inline-flex size-11 items-center justify-center rounded-xl text-foreground transition-colors hover:bg-muted/70 focus-visible:outline-2 focus-visible:outline-ring"
               >
                 <Heart className="size-5 text-muted-foreground hover:text-rose-500 transition-colors" aria-hidden="true" />
@@ -171,7 +179,7 @@ export function Header() {
 
               {/* Account Link */}
               <div className="hidden sm:inline-flex">
-                <IconLink to={user ? '/me' : '/login'} label={user ? 'حسابي' : 'تسجيل الدخول'}>
+                <IconLink to={user ? '/me' : '/login'} label={user ? t('header.account') : t('header.login')}>
                   <User className="size-5" aria-hidden="true" />
                 </IconLink>
               </div>
@@ -180,7 +188,7 @@ export function Header() {
               <CartDrawer>
                 <button
                   type="button"
-                  aria-label={cartCount > 0 ? `سلة التسوّق — ${cartCount} عنصر` : 'سلة التسوّق'}
+                  aria-label={cartCount > 0 ? t('header.cartCount', { n: cartCount }) : t('header.cart')}
                   className="relative inline-flex size-11 items-center justify-center rounded-xl text-foreground transition-colors hover:bg-muted/70 focus-visible:outline-2 focus-visible:outline-ring"
                 >
                   <ShoppingBag className="size-5 text-foreground" aria-hidden="true" />
@@ -264,7 +272,7 @@ export function SearchBox({
       }}
     >
       <label htmlFor="site-search" className="sr-only">
-        ابحث عن عطر أو ماركة
+        {t('header.searchLabel')}
       </label>
       <input
         id="site-search"
@@ -274,12 +282,12 @@ export function SearchBox({
         value={term}
         autoFocus={autoFocus}
         onChange={(event) => setTerm(event.target.value)}
-        placeholder="ابحث عن عطر، زيت عطري، أو ماركة فاخرة…"
+        placeholder={t('header.searchPlaceholder')}
         className="h-10 w-full rounded-full border border-input bg-card pe-4 ps-10 text-xs sm:text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring shadow-2xs transition-all focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
       />
       <button
         type="submit"
-        aria-label="ابحث"
+        aria-label={t('header.searchSubmit')}
         className="absolute start-0 inline-flex size-10 items-center justify-center rounded-full text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
       >
         <Search className="size-4 text-primary" aria-hidden="true" />

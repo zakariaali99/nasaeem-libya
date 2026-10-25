@@ -1,12 +1,14 @@
 import { useEffect } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
+import { Link, useNavigate } from '@/lib/i18nRouter'
 import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { usePaymentRedirect } from '@/lib/queries/payments'
 import { usePageTitle } from '@/lib/usePageTitle'
+import { t } from '@/lib/i18n'
 
 export default function CheckoutRedirectPage() {
-  usePageTitle('التحقق من الدفع')
+  usePageTitle(t('redirect.title'))
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
 
@@ -23,10 +25,10 @@ export default function CheckoutRedirectPage() {
   if (!orderId) {
     return (
       <div className="mx-auto max-w-lg px-4 py-16 text-center space-y-4">
-        <h1 className="text-2xl font-bold text-foreground">بيانات الدفع غير مكتملة</h1>
-        <Alert tone="error">لم يتم العثور على معرّف الطلب للتحقق من عملية الدفع.</Alert>
+        <h1 className="text-2xl font-bold text-foreground">{t('redirect.incomplete')}</h1>
+        <Alert tone="error">{t('redirect.noOrder')}</Alert>
         <Button asChild>
-          <Link to="/cart">العودة إلى السلة</Link>
+          <Link to="/cart">{t('redirect.backToCart')}</Link>
         </Button>
       </div>
     )
@@ -37,9 +39,9 @@ export default function CheckoutRedirectPage() {
       <div className="mx-auto max-w-lg px-4 py-20 text-center space-y-6">
         <div className="mx-auto size-12 animate-spin rounded-full border-4 border-border border-t-primary" />
         <div className="space-y-2">
-          <h1 className="text-2xl font-bold text-foreground">جارٍ تأكيد عملية الدفع…</h1>
+          <h1 className="text-2xl font-bold text-foreground">{t('redirect.checking')}</h1>
           <p className="text-sm text-muted-foreground">
-            يرجى الانتظار بينما نتحقق من استلام الدفعة وتأكيد طلبك مع المصرف.
+            {t('redirect.wait')}
           </p>
         </div>
       </div>
@@ -49,16 +51,16 @@ export default function CheckoutRedirectPage() {
   if (isError || data?.order_status === 'failed' || data?.order_status === 'cancelled') {
     return (
       <div className="mx-auto max-w-lg px-4 py-16 text-center space-y-6">
-        <h1 className="text-2xl font-bold text-destructive">تعذّر تأكيد عملية الدفع</h1>
+        <h1 className="text-2xl font-bold text-destructive">{t('redirect.failed')}</h1>
         <Alert tone="error">
-          {data?.message || 'لم تكتمل عملية الدفع أو تم إلغاؤها من قبل المستخدم.'}
+          {data?.message || t('redirect.failedText')}
         </Alert>
         <div className="flex justify-center gap-3">
           <Button asChild variant="outline">
-            <Link to="/cart">العودة إلى السلة</Link>
+            <Link to="/cart">{t('redirect.backToCart')}</Link>
           </Button>
           <Button asChild>
-            <Link to={`/checkout/${orderId}`}>إعادة المحاولة</Link>
+            <Link to={`/checkout/${orderId}`}>{t('common.retry')}</Link>
           </Button>
         </div>
       </div>

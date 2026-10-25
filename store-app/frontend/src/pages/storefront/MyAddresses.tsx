@@ -17,9 +17,10 @@ import {
   useSaveAddress,
 } from '@/lib/queries/orders'
 import type { Address } from '@/types/api'
+import { t } from '@/lib/i18n'
 
 export default function MyAddresses() {
-  usePageTitle('عناويني')
+  usePageTitle(t('addresses.title'))
   const { data: addresses, isPending } = useAddresses()
   const [editing, setEditing] = useState<Address | null>(null)
   const [creating, setCreating] = useState(false)
@@ -29,12 +30,12 @@ export default function MyAddresses() {
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-8">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">عناويني</h1>
-        <Button size="sm" onClick={() => { setEditing(null); setCreating(true) }}>إضافة عنوان</Button>
+        <h1 className="text-2xl font-bold">{t('addresses.title')}</h1>
+        <Button size="sm" onClick={() => { setEditing(null); setCreating(true) }}>{t('addresses.add')}</Button>
       </div>
 
       {(addresses ?? []).length === 0 && !creating ? (
-        <EmptyState title="لا توجد عناوين محفوظة" description="احفظ عنوانك مرة واحدة لتختاره بنقرة عند إتمام الطلب." />
+        <EmptyState title={t('addresses.emptyTitle')} description={t('addresses.emptyText')} />
       ) : (
         <ul className="space-y-3">
           {(addresses ?? []).map((address) => (
@@ -44,13 +45,13 @@ export default function MyAddresses() {
                   <p className="font-semibold">
                     {[address.city_name, address.region_name].filter(Boolean).join(' — ')}
                     {address.is_default && (
-                      <span className="ms-2 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">الافتراضي</span>
+                      <span className="ms-2 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">{t('addresses.default')}</span>
                     )}
                   </p>
                   <p className="mt-1 text-muted-foreground">{address.address}</p>
                 </div>
                 <div className="flex shrink-0 gap-2">
-                  <Button variant="outline" size="sm" onClick={() => { setCreating(false); setEditing(address) }}>تعديل</Button>
+                  <Button variant="outline" size="sm" onClick={() => { setCreating(false); setEditing(address) }}>{t('addresses.edit')}</Button>
                   <DeleteButton id={address.id} />
                 </div>
               </div>
@@ -77,9 +78,9 @@ function DeleteButton({ id }: { id: string }) {
       variant="outline"
       size="sm"
       loading={remove.isPending}
-      onClick={() => { if (window.confirm('حذف هذا العنوان؟')) remove.mutate(id) }}
+      onClick={() => { if (window.confirm(t('addresses.confirmDelete'))) remove.mutate(id) }}
     >
-      حذف
+      {t('addresses.delete')}
     </Button>
   )
 }
@@ -99,21 +100,21 @@ function AddressForm({ address, onDone }: { address: Address | null; onDone: () 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
     setError(null)
-    if (!cityId) return setError('اختر المدينة')
-    if (!text.trim()) return setError('اكتب العنوان بالتفصيل')
+    if (!cityId) return setError(t('addresses.chooseCity'))
+    if (!text.trim()) return setError(t('addresses.writeAddress'))
     try {
       // The region is optional: most cities have none defined, and requiring
       // one made the form impossible to submit for them.
       await save.mutateAsync({ city: cityId, region: regionId || null, address: text.trim(), is_default: isDefault })
       onDone()
     } catch (failure) {
-      setError(failure instanceof ApiError ? failure.message : 'تعذّر حفظ العنوان، حاول مرة أخرى')
+      setError(failure instanceof ApiError ? failure.message : t('addresses.saveFailed'))
     }
   }
 
   return (
     <form onSubmit={submit} noValidate className="mt-6 space-y-4 rounded-lg border border-border bg-card p-4">
-      <Field label="المدينة" id="addr-city">
+      <Field label={t('addresses.city')} id="addr-city">
         {(props) => (
           <Select
             {...props}
@@ -121,16 +122,16 @@ function AddressForm({ address, onDone }: { address: Address | null; onDone: () 
             onChange={(e) => { setCityId(e.target.value); setRegionId('') }}
             required
           >
-            <option value="">اختر المدينة</option>
+            <option value="">{t('addresses.chooseCity')}</option>
             {cities.map((city) => <option key={city.id} value={city.id}>{city.name}</option>)}
           </Select>
         )}
       </Field>
       {regions.length > 0 ? (
-        <Field label="المنطقة (اختياري)" id="addr-region">
+        <Field label={t('addresses.region')} id="addr-region">
           {(props) => (
             <Select {...props} value={regionId} onChange={(e) => setRegionId(e.target.value)}>
-              <option value="">كل مناطق المدينة</option>
+              <option value="">{t('addresses.allRegions')}</option>
               {regions.map((region) => (
                 <option key={region.id} value={region.id}>{region.name}{FEATURES.shipping ? ` — ${formatPrice(region.delivery_fee)}` : ''}</option>
               ))}
@@ -138,26 +139,26 @@ function AddressForm({ address, onDone }: { address: Address | null; onDone: () 
           )}
         </Field>
       ) : null}
-      <Field label="العنوان بالتفصيل" id="addr-text">
+      <Field label={t('addresses.address')} id="addr-text">
         {(props) => (
           <Textarea
             {...props}
             rows={3}
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="الشارع، أقرب نقطة دالة، رقم المنزل…"
+            placeholder={t('addresses.placeholder')}
             required
           />
         )}
       </Field>
       <label className="flex min-h-11 items-center gap-2 text-sm">
         <input type="checkbox" className="size-4 accent-primary" checked={isDefault} onChange={(e) => setIsDefault(e.target.checked)} />
-        تعيين كعنوان افتراضي
+        {t('addresses.makeDefault')}
       </label>
       {error ? <p role="alert" className="text-sm font-semibold text-destructive">{error}</p> : null}
       <div className="flex gap-2">
-        <Button type="submit" loading={save.isPending}>حفظ</Button>
-        <Button type="button" variant="outline" onClick={onDone}>إلغاء</Button>
+        <Button type="submit" loading={save.isPending}>{t('addresses.save')}</Button>
+        <Button type="button" variant="outline" onClick={onDone}>{t('common.cancel')}</Button>
       </div>
     </form>
   )

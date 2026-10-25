@@ -5,6 +5,8 @@
  * session credentials, CSRF and Arabic error handling in a single place.
  */
 
+import { t } from '@/lib/i18n'
+
 export interface ApiMeta {
   page: number
   limit: number
@@ -38,8 +40,6 @@ export class ApiError extends Error {
   }
 }
 
-const NETWORK_ERROR = 'تعذّر الاتصال بالخادم، تحقّق من اتصالك بالإنترنت'
-const UNKNOWN_ERROR = 'حدث خطأ غير متوقع، يرجى المحاولة لاحقاً'
 
 const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
@@ -79,7 +79,7 @@ function buildUrl(path: string, params?: RequestOptions['params']): string {
 }
 
 async function parseError(response: Response): Promise<ApiError> {
-  let message = UNKNOWN_ERROR
+  let message = t('api.unknown')
   let errors: FieldErrors | undefined
 
   try {
@@ -165,7 +165,7 @@ export async function request<T>(
       body: body === undefined ? undefined : isFormData ? body : JSON.stringify(body),
     })
   } catch {
-    throw new ApiError(0, NETWORK_ERROR)
+    throw new ApiError(0, t('api.network'))
   }
 
   if (response.status === 204) {
@@ -183,7 +183,7 @@ export async function request<T>(
     // A 2xx with a non-JSON body (a proxy interposing an HTML page) is not a
     // result the caller can use — surface it as an ApiError, not a raw
     // SyntaxError that bypasses every error branch.
-    throw new ApiError(response.status, UNKNOWN_ERROR)
+    throw new ApiError(response.status, t('api.unknown'))
   }
   // The server always wraps in {data}. Tolerate a bare payload so a single
   // non-conforming endpoint degrades instead of throwing.

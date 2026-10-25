@@ -1,7 +1,7 @@
 import { SlidersHorizontal, X } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from '@/lib/i18nRouter'
 
 import { EmptyState } from '@/components/storefront/EmptyState'
 import { ErrorState } from '@/components/storefront/ErrorState'
@@ -14,12 +14,13 @@ import { formatNumber } from '@/lib/format'
 import { useCategories, useCollections, useProducts } from '@/lib/queries/catalog'
 import { useUrlState } from '@/lib/useUrlState'
 import { cn } from '@/lib/utils'
+import { t } from '@/lib/i18n'
 
 export const SORT_OPTIONS = [
-  { value: 'newest', label: 'الأحدث' },
-  { value: 'price_asc', label: 'السعر: من الأقل' },
-  { value: 'price_desc', label: 'السعر: من الأعلى' },
-  { value: 'name', label: 'الاسم' },
+  { value: 'newest', label: 'listing.newest' },
+  { value: 'price_asc', label: 'listing.priceAsc' },
+  { value: 'price_desc', label: 'listing.priceDesc' },
+  { value: 'name', label: 'listing.name' },
 ] as const
 
 export interface ProductListingProps {
@@ -46,8 +47,8 @@ export function ProductListing({
   description,
   fixedParams = {},
   showFacets = true,
-  emptyTitle = 'لا توجد منتجات مطابقة',
-  emptyDescription = 'جرّب تعديل عوامل التصفية أو تصفّح كل المنتجات.',
+  emptyTitle = t('listing.emptyTitle'),
+  emptyDescription = t('listing.emptyText'),
 }: ProductListingProps) {
   const { get, set } = useUrlState({ sort: 'newest', page: '1' })
   const [filtersOpen, setFiltersOpen] = useState(false)
@@ -88,7 +89,7 @@ export function ProductListing({
         {description ? <div className="text-sm text-muted-foreground">{description}</div> : null}
         {meta ? (
           <p className="text-sm text-muted-foreground" aria-live="polite">
-            {formatNumber(meta.total)} منتج
+            {t('listing.count', { n: formatNumber(meta.total) })}
           </p>
         ) : null}
       </div>
@@ -101,7 +102,7 @@ export function ProductListing({
           aria-controls="product-filters"
         >
           <SlidersHorizontal aria-hidden="true" />
-          تصفية
+          {t('listing.filter')}
           {activeFilters > 0 ? (
             <span className="inline-flex size-6 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">
               {formatNumber(activeFilters)}
@@ -111,7 +112,7 @@ export function ProductListing({
 
         <div className="ms-auto flex items-center gap-2">
           <label htmlFor="sort" className="text-sm text-muted-foreground">
-            ترتيب
+            {t('listing.sort')}
           </label>
           <Select
             id="sort"
@@ -121,7 +122,7 @@ export function ProductListing({
           >
             {SORT_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
-                {option.label}
+                {t(option.label)}
               </option>
             ))}
           </Select>
@@ -137,7 +138,7 @@ export function ProductListing({
       >
         {showFacets ? <FacetPickers get={get} set={set} /> : null}
 
-        <Field label="أقل سعر" htmlFor="min_price">
+        <Field label={t('listing.minPrice')} htmlFor="min_price">
           <Input
             id="min_price"
             type="number"
@@ -148,7 +149,7 @@ export function ProductListing({
           />
         </Field>
 
-        <Field label="أعلى سعر" htmlFor="max_price">
+        <Field label={t('listing.maxPrice')} htmlFor="max_price">
           <Input
             id="max_price"
             type="number"
@@ -167,7 +168,7 @@ export function ProductListing({
               checked={get('in_stock') === 'true'}
               onChange={(event) => set({ in_stock: event.target.checked ? 'true' : '' })}
             />
-            المتوفر فقط
+            {t('listing.inStockOnly')}
           </label>
           {activeFilters > 0 ? (
             <Button
@@ -183,7 +184,7 @@ export function ProductListing({
               }
             >
               <X aria-hidden="true" />
-              مسح الكل
+              {t('listing.clearAll')}
             </Button>
           ) : null}
         </div>
@@ -192,7 +193,7 @@ export function ProductListing({
       {isPending ? (
         <>
           <span className="sr-only" role="status">
-            جارٍ تحميل المنتجات…
+            {t('listing.loading')}
           </span>
           <ProductGridSkeleton />
         </>
@@ -204,7 +205,7 @@ export function ProductListing({
           description={emptyDescription}
           action={
             <Button asChild variant="outline">
-              <Link to="/products">تصفّح كل المنتجات</Link>
+              <Link to="/products">{t('listing.browseAll')}</Link>
             </Button>
           }
         />
@@ -241,13 +242,13 @@ function FacetPickers({
 
   return (
     <>
-      <Field label="التصنيف" htmlFor="category">
+      <Field label={t('listing.category')} htmlFor="category">
         <Select
           id="category"
           value={get('category')}
           onChange={(event) => set({ category: event.target.value })}
         >
-          <option value="">كل التصنيفات</option>
+          <option value="">{t('listing.allCategories')}</option>
           {(categories ?? []).map((category) => (
             <option key={category.id} value={category.slug}>
               {category.name}
@@ -256,13 +257,13 @@ function FacetPickers({
         </Select>
       </Field>
 
-      <Field label="المجموعة" htmlFor="collection">
+      <Field label={t('listing.collection')} htmlFor="collection">
         <Select
           id="collection"
           value={get('collection')}
           onChange={(event) => set({ collection: event.target.value })}
         >
-          <option value="">كل المجموعات</option>
+          <option value="">{t('listing.allCollections')}</option>
           {(collections ?? []).map((collection) => (
             <option key={collection.id} value={collection.slug}>
               {collection.name}

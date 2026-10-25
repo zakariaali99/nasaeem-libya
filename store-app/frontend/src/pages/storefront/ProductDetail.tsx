@@ -1,6 +1,7 @@
 import { Heart, Share2, ShoppingBag } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
+import { Link } from '@/lib/i18nRouter'
 
 import { DiscoveryBoxBanner } from '@/components/storefront/DiscoveryBoxBanner'
 import { EmptyState } from '@/components/storefront/EmptyState'
@@ -37,6 +38,7 @@ import { usePageTitle } from '@/lib/usePageTitle'
 import { FEATURES } from '@/lib/features'
 import { formatPrice } from '@/lib/format'
 import type { Product, ProductVariant } from '@/types/api'
+import { t } from '@/lib/i18n'
 
 export default function ProductDetailPage() {
   const { productSlug = '' } = useParams()
@@ -49,7 +51,7 @@ export default function ProductDetailPage() {
   }, [product?.id])
 
   usePageTitle(
-    product?.meta_title || product?.name || 'المنتج',
+    product?.meta_title || product?.name || t('pdp.fallbackTitle'),
     product?.meta_description || product?.description?.slice(0, 160),
   )
 
@@ -59,14 +61,14 @@ export default function ProductDetailPage() {
     const notFound = error instanceof ApiError && error.status === 404
     return (
       <div className="mx-auto w-full max-w-3xl px-4 py-16">
-        <h1 className="sr-only">{notFound ? 'المنتج غير موجود' : 'تعذّر تحميل المنتج'}</h1>
+        <h1 className="sr-only">{notFound ? t('pdp.notFound') : t('pdp.loadFailed')}</h1>
         {notFound ? (
           <EmptyState
-            title="المنتج غير موجود"
-            description="ربما تم حذفه أو تغيّر رابطه."
+            title={t('pdp.notFound')}
+            description={t('pdp.notFoundText')}
             action={
               <Button asChild>
-                <Link to="/products">تصفّح كل المنتجات</Link>
+                <Link to="/products">{t('listing.browseAll')}</Link>
               </Button>
             }
           />
@@ -168,16 +170,16 @@ function ProductView({
 
   const canAdd = inStock && !needsChoice && !addToCart.isPending
   const addLabel = needsChoice
-    ? `اختر ${groups.map((group) => group.name).join(' و')}`
+    ? t('pdp.choose', { names: groups.map((group) => group.name).join(t('common.and')) })
     : !inStock
-      ? 'غير متوفر حالياً'
+      ? t('stock.out')
       : severalPicked
-        ? `أضف ${picked.length} أحجام إلى السلة`
-        : 'أضف إلى السلة'
+        ? t('pdp.addSizes', { n: picked.length })
+        : t('pdp.addToCart')
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6">
-      <nav aria-label="مسار التصفح" className="mb-4 text-sm text-muted-foreground">
+      <nav aria-label={t('pdp.breadcrumb')} className="mb-4 text-sm text-muted-foreground">
         <ol className="-my-2 flex flex-wrap items-center gap-1">
           <li>
             <Link
@@ -185,7 +187,7 @@ function ProductView({
               viewTransition
               className="inline-flex min-h-11 items-center rounded px-2 transition-colors hover:text-foreground"
             >
-              الرئيسية
+              {t('common.home')}
             </Link>
           </li>
           <li aria-hidden="true">/</li>
@@ -195,7 +197,7 @@ function ProductView({
               viewTransition
               className="inline-flex min-h-11 items-center rounded px-2 transition-colors hover:text-foreground"
             >
-              المنتجات
+              {t('nav.products')}
             </Link>
           </li>
           {product.categories?.[0] ? (
@@ -223,7 +225,7 @@ function ProductView({
             <h1 className="text-2xl font-bold leading-snug sm:text-3xl">{product.name}</h1>
             {product.sku ? (
               <p className="text-sm text-muted-foreground">
-                رمز المنتج: <span className="tabular-nums">{variant?.sku || product.sku}</span>
+                {t('pdp.sku')} <span className="tabular-nums">{variant?.sku || product.sku}</span>
               </p>
             ) : null}
           </div>
@@ -260,14 +262,14 @@ function ProductView({
                 </li>
               ))}
               <li className="text-xs text-muted-foreground pt-1">
-                يُضاف كل حجم كسطر منفصل في السلة، بالكمية المختارة.
+                {t('pdp.eachSizeLine')}
               </li>
             </ul>
           ) : null}
 
           {needsChoice ? (
             <p className="text-sm text-muted-foreground" role="status">
-              اختر {groups.map((group) => group.name).join(' و')} لعرض السعر والتوفر بدقة.
+              {t('pdp.chooseToSee', { names: groups.map((group) => group.name).join(t('common.and')) })}
             </p>
           ) : null}
 
@@ -296,9 +298,9 @@ function ProductView({
             // fade-rise: purposeful state-change feedback, not decoration.
             <div className="animate-fade-rise">
               <Alert tone="success" role="status">
-                تمت الإضافة إلى السلة بنجاح.{' '}
+                {t('pdp.added')}{' '}
                 <Link to="/cart" className="font-semibold underline">
-                  عرض سلة المشتريات
+                  {t('pdp.viewCart')}
                 </Link>
               </Alert>
             </div>
@@ -308,7 +310,7 @@ function ProductView({
             <Alert tone="error" role="alert">
               {addToCart.error instanceof ApiError
                 ? addToCart.error.message
-                : 'تعذّرت الإضافة إلى السلة'}
+                : t('pdp.addFailed')}
             </Alert>
           ) : null}
 
@@ -321,7 +323,7 @@ function ProductView({
 
       {product.description ? (
         <section className="mt-10">
-          <h2 className="mb-3 text-xl font-bold">الوصف</h2>
+          <h2 className="mb-3 text-xl font-bold">{t('pdp.description')}</h2>
           <p className="max-w-3xl whitespace-pre-line leading-loose text-foreground">
             {product.description}
           </p>
@@ -374,14 +376,14 @@ function ProductView({
           <div className="min-w-0">
             <Price price={price} compareAtPrice={compareAt} size="sm" />
             <span className="block text-[10px] text-muted-foreground truncate font-medium">
-              {added ? 'تمت الإضافة إلى السلة ✓' : inStock ? 'متوفر' : 'غير متوفر حالياً'}
+              {added ? t('pdp.addedShort') : inStock ? t('stock.inStock') : t('stock.out')}
             </span>
           </div>
           {added ? (
             <Button asChild size="sm" className="rounded-xl font-bold h-11 px-5 gap-1.5 shadow-sm text-xs">
               <Link to="/cart">
                 <ShoppingBag className="size-4" aria-hidden="true" />
-                <span>عرض السلة</span>
+                <span>{t('pdp.viewCartShort')}</span>
               </Link>
             </Button>
           ) : (
@@ -408,13 +410,13 @@ function ProductView({
 
 function Specs({ product, variant }: { product: Product; variant: ProductVariant | null }) {
   const rows = [
-    product.barcode ? ['الباركود', product.barcode] : null,
-    variant?.sku ? ['رمز الخيار', variant.sku] : null,
+    product.barcode ? [t('pdp.barcode'), product.barcode] : null,
+    variant?.sku ? [t('pdp.variantSku'), variant.sku] : null,
     product.categories?.length
-      ? ['التصنيف', product.categories.map((category) => category.name).join('، ')]
+      ? [t('pdp.category'), product.categories.map((category) => category.name).join(t('common.listSep'))]
       : null,
     product.collections?.length
-      ? ['المجموعة', product.collections.map((collection) => collection.name).join('، ')]
+      ? [t('pdp.collection'), product.collections.map((collection) => collection.name).join(t('common.listSep'))]
       : null,
     // The exact count is the store's business, not the customer's (owner's
     // decision): availability is shown by the stock badge instead.
@@ -424,7 +426,7 @@ function Specs({ product, variant }: { product: Product; variant: ProductVariant
 
   return (
     <section className="mt-10">
-      <h2 className="mb-3 text-xl font-bold">المواصفات</h2>
+      <h2 className="mb-3 text-xl font-bold">{t('pdp.specs')}</h2>
       <dl className="max-w-2xl divide-y divide-border overflow-hidden rounded-lg border border-border bg-card shadow-xs">
         {rows.map(([label, value]) => (
           <div key={label} className="flex gap-4 px-4 py-3 text-sm">
@@ -470,7 +472,7 @@ function RelatedProducts({ product }: { product: Product }) {
 
   return (
     <section className="mt-10">
-      <h2 className="mb-3 text-xl font-bold">منتجات مشابهة</h2>
+      <h2 className="mb-3 text-xl font-bold">{t('pdp.similar')}</h2>
       <ProductGrid products={related} layout="slider" />
     </section>
   )
@@ -539,7 +541,7 @@ function ProductDetailSkeleton() {
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6" aria-busy="true">
       <span className="sr-only" role="status">
-        جارٍ تحميل المنتج…
+        {t('pdp.loading')}
       </span>
       <div className="grid gap-8 lg:grid-cols-2">
         <Skeleton className="aspect-square w-full rounded-2xl" />
@@ -563,8 +565,8 @@ function ProductDetailWishlistButton({ productId }: { productId: string }) {
     <button
       type="button"
       onClick={() => toggle.mutate(productId)}
-      aria-label={isWishlisted ? 'إزالة من المفضلة' : 'إضافة إلى المفضلة'}
-      title={isWishlisted ? 'في المفضلة' : 'أضف للمفضلة'}
+      aria-label={isWishlisted ? t('card.removeWishlist') : t('card.addWishlist')}
+      title={isWishlisted ? t('pdp.inWishlist') : t('pdp.addWishlist')}
       className={`inline-flex size-11 items-center justify-center rounded-xl border transition-all ${
         isWishlisted
           ? 'border-rose-500 bg-rose-500/10 text-rose-500'
@@ -600,8 +602,8 @@ function ProductDetailShareButton({ title }: { title: string }) {
     <button
       type="button"
       onClick={handleShare}
-      aria-label="مشاركة رابط المنتج"
-      title={copied ? 'تم نسخ الرابط!' : 'مشاركة المنتج'}
+      aria-label={t('pdp.shareLabel')}
+      title={copied ? t('pdp.copied') : t('pdp.share')}
       className="inline-flex size-11 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
     >
       <Share2 className="size-5" />

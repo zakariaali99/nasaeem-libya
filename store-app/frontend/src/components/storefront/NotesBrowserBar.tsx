@@ -1,7 +1,8 @@
 import { Compass } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link } from '@/lib/i18nRouter'
 
 import { useCategories } from '@/lib/queries/catalog'
+import { t } from '@/lib/i18n'
 
 interface NotesBrowserBarProps {
   onOpenFinder?: () => void
@@ -27,7 +28,7 @@ export function NotesBrowserBar({ onOpenFinder }: NotesBrowserBarProps) {
           className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-2xl border border-primary/40 bg-primary/10 px-4 py-2 text-xs font-black text-primary hover:bg-primary/20 transition-colors shadow-xs"
         >
           <Compass className="size-4" aria-hidden="true" />
-          <span>مرشد العطور</span>
+          <span>{t('header.finder')}</span>
         </button>
       )}
 

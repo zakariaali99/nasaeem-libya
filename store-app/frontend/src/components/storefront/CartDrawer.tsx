@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from '@/lib/i18nRouter'
 import { ArrowLeft, Minus, Plus, ShoppingBag, Trash2, Truck } from 'lucide-react'
 import {
   Sheet,
@@ -14,6 +14,7 @@ import { formatPrice } from '@/lib/format'
 import { useCart, useRemoveCartItem, useUpdateCartItem } from '@/lib/queries/cart'
 import { useActiveCartPromotion } from '@/lib/queries/orders'
 import type { CartLine } from '@/types/api'
+import { t } from '@/lib/i18n'
 
 interface CartDrawerProps {
   children?: React.ReactNode
@@ -41,10 +42,10 @@ export function CartDrawer({ children }: CartDrawerProps) {
           <button
             type="button"
             className="relative flex items-center gap-2 rounded-full px-3.5 py-2 text-sm font-semibold transition-colors hover:bg-muted text-foreground"
-            aria-label="سلة التسوق"
+            aria-label={t('cart.title')}
           >
             <ShoppingBag className="size-5 text-primary" />
-            <span className="hidden sm:inline">السلة</span>
+            <span className="hidden sm:inline">{t('nav.cart')}</span>
             {cart && cart.item_count > 0 && (
               <span className="flex size-5 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">
                 {cart.item_count}
@@ -61,9 +62,9 @@ export function CartDrawer({ children }: CartDrawerProps) {
             </div>
             <div>
               <SheetTitle className="text-xl font-bold text-foreground">
-                سلة التسوق ({cart?.item_count ?? 0})
+                {t('cart.drawerTitle', { n: cart?.item_count ?? 0 })}
               </SheetTitle>
-              <p className="text-xs text-muted-foreground mt-0.5">مراجعة المنتجات ومتابعة الطلب</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{t('cart.drawerSubtitle')}</p>
             </div>
           </div>
 
@@ -123,13 +124,13 @@ export function CartDrawer({ children }: CartDrawerProps) {
                 <ShoppingBag className="size-8" />
               </div>
               <div className="space-y-1">
-                <h3 className="font-bold text-foreground">سلتك فارغة حالياً</h3>
+                <h3 className="font-bold text-foreground">{t('cart.emptyTitle')}</h3>
                 <p className="text-xs text-muted-foreground">
-                  استكشف تشكيلاتنا المميزة من العطور والبخور وأضف ما يعجبك.
+                  {t('cart.emptyText')}
                 </p>
               </div>
               <Button asChild onClick={() => setOpen(false)}>
-                <Link to="/products">تصفح المنتجات الآن</Link>
+                <Link to="/products">{t('cart.browseNow')}</Link>
               </Button>
             </div>
           ) : (
@@ -153,7 +154,7 @@ export function CartDrawer({ children }: CartDrawerProps) {
                       />
                     ) : (
                       <div className="flex size-full items-center justify-center text-xs text-muted-foreground">
-                        لا صورة
+                        {t('cart.noImage')}
                       </div>
                     )}
                   </div>
@@ -175,7 +176,7 @@ export function CartDrawer({ children }: CartDrawerProps) {
                         )}
                         {item.available === false ? (
                           <span className="block text-[11px] font-semibold text-destructive mt-0.5">
-                            لم يعد متاحاً، احذفه لإكمال الطلب
+                            {t('cart.unavailableShort')}
                           </span>
                         ) : null}
                       </div>
@@ -183,7 +184,7 @@ export function CartDrawer({ children }: CartDrawerProps) {
                         type="button"
                         onClick={() => removeItem.mutate(item.id)}
                         className="text-muted-foreground hover:text-destructive p-1 transition-colors"
-                        aria-label="حذف من السلة"
+                        aria-label={t('cart.remove')}
                       >
                         <Trash2 className="size-3.5" />
                       </button>
@@ -204,7 +205,7 @@ export function CartDrawer({ children }: CartDrawerProps) {
                             })
                           }
                           className="flex size-6 items-center justify-center rounded-md hover:bg-background text-foreground transition-colors"
-                          aria-label="تقليل الكمية"
+                          aria-label={t('cart.decrease')}
                         >
                           <Minus className="size-3" />
                         </button>
@@ -220,7 +221,7 @@ export function CartDrawer({ children }: CartDrawerProps) {
                             })
                           }
                           className="flex size-6 items-center justify-center rounded-md hover:bg-background text-foreground transition-colors"
-                          aria-label="زيادة الكمية"
+                          aria-label={t('cart.increase')}
                         >
                           <Plus className="size-3" />
                         </button>
@@ -237,17 +238,17 @@ export function CartDrawer({ children }: CartDrawerProps) {
           <div className="p-5 border-t border-border bg-card space-y-3">
             <div className="space-y-1.5 text-sm">
               <div className="flex justify-between text-muted-foreground text-xs">
-                <span>المجموع الفرعي:</span>
+                <span>{t('cart.subtotalColon')}</span>
                 <span className="font-mono text-foreground font-semibold">{formatPrice(subtotal)}</span>
               </div>
               {Number(cart?.discount_total ?? 0) > 0 && (
                 <div className="flex justify-between text-emerald-600 text-xs">
-                  <span>الخصم المطبق:</span>
+                  <span>{t('cart.discountColon')}</span>
                   <span className="font-mono font-semibold">-{formatPrice(cart!.discount_total)}</span>
                 </div>
               )}
               <div className="flex justify-between text-base font-bold text-foreground pt-1.5 border-t border-border">
-                <span>المجموع الإجمالي:</span>
+                <span>{t('cart.totalColon')}</span>
                 <span className="font-mono text-primary text-lg">{formatPrice(cart?.total ?? subtotal)}</span>
               </div>
             </div>
@@ -259,7 +260,7 @@ export function CartDrawer({ children }: CartDrawerProps) {
                 onClick={() => setOpen(false)}
                 className="w-full text-xs font-semibold"
               >
-                <Link to="/cart">عرض السلة الكاملة</Link>
+                <Link to="/cart">{t('cart.viewFull')}</Link>
               </Button>
               <Button
                 asChild
@@ -267,8 +268,8 @@ export function CartDrawer({ children }: CartDrawerProps) {
                 className="w-full text-xs font-bold shadow-sm"
               >
                 <Link to="/cart" className="flex items-center justify-center gap-1.5">
-                  <span>متابعة الشراء</span>
-                  <ArrowLeft className="size-3.5" />
+                  <span>{t('cart.checkout')}</span>
+                  <ArrowLeft className="size-3.5 ltr:-scale-x-100" />
                 </Link>
               </Button>
             </div>

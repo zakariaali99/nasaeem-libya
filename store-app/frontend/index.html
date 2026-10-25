@@ -17,6 +17,13 @@
   </head>
   <body>
     <script>
+      // An English address is set left-to-right before anything paints.
+      if (/^\/en(\/|$)/.test(location.pathname)) {
+        document.documentElement.lang = 'en'
+        document.documentElement.dir = 'ltr'
+      }
+    </script>
+    <script>
       /*
        * Product-page priming. Measured, not guessed: Lighthouse put 4,776 ms of
        * the product page's LCP into "load delay", because the image could not
@@ -31,7 +38,7 @@
        * owns every response — it adopts this promise rather than re-requesting.
        */
       (function () {
-        var match = location.pathname.match(/^\/products\/([^/]+)\/?$/)
+        var match = location.pathname.match(/^(?:\/en)?\/products\/([^/]+)\/?$/)
         if (!match) return
         var url = '/api/products/' + match[1] + '/'
         window.__nasaimPreload = {

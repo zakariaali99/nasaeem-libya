@@ -1,6 +1,7 @@
 import { FEATURES } from '@/lib/features'
 import { formatPrice } from '@/lib/format'
 import { useSiteText } from '@/lib/siteText'
+import { t } from '@/lib/i18n'
 
 export interface OrderSummaryProps {
   subtotal: string
@@ -33,16 +34,16 @@ export function OrderSummary({
 
   return (
     <dl className="space-y-2 rounded-lg border border-border bg-card p-4 text-sm">
-      <Row label="المجموع الفرعي" value={formatPrice(subtotal)} />
+      <Row label={t('summary.subtotal')} value={formatPrice(subtotal)} />
       {hasDiscount ? (
-        <Row label="الخصم" value={`− ${formatPrice(discountTotal)}`} tone="discount" />
+        <Row label={t('summary.discount')} value={`− ${formatPrice(discountTotal)}`} tone="discount" />
       ) : null}
       {quotedLater ? null : (
         <Row
-          label="التوصيل"
+          label={t('summary.delivery')}
           value={
             isFreeShipping
-              ? 'مجاني 🚀'
+              ? t('summary.free')
               : hasShipping
                 ? formatPrice(shippingTotal)
                 : shippingNote ?? formatPrice(0)
@@ -53,7 +54,7 @@ export function OrderSummary({
       )}
       <div className="flex items-baseline justify-between gap-4 border-t border-border pt-2">
         <dt className="text-base font-semibold">
-          الإجمالي
+          {t('summary.total')}
         </dt>
         <dd className="text-lg font-bold tabular-nums text-price">{formatPrice(total)}</dd>
       </div>

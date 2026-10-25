@@ -11,7 +11,12 @@
  * displayed 10.50 د.ل as "11 د.ل".
  */
 
+import { isEnglish } from '@/lib/i18n'
+
 export const CURRENCY_SYMBOL = 'د.ل'
+
+/** «د.ل» on Arabic pages, "LYD" on English ones. */
+export const currencySymbol = () => (isEnglish() ? 'LYD' : CURRENCY_SYMBOL)
 
 const numberFormatter = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 0,
@@ -33,9 +38,9 @@ export function toNumber(value: number | string | null | undefined): number {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
-/** `1,234.50 د.ل` — every price in the app goes through this. */
+/** `1,234.50 د.ل` (`1,234.50 LYD` in English) — every price in the app goes through this. */
 export function formatPrice(value: number | string | null | undefined): string {
-  return `${moneyFormatter.format(toNumber(value))} ${CURRENCY_SYMBOL}`
+  return `${moneyFormatter.format(toNumber(value))} ${currencySymbol()}`
 }
 
 /** Money with no currency symbol, for inputs and table cells that label it. */
@@ -70,16 +75,37 @@ const dateTimeFormatter = new Intl.DateTimeFormat('ar-LY', {
   numberingSystem: 'latn',
 })
 
+// "25 October 2026" on English pages.
+const englishDate = new Intl.DateTimeFormat('en-GB', { year: 'numeric', month: 'long', day: 'numeric' })
+const englishDateTime = new Intl.DateTimeFormat('en-GB', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+})
+
 export function formatDate(value: string | Date | null | undefined): string {
   if (!value) return ''
   const date = value instanceof Date ? value : new Date(value)
-  return Number.isNaN(date.getTime()) ? '' : dateFormatter.format(date)
+  if (Number.isNaN(date.getTime())) return ''
+  return (isEnglish() ? englishDate : dateFormatter).format(date)
+}
+
+/** `25/10/2026` — the short date in order lists. */
+export function formatShortDate(value: string | Date | null | undefined): string {
+  if (!value) return ''
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleDateString(isEnglish() ? 'en-GB' : 'ar-LY')
 }
 
 export function formatDateTime(value: string | Date | null | undefined): string {
   if (!value) return ''
   const date = value instanceof Date ? value : new Date(value)
-  return Number.isNaN(date.getTime()) ? '' : dateTimeFormatter.format(date)
+  if (Number.isNaN(date.getTime())) return ''
+  return (isEnglish() ? englishDateTime : dateTimeFormatter).format(date)
 }
 
 /**

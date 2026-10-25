@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 
 import App from '@/App'
+import { chooseEntryLanguage, loadLang } from '@/lib/i18n'
 import './styles/globals.css'
 
 const container = document.getElementById('root')
@@ -19,11 +20,15 @@ window.addEventListener('error', (event) => {
   }
 })
 
-createRoot(container).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+// Device language or the saved choice first, then English loaded before the
+// first English page renders.
+loadLang(chooseEntryLanguage()).finally(() => {
+  createRoot(container).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  )
+})
 
 /*
  * PWA: the service worker is the weak-network strategy — shell and assets

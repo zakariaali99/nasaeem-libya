@@ -9,7 +9,8 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
+import { Link, useNavigate } from '@/lib/i18nRouter'
 
 import { ErrorState } from '@/components/storefront/ErrorState'
 import { OrderSummary } from '@/components/storefront/OrderSummary'
@@ -31,11 +32,12 @@ import { LuxuryGiftingSection, type GiftingState } from '@/components/storefront
 import { useSiteText } from '@/lib/siteText'
 import { usePageTitle } from '@/lib/usePageTitle'
 import { cn } from '@/lib/utils'
+import { t } from '@/lib/i18n'
 
 export default function CheckoutPage() {
   const { orderId = '' } = useParams()
   const navigate = useNavigate()
-  usePageTitle('إتمام الطلب والدفع — نسائم ليبيا', 'أدخل عنوان التوصيل واختر طريقة الدفع.')
+  usePageTitle(t('checkout.title'), t('checkout.metaDescription'))
   const guaranteeNote = useSiteText()('checkout.guarantee')
 
   const { data: user } = useMe()
@@ -121,10 +123,10 @@ export default function CheckoutPage() {
     return (
       <div className="mx-auto w-full max-w-lg px-4 py-16 text-center space-y-4">
         <Alert tone="error">
-          {error instanceof ApiError ? error.message : 'تعذّر تحميل بيانات الطلب.'}
+          {error instanceof ApiError ? error.message : t('checkout.loadFailed')}
         </Alert>
         <Button onClick={() => refetch()} variant="outline">
-          إعادة المحاولة
+          {t('common.retry')}
         </Button>
       </div>
     )
@@ -135,13 +137,13 @@ export default function CheckoutPage() {
       <div className="mx-auto w-full max-w-lg px-4 py-16 text-center space-y-4">
         <Alert tone="info">
           {order.status === 'cancelled'
-            ? 'انتهت مهلة هذه السلة قبل تأكيدها. أضف المنتجات إلى السلة من جديد.'
-            : 'هذا الطلب مؤكَّد بالفعل.'}
+            ? t('checkout.expired')
+            : t('checkout.alreadyConfirmed')}
           <Link
             to={order.status === 'cancelled' ? '/products' : user ? `/me/orders/${order.id}` : '/'}
             className="block mt-2 font-bold text-primary hover:underline"
           >
-            {order.status === 'cancelled' ? 'تصفّح المنتجات' : user ? 'عرض تفاصيل الطلب' : 'العودة إلى المتجر'}
+            {order.status === 'cancelled' ? t('checkout.browseProducts') : user ? t('checkout.viewOrder') : t('checkout.backToStore')}
           </Link>
         </Alert>
       </div>
@@ -156,25 +158,25 @@ export default function CheckoutPage() {
     // Validation for guest customer name & phone
     const errs: Record<string, string[]> = {}
     if (!customerName.trim() && !user?.name) {
-      errs.customer_name = ['الاسم الثلاثي مطلوب لإتمام الطلب']
+      errs.customer_name = [t('checkout.nameRequired')]
     }
     const phoneDigits = (customerPhone.trim() || user?.phone_number || '').replace(/[^\d]/g, '')
     if (!phoneDigits) {
-      errs.customer_phone = ['رقم الهاتف مطلوب للتواصل والتسليم']
+      errs.customer_phone = [t('checkout.phoneRequired')]
     } else if (!/^(?:218|0)?9[1-5]\d{7}$/.test(phoneDigits)) {
       // The number becomes the account: a mistyped one cannot be called back.
-      errs.customer_phone = ['اكتب رقماً ليبياً صحيحاً من 10 أرقام، مثل 0912345678']
+      errs.customer_phone = [t('checkout.phoneInvalid')]
     }
     if (!cityId) {
-      errs.city_id = ['يرجى اختيار مدينة التوصيل']
+      errs.city_id = [t('checkout.cityRequired')]
     }
     if (!address.trim()) {
-      errs.address = ['يرجى كتابة العنوان التفصيلي للتوصيل']
+      errs.address = [t('checkout.addressRequired')]
     }
 
     if (Object.keys(errs).length > 0) {
       setFieldErrors(errs)
-      setFormError('يرجى استكمال البيانات المطلوبة قبل إتمام الطلب.')
+      setFormError(t('checkout.completeForm'))
       // Take the customer to the first field that needs them: the confirm
       // button sits a full screen below it on a phone.
       const first = ['customer_name', 'customer_phone', 'city_id', 'address'].find((key) => errs[key])
@@ -223,7 +225,7 @@ export default function CheckoutPage() {
         setFieldErrors(failure.errors ?? {})
         setFormError(failure.message)
       } else {
-        setFormError('تعذّر تأكيد الطلب، حاول مرة أخرى')
+        setFormError(t('checkout.confirmFailed'))
       }
     }
   }
@@ -255,24 +257,24 @@ export default function CheckoutPage() {
       <div className="flex items-center justify-center gap-2 sm:gap-4 py-2 border-b border-border/80">
         <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
           <span className="flex size-6 items-center justify-center rounded-full bg-muted text-muted-foreground font-mono">1</span>
-          <span>السلة</span>
+          <span>{t('checkout.stepCart')}</span>
         </div>
         <div className="h-0.5 w-6 sm:w-12 bg-primary" />
         <div className="flex items-center gap-2 text-xs font-bold text-primary">
           <span className="flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground font-mono">2</span>
-          <span>العنوان والدفع</span>
+          <span>{t('checkout.stepAddress')}</span>
         </div>
         <div className="h-0.5 w-6 sm:w-12 bg-border" />
         <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
           <span className="flex size-6 items-center justify-center rounded-full bg-muted text-muted-foreground font-mono">3</span>
-          <span>تأكيد الطلب</span>
+          <span>{t('checkout.stepConfirm')}</span>
         </div>
       </div>
 
       <div className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">إتمام الطلب وتحديد التوصيل</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">{t('checkout.heading')}</h1>
         <p className="text-xs sm:text-sm text-muted-foreground">
-          رقم الطلب المؤقت: <bdi className="font-mono font-bold text-foreground">#{order.order_number}</bdi>
+          {t('checkout.tempNumber')} <bdi className="font-mono font-bold text-foreground">#{order.order_number}</bdi>
         </p>
       </div>
 
@@ -285,22 +287,22 @@ export default function CheckoutPage() {
                 <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <User className="size-4" />
                 </div>
-                <h2 className="text-base sm:text-lg font-bold text-foreground">بيانات العميل المستلم</h2>
+                <h2 className="text-base sm:text-lg font-bold text-foreground">{t('checkout.customer')}</h2>
               </div>
               {!user && (
                 <span className="shrink-0 whitespace-nowrap text-[11px] font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-full">
-                  بدون تسجيل
+                  {t('checkout.noAccount')}
                 </span>
               )}
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="الاسم الثلاثي بالكامل *" htmlFor="customer_name" error={fieldErrors.customer_name?.[0]}>
+              <Field label={t('checkout.fullName')} htmlFor="customer_name" error={fieldErrors.customer_name?.[0]}>
                 <Input
                   id="customer_name"
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
-                  placeholder="مثال: أحمد عبد الله المحمودي"
+                  placeholder={t('checkout.namePlaceholder')}
                   autoComplete="name"
                   aria-invalid={Boolean(fieldErrors.customer_name)}
                   className="h-11 rounded-xl text-sm font-bold placeholder:font-normal placeholder:text-muted-foreground/70"
@@ -308,7 +310,7 @@ export default function CheckoutPage() {
                 />
               </Field>
 
-              <Field label="رقم هاتف الواتساب الليبي *" htmlFor="customer_phone" error={fieldErrors.customer_phone?.[0]}>
+              <Field label={t('checkout.phone')} htmlFor="customer_phone" error={fieldErrors.customer_phone?.[0]}>
                 <Input
                   id="customer_phone"
                   value={customerPhone}
@@ -327,7 +329,7 @@ export default function CheckoutPage() {
 
             {!user && (
               <p className="text-[11px] text-muted-foreground bg-muted/40 p-2.5 rounded-xl">
-                لا تحتاج إلى تسجيل ولا كلمة مرور: تتابع طلبك من «طلباتي» على هذا الجهاز. إن كان لك حساب بهذا الرقم فسيُضاف الطلب إليه.
+                {t('checkout.noPassword')}
               </p>
             )}
           </section>
@@ -338,7 +340,7 @@ export default function CheckoutPage() {
               <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
                 <MapPin className="size-4" />
               </div>
-              <h2 className="text-base sm:text-lg font-bold text-foreground">عنوان ومكان التوصيل</h2>
+              <h2 className="text-base sm:text-lg font-bold text-foreground">{t('checkout.delivery')}</h2>
             </div>
 
             {citiesError ? (
@@ -347,13 +349,13 @@ export default function CheckoutPage() {
               <Alert tone="error">
                 <AlertTriangle className="sr-only" aria-hidden="true" />
                 {cityData?.message ??
-                  'لا توجد مدن توصيل مُعرّفة في المتجر حالياً، يرجى التواصل معنا لإتمام الطلب'}
+                  t('checkout.noCities')}
               </Alert>
             ) : (
               <>
               {(savedAddresses ?? []).length > 0 ? (
                 <div className="space-y-2">
-                  <p className="text-xs font-bold text-foreground">عناوينك المحفوظة</p>
+                  <p className="text-xs font-bold text-foreground">{t('checkout.savedAddresses')}</p>
                   <div className="flex flex-wrap gap-2">
                     {(savedAddresses ?? []).map((saved) => (
                       <button
@@ -378,7 +380,7 @@ export default function CheckoutPage() {
                 </div>
               ) : null}
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="المدينة *" htmlFor="city" error={fieldErrors.city_id?.[0]}>
+                <Field label={t('checkout.city')} htmlFor="city" error={fieldErrors.city_id?.[0]}>
                   <Select
                     id="city"
                     value={cityId}
@@ -386,7 +388,7 @@ export default function CheckoutPage() {
                     className="h-11 rounded-xl"
                     required
                   >
-                    <option value="">اختر المدينة</option>
+                    <option value="">{t('checkout.chooseCity')}</option>
                     {sortedCities.map((city) => (
                       <option key={city.id} value={city.id}>
                         {city.name}
@@ -396,7 +398,7 @@ export default function CheckoutPage() {
                 </Field>
 
                 {regions.length > 0 ? (
-                  <Field label="المنطقة والحي (اختياري)" htmlFor="region" error={fieldErrors.region_id?.[0]}>
+                  <Field label={t('checkout.region')} htmlFor="region" error={fieldErrors.region_id?.[0]}>
                     <Select
                       id="region"
                       value={regionId}
@@ -405,7 +407,7 @@ export default function CheckoutPage() {
                       aria-invalid={Boolean(fieldErrors.region_id)}
                       className="h-11 rounded-xl"
                     >
-                      <option value="">{cityId ? 'كل أحياء ومناطق المدينة' : 'اختر المدينة أولاً'}</option>
+                      <option value="">{cityId ? t('checkout.allRegions') : t('checkout.cityFirst')}</option>
                       {regions.map((region) => (
                         <option key={region.id} value={region.id}>
                           {region.name}
@@ -418,26 +420,26 @@ export default function CheckoutPage() {
               </>
             )}
 
-            <Field label="العنوان بالتفصيل *" htmlFor="address" error={fieldErrors.address?.[0]}>
+            <Field label={t('checkout.address')} htmlFor="address" error={fieldErrors.address?.[0]}>
               <Textarea
                 id="address"
                 rows={2}
                 value={address}
                 onChange={(event) => setAddress(event.target.value)}
-                placeholder="الشارع، أقرب نقطة دالة، رقم العمارة أو المنزل..."
+                placeholder={t('checkout.addressPlaceholder')}
                 aria-invalid={Boolean(fieldErrors.address)}
                 className="rounded-xl text-xs sm:text-sm"
                 required
               />
             </Field>
 
-            <Field label="ملاحظات إضافية للتوصيل (اختياري)" htmlFor="notes">
+            <Field label={t('checkout.notes')} htmlFor="notes">
               <Textarea
                 id="notes"
                 rows={2}
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
-                placeholder="الوقت المفضل للتسليم أو أي توجيهات للمندوب..."
+                placeholder={t('checkout.notesPlaceholder')}
                 className="rounded-xl text-xs sm:text-sm"
               />
             </Field>
@@ -452,7 +454,7 @@ export default function CheckoutPage() {
               <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
                 <Banknote className="size-4" />
               </div>
-              <h2 className="text-base sm:text-lg font-bold text-foreground">طريقة الدفع</h2>
+              <h2 className="text-base sm:text-lg font-bold text-foreground">{t('checkout.payment')}</h2>
             </div>
 
             <div className="space-y-3">
@@ -476,10 +478,10 @@ export default function CheckoutPage() {
                 <div className="flex-1 space-y-1">
                   <div className="flex items-center gap-2">
                     <Banknote className="size-4 text-emerald-600 dark:text-emerald-400" />
-                    <span className="font-bold text-sm text-foreground">الدفع عند الاستلام</span>
+                    <span className="font-bold text-sm text-foreground">{t('checkout.cod')}</span>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    تدفع نقداً عند استلام طلبك.
+                    {t('checkout.codText')}
                   </p>
                 </div>
               </label>
@@ -504,10 +506,10 @@ export default function CheckoutPage() {
                 <div className="flex-1 space-y-1">
                   <div className="flex items-center gap-2">
                     <Building2 className="size-4 text-primary" />
-                    <span className="font-bold text-sm text-foreground">تحويل مصرفي مباشر</span>
+                    <span className="font-bold text-sm text-foreground">{t('checkout.bank')}</span>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    تحوّل قيمة الطلب إلى حساب المتجر من تطبيق مصرفك.
+                    {t('checkout.bankText')}
                   </p>
                 </div>
               </label>
@@ -517,10 +519,10 @@ export default function CheckoutPage() {
                 <div className="rounded-2xl border border-primary/30 bg-primary/10 p-4 space-y-2 animate-fade-rise">
                   <div className="flex items-center gap-2 text-primary font-bold text-xs sm:text-sm">
                     <MessageSquare className="size-4 shrink-0" />
-                    <span>كيف يتم التحويل؟</span>
+                    <span>{t('checkout.bankHow')}</span>
                   </div>
                   <p className="text-xs text-foreground/90 leading-relaxed font-medium">
-                    بعد تأكيد الطلب تظهر لك بيانات حساب المتجر، وإن لم تكن مسجّلة بعد فسنتواصل معك لتزويدك بها. حوّل المبلغ ثم أرسل لنا صورة الإشعار.
+                    {t('checkout.bankHowText')}
                   </p>
                 </div>
               )}
@@ -532,7 +534,7 @@ export default function CheckoutPage() {
         <aside className="space-y-5 lg:sticky lg:top-24 lg:self-start">
           <div className="rounded-2xl border border-border bg-card p-5 shadow-xs space-y-4">
             <h3 className="text-sm font-bold text-foreground border-b border-border/80 pb-2">
-              ملخص الأصناف في الطلب
+              {t('checkout.itemsSummary')}
             </h3>
             
             <ul className="space-y-2.5 text-xs max-h-72 overflow-y-auto">
@@ -559,7 +561,7 @@ export default function CheckoutPage() {
                 shippingTotal={shipping}
                 total={total}
                 isFreeShipping={isFreeShipping}
-                shippingNote="رسوم التوصيل محتسبة للمنطقة المحددة"
+                shippingNote={t('checkout.shippingForRegion')}
               />
             </div>
 
@@ -576,7 +578,7 @@ export default function CheckoutPage() {
               loading={confirm.isPending}
               className="rounded-xl font-bold text-sm h-12 shadow-sm"
             >
-              تأكيد الطلب الآن
+              {t('checkout.confirmNow')}
             </Button>
 
             <div className="border-t border-border/80 pt-3 text-center space-y-1">
@@ -599,7 +601,7 @@ export default function CheckoutPage() {
       <div className="fixed inset-x-0 bottom-14 z-30 border-t border-border bg-card/95 p-3 px-4 backdrop-blur-md shadow-lg lg:hidden">
         <div className="flex items-center justify-between gap-3 max-w-lg mx-auto">
           <div>
-            <span className="text-[10px] text-muted-foreground block font-medium">الإجمالي النهائي:</span>
+            <span className="text-[10px] text-muted-foreground block font-medium">{t('checkout.finalTotal')}</span>
             <span className="font-mono text-base font-extrabold text-price">{formatPrice(total)}</span>
           </div>
           <Button
@@ -611,7 +613,7 @@ export default function CheckoutPage() {
             loading={confirm.isPending}
             className="rounded-xl font-bold h-11 px-6 text-xs shadow-md gap-1.5"
           >
-            <span>تأكيد الطلب</span>
+            <span>{t('checkout.confirm')}</span>
           </Button>
         </div>
       </div>,

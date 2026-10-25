@@ -9,16 +9,17 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { LineThumb } from '@/components/ui/line-thumb'
 import { Skeleton } from '@/components/ui/skeleton'
-import { formatPrice } from '@/lib/format'
+import { formatPrice, formatShortDate } from '@/lib/format'
 import { useTrackOrders } from '@/lib/queries/orders'
 import { usePageTitle } from '@/lib/usePageTitle'
+import { t } from '@/lib/i18n'
 
 /**
  * Anyone can look an order up by phone, order number, or both. The server
  * answers with tracking fields only — no name, phone or address.
  */
 export default function TrackOrder() {
-  usePageTitle('تتبّع الطلب', 'تابع حالة طلبك برقم الهاتف أو رقم الطلب.')
+  usePageTitle(t('track.title'), t('track.metaDescription'))
   // Kept in the page, not the address bar: a phone number in the URL would
   // sit in browser history and server logs.
   const [query, setQuery] = useState({ phone: '', number: '' })
@@ -33,7 +34,7 @@ export default function TrackOrder() {
     const nextPhone = phoneInput.trim()
     const nextNumber = numberInput.trim()
     if (!nextPhone && !nextNumber) {
-      setFormError('أدخل رقم الهاتف أو رقم الطلب، أو الاثنين معاً.')
+      setFormError(t('track.needInput'))
       return
     }
     setFormError(null)
@@ -45,15 +46,15 @@ export default function TrackOrder() {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-8">
-      <h1 className="mb-2 text-2xl font-bold">تتبّع الطلب</h1>
+      <h1 className="mb-2 text-2xl font-bold">{t('track.title')}</h1>
       <p className="mb-6 text-sm text-muted-foreground">
-        اكتب رقم هاتفك لترى طلباتك، أو رقم الطلب لترى طلباً واحداً، أو الاثنين معاً.
+        {t('track.intro')}
       </p>
 
       <form onSubmit={onSubmit} noValidate className="mb-8 space-y-4 rounded-2xl border border-border bg-card p-4 sm:p-5">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label htmlFor="track-phone">رقم الهاتف</Label>
+            <Label htmlFor="track-phone">{t('track.phone')}</Label>
             <Input
               id="track-phone"
               type="tel"
@@ -67,7 +68,7 @@ export default function TrackOrder() {
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="track-number">رقم الطلب</Label>
+            <Label htmlFor="track-number">{t('track.number')}</Label>
             <Input
               id="track-number"
               dir="ltr"
@@ -81,7 +82,7 @@ export default function TrackOrder() {
         {formError ? <Alert tone="error">{formError}</Alert> : null}
         <Button type="submit" block size="lg" loading={isFetching} className="gap-2">
           <PackageSearch className="size-4" aria-hidden="true" />
-          ابحث
+          {t('track.search')}
         </Button>
       </form>
 
@@ -90,11 +91,11 @@ export default function TrackOrder() {
           {[0, 1].map((i) => <Skeleton key={i} className="h-32 w-full rounded-2xl" />)}
         </div>
       ) : error ? (
-        <Alert tone="error">{error.message || 'تعذّر البحث الآن، حاول بعد قليل.'}</Alert>
+        <Alert tone="error">{error.message || t('track.failed')}</Alert>
       ) : orders.length === 0 ? (
         <EmptyState
-          title="لم نجد طلباً"
-          description="تأكد من رقم الهاتف أو رقم الطلب. إن طلبت برقمين مختلفين فجرّب كل رقم وحده."
+          title={t('track.notFound')}
+          description={t('track.notFoundText')}
         />
       ) : (
         <ul className="space-y-3">
@@ -105,7 +106,7 @@ export default function TrackOrder() {
                 <StageBadge stage={order.stage} />
               </div>
               <div className="mt-1 flex items-center justify-between text-sm text-muted-foreground">
-                <span>{new Date(order.created_at).toLocaleDateString('ar-LY')}</span>
+                <span>{formatShortDate(order.created_at)}</span>
                 <span className="font-semibold text-foreground">{formatPrice(order.total)}</span>
               </div>
               <ul className="mt-3 space-y-2 border-t border-border/60 pt-3 text-sm">
@@ -126,7 +127,7 @@ export default function TrackOrder() {
                   rel="noopener noreferrer"
                   className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-primary underline-offset-4 hover:underline"
                 >
-                  تتبّع الشحنة لدى شركة التوصيل
+                  {t('track.courier')}
                 </a>
               ) : null}
             </li>

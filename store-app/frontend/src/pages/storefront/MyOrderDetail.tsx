@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
+import { Link } from '@/lib/i18nRouter'
 import { Check, CheckCircle2, Clock, Copy, Package, Truck } from 'lucide-react'
 import { StageBadge } from '@/components/admin/StatusBadge'
 import { ErrorState } from '@/components/storefront/ErrorState'
@@ -7,13 +8,14 @@ import { Button } from '@/components/ui/button'
 import { LineThumb } from '@/components/ui/line-thumb'
 import { Skeleton } from '@/components/ui/skeleton'
 import { FEATURES } from '@/lib/features'
-import { formatPrice } from '@/lib/format'
+import { formatDate, formatPrice } from '@/lib/format'
 import { usePageTitle } from '@/lib/usePageTitle'
 import { useOrder } from '@/lib/queries/orders'
+import { t } from '@/lib/i18n'
 
 export default function MyOrderDetail() {
   const { orderId = '' } = useParams()
-  usePageTitle('تفاصيل الطلب')
+  usePageTitle(t('orderDetail.title'))
   const { data: order, isPending, isError, refetch } = useOrder(orderId)
   const [copied, setCopied] = useState(false)
 
@@ -39,7 +41,7 @@ export default function MyOrderDetail() {
         <ErrorState onRetry={() => refetch()} />
         <p className="mt-4 text-center">
           <Link to="/me/orders" className="font-semibold text-primary underline">
-            العودة إلى طلباتي
+            {t('orderDetail.back')}
           </Link>
         </p>
       </div>
@@ -58,10 +60,10 @@ export default function MyOrderDetail() {
   const currentStep = getStepStatus()
 
   const steps = [
-    { num: 1, label: 'تم تأكيد الطلب', icon: Clock },
-    { num: 2, label: 'قيد التجهيز والتغليف', icon: Package },
-    { num: 3, label: 'مع مندوب التوصيل', icon: Truck },
-    { num: 4, label: 'تم التسليم بنجاح', icon: CheckCircle2 },
+    { num: 1, label: t('orderDetail.step1'), icon: Clock },
+    { num: 2, label: t('orderDetail.step2'), icon: Package },
+    { num: 3, label: t('orderDetail.step3'), icon: Truck },
+    { num: 4, label: t('orderDetail.step4'), icon: CheckCircle2 },
   ]
 
   return (
@@ -69,12 +71,12 @@ export default function MyOrderDetail() {
       {/* Header Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card p-5 shadow-xs">
         <div>
-          <span className="text-xs font-semibold text-muted-foreground">رقم الطلب</span>
+          <span className="text-xs font-semibold text-muted-foreground">{t('orderDetail.number')}</span>
           <h1 className="text-xl font-bold font-mono text-foreground sm:text-2xl">
             {order.order_number}
           </h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            بتاريخ {new Date(order.created_at).toLocaleDateString('ar-LY')}
+            {t('orderDetail.date', { date: formatDate(order.created_at) })}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -85,7 +87,7 @@ export default function MyOrderDetail() {
       {/* Visual Timeline (if not cancelled) */}
       {currentStep !== -1 && (
         <section className="rounded-2xl border border-border bg-card p-5 shadow-xs">
-          <h2 className="text-sm font-bold text-foreground mb-6">مراحل تنفيذ وتوصيل الطلب</h2>
+          <h2 className="text-sm font-bold text-foreground mb-6">{t('orderDetail.stages')}</h2>
           <div className="grid grid-cols-4 gap-2 text-center relative">
             {/* Connecting line */}
             <div className="absolute top-4 start-8 end-8 h-1 bg-muted -z-0" />
@@ -130,7 +132,7 @@ export default function MyOrderDetail() {
 
       {/* Items Section */}
       <section className="rounded-2xl border border-border bg-card p-5 shadow-xs">
-        <h2 className="mb-4 text-base font-bold text-foreground">المنتجات المطلوبة</h2>
+        <h2 className="mb-4 text-base font-bold text-foreground">{t('orderDetail.items')}</h2>
         <ul className="divide-y divide-border/60">
           {(order.items ?? []).map((item) => (
             <li key={item.id} className="flex items-center justify-between gap-3 py-3 text-sm">
@@ -141,7 +143,7 @@ export default function MyOrderDetail() {
                   {item.variant_label && (
                     <span className="block text-xs text-muted-foreground">{item.variant_label}</span>
                   )}
-                  <span className="text-xs text-muted-foreground">الكمية: {item.quantity}</span>
+                  <span className="text-xs text-muted-foreground">{t('orderDetail.quantity', { n: item.quantity })}</span>
                 </div>
               </div>
               <span className="font-mono font-bold text-foreground">{formatPrice(item.total_price)}</span>
@@ -153,23 +155,23 @@ export default function MyOrderDetail() {
       {/* Financial Breakdown */}
       <section className="rounded-2xl border border-border bg-card p-5 shadow-xs space-y-2 text-sm">
         <div className="flex justify-between text-muted-foreground">
-          <span>المجموع الفرعي</span>
+          <span>{t('orderDetail.subtotal')}</span>
           <span className="font-mono">{formatPrice(order.subtotal)}</span>
         </div>
         {Number(order.discount_total) > 0 && (
           <div className="flex justify-between text-emerald-600 font-semibold">
-            <span>الخصم المطبق</span>
+            <span>{t('orderDetail.discount')}</span>
             <span className="font-mono">−{formatPrice(order.discount_total)}</span>
           </div>
         )}
         {Number(order.shipping_total) > 0 || FEATURES.shipping ? (
           <div className="flex justify-between text-muted-foreground">
-            <span>رسوم التوصيل</span>
+            <span>{t('orderDetail.shipping')}</span>
             <span className="font-mono">{formatPrice(order.shipping_total)}</span>
           </div>
         ) : null}
         <div className="flex justify-between border-t border-border pt-3 text-base font-bold text-foreground">
-          <span>الإجمالي النهائي</span>
+          <span>{t('orderDetail.total')}</span>
           <span className="font-mono text-primary text-lg">{formatPrice(order.total)}</span>
         </div>
       </section>
@@ -177,17 +179,17 @@ export default function MyOrderDetail() {
       {/* Shipping Address & Courier Tracking */}
       <section className="rounded-2xl border border-border bg-card p-5 shadow-xs space-y-3 text-sm">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-bold text-foreground">بيانات التوصيل</h2>
+          <h2 className="text-base font-bold text-foreground">{t('orderDetail.delivery')}</h2>
         </div>
 
         <p className="text-muted-foreground leading-relaxed bg-muted/30 p-3 rounded-xl border border-border/50">
-          {order.shipping_address || 'عنوان التوصيل المسجل مع الطلب'}
+          {order.shipping_address || t('orderDetail.addressFallback')}
         </p>
 
         {order.tracking_number && (
           <div className="flex items-center justify-between gap-2 rounded-xl border border-primary/20 bg-primary/5 p-3">
             <div>
-              <span className="block text-xs font-semibold text-primary">رقم التتبع الخاص بالشحنة:</span>
+              <span className="block text-xs font-semibold text-primary">{t('orderDetail.tracking')}</span>
               <span className="font-mono text-sm font-bold text-foreground">{order.tracking_number}</span>
             </div>
             <Button
@@ -197,7 +199,7 @@ export default function MyOrderDetail() {
               className="text-xs"
             >
               {copied ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5" />}
-              <span>{copied ? 'تم النسخ' : 'نسخ الرقم'}</span>
+              <span>{copied ? t('orderDetail.copied') : t('orderDetail.copy')}</span>
             </Button>
           </div>
         )}
@@ -208,7 +210,7 @@ export default function MyOrderDetail() {
           to="/me/orders"
           className="inline-flex items-center gap-1.5 text-sm font-bold text-primary hover:underline"
         >
-          ← العودة إلى قائمة طلباتي
+          <span className="ltr:hidden">←</span><span className="rtl:hidden">→</span> {t('orderDetail.backList')}
         </Link>
       </div>
     </div>

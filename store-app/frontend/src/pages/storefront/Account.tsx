@@ -1,6 +1,6 @@
 import { CheckCircle2, ChevronLeft, Eye, EyeOff, Heart, KeyRound, Lock, MapPin, Package, User } from 'lucide-react'
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from '@/lib/i18nRouter'
 
 import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -10,9 +10,10 @@ import { api, ApiError } from '@/lib/api'
 import { formatDate } from '@/lib/format'
 import { useLogout, useMe } from '@/lib/queries/auth'
 import { usePageTitle } from '@/lib/usePageTitle'
+import { t } from '@/lib/i18n'
 
 export default function AccountPage() {
-  usePageTitle('حسابي — نسائم ليبيا', 'إدارة حسابك وأمان كلمة المرور')
+  usePageTitle(t('account.title'), t('account.metaDescription'))
   const { data: user } = useMe()
   const logout = useLogout()
   const navigate = useNavigate()
@@ -33,12 +34,12 @@ export default function AccountPage() {
     setPassSuccess(null)
 
     if (newPassword.length < 6) {
-      setPassError('كلمة المرور الجديدة يجب أن تكون 6 أحرف أو أرقام على الأقل')
+      setPassError(t('account.passTooShort'))
       return
     }
 
     if (newPassword !== confirmPassword) {
-      setPassError('كلمة المرور الجديدة وتأكيدها غير متطابقين')
+      setPassError(t('account.passMismatch'))
       return
     }
 
@@ -48,7 +49,7 @@ export default function AccountPage() {
         current_password: currentPassword,
         new_password: newPassword,
       })
-      setPassSuccess(res.data.message || 'تم تحديث كلمة المرور بنجاح')
+      setPassSuccess(res.data.message || t('account.passUpdated'))
       setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')
@@ -56,7 +57,7 @@ export default function AccountPage() {
       if (err instanceof ApiError) {
         setPassError(err.message)
       } else {
-        setPassError('تعذّر تغيير كلمة المرور، يرجى التأكد من كلمة المرور الحالية')
+        setPassError(t('account.passFailed'))
       }
     } finally {
       setSavingPass(false)
@@ -71,8 +72,8 @@ export default function AccountPage() {
             <User className="size-6" />
           </div>
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-foreground">الملف الشخصي والحساب</h1>
-            <p className="text-xs text-muted-foreground">إدارة بيانات التواصل وتغيير كلمة المرور</p>
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground">{t('account.heading')}</h1>
+            <p className="text-xs text-muted-foreground">{t('account.subheading')}</p>
           </div>
         </div>
 
@@ -86,17 +87,17 @@ export default function AccountPage() {
           }}
           className="rounded-xl text-xs font-bold"
         >
-          تسجيل الخروج
+          {t('account.logout')}
         </Button>
       </div>
 
       {/* Where a customer actually wants to go from here. On a phone this page
           is the only way in: the bottom bar's «حسابي» lands here. */}
-      <nav aria-label="روابط حسابي" className="grid gap-3 sm:grid-cols-3">
+      <nav aria-label={t('account.links')} className="grid gap-3 sm:grid-cols-3">
         {[
-          { to: '/me/orders', label: 'طلباتي', hint: 'تابع طلباتك', Icon: Package },
-          { to: '/me/addresses', label: 'عناويني', hint: 'عناوين التوصيل المحفوظة', Icon: MapPin },
-          { to: '/wishlist', label: 'المفضلة', hint: 'ما حفظته لوقت لاحق', Icon: Heart },
+          { to: '/me/orders', label: t('account.orders'), hint: t('account.ordersHint'), Icon: Package },
+          { to: '/me/addresses', label: t('account.addresses'), hint: t('account.addressesHint'), Icon: MapPin },
+          { to: '/wishlist', label: t('account.wishlist'), hint: t('account.wishlistHint'), Icon: Heart },
         ].map(({ to, label, hint, Icon }) => (
           <Link
             key={to}
@@ -110,19 +111,19 @@ export default function AccountPage() {
               <span className="block text-sm font-bold text-foreground">{label}</span>
               <span className="block truncate text-xs text-muted-foreground">{hint}</span>
             </span>
-            <ChevronLeft className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <ChevronLeft className="size-4 shrink-0 text-muted-foreground ltr:-scale-x-100" aria-hidden="true" />
           </Link>
         ))}
       </nav>
 
       {/* Basic Profile Data */}
       <section className="space-y-3">
-        <h2 className="text-sm font-bold text-foreground">بيانات الحساب الأساسية</h2>
+        <h2 className="text-sm font-bold text-foreground">{t('account.basics')}</h2>
         <dl className="divide-y divide-border rounded-2xl border border-border bg-card shadow-xs">
           {[
-            ['الاسم الكريم', user.name || 'عميل نسائم ليبيا'],
-            ['رقم الهاتف المسجل', user.phone_number],
-            ['تاريخ الانضمام للمتجر', formatDate(user.date_joined)],
+            [t('account.name'), user.name || t('account.nameFallback')],
+            [t('account.phone'), user.phone_number],
+            [t('account.joined'), formatDate(user.date_joined)],
           ].map(([label, value]) => (
             <div key={label} className="flex items-center justify-between gap-4 p-4 text-xs sm:text-sm">
               <dt className="text-muted-foreground">{label}</dt>
@@ -139,8 +140,8 @@ export default function AccountPage() {
             <KeyRound className="size-4" />
           </div>
           <div>
-            <h2 className="text-sm sm:text-base font-bold text-foreground">أمان الحساب وكلمة المرور</h2>
-            <p className="text-xs text-muted-foreground">يمكنك تعيين كلمة مرور مخصصة لحسابك في أي وقت</p>
+            <h2 className="text-sm sm:text-base font-bold text-foreground">{t('account.security')}</h2>
+            <p className="text-xs text-muted-foreground">{t('account.securityText')}</p>
           </div>
         </div>
 
@@ -156,14 +157,14 @@ export default function AccountPage() {
         {passError && <Alert tone="error">{passError}</Alert>}
 
         <form onSubmit={handlePasswordChange} className="space-y-4">
-          <Field label="كلمة المرور الحالية" htmlFor="current_pass" hint="إن فُتح حسابك عند الشراء فهي الأرقام الستة التي ظهرت لك بعد تأكيد الطلب">
+          <Field label={t('account.currentPass')} htmlFor="current_pass" hint={t('account.currentPassHint')}>
             <div className="relative">
               <Input
                 id="current_pass"
                 type={showPass ? 'text' : 'password'}
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
-                placeholder="أدخل كلمة المرور الحالية..."
+                placeholder={t('account.currentPassPlaceholder')}
                 className="h-11 rounded-xl text-xs pe-11 font-mono"
                 required
               />
@@ -171,7 +172,7 @@ export default function AccountPage() {
                 type="button"
                 onClick={() => setShowPass((p) => !p)}
                 className="absolute end-0 top-0 flex h-full items-center px-3 text-muted-foreground hover:text-foreground"
-                aria-label={showPass ? 'إخفاء' : 'إظهار'}
+                aria-label={showPass ? t('account.hide') : t('account.show')}
               >
                 {showPass ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
               </button>
@@ -179,25 +180,25 @@ export default function AccountPage() {
           </Field>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="كلمة المرور الجديدة" htmlFor="new_pass">
+            <Field label={t('account.newPass')} htmlFor="new_pass">
               <Input
                 id="new_pass"
                 type={showPass ? 'text' : 'password'}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="6 خانات أو أكثر..."
+                placeholder={t('account.newPassPlaceholder')}
                 className="h-11 rounded-xl text-xs font-mono"
                 required
               />
             </Field>
 
-            <Field label="تأكيد كلمة المرور الجديدة" htmlFor="confirm_pass">
+            <Field label={t('account.confirmPass')} htmlFor="confirm_pass">
               <Input
                 id="confirm_pass"
                 type={showPass ? 'text' : 'password'}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="أعد كتابة كلمة المرور..."
+                placeholder={t('account.confirmPassPlaceholder')}
                 className="h-11 rounded-xl text-xs font-mono"
                 required
               />
@@ -210,7 +211,7 @@ export default function AccountPage() {
             className="rounded-xl text-xs font-bold h-11 px-6 gap-2"
           >
             <Lock className="size-3.5" />
-            <span>حفظ وتحديث كلمة المرور</span>
+            <span>{t('account.savePass')}</span>
           </Button>
         </form>
       </section>

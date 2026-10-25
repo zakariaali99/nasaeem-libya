@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from '@/lib/i18nRouter'
 
 import { WidgetHeading } from '@/components/storefront/widgets/WidgetShell'
 import { cn } from '@/lib/utils'

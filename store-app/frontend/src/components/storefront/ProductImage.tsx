@@ -2,6 +2,7 @@ import { ImageOff } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import type { ProductImage as ProductImageType } from '@/types/api'
+import { t } from '@/lib/i18n'
 
 export interface ProductImageProps {
   image?: ProductImageType
@@ -34,7 +35,7 @@ export function ProductImage({
         )}
       >
         <ImageOff className="size-10" aria-hidden="true" />
-        <span className="sr-only">لا توجد صورة لهذا المنتج</span>
+        <span className="sr-only">{t('product.noImage')}</span>
       </div>
     )
   }

@@ -2,6 +2,7 @@ import { Minus, Plus } from 'lucide-react'
 
 import { formatNumber } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { t } from '@/lib/i18n'
 
 export interface QuantityStepperProps {
   value: number
@@ -29,7 +30,7 @@ export function QuantityStepper({
   min = 1,
   max,
   disabled = false,
-  label = 'الكمية',
+  label = t('quantity.label'),
   className,
 }: QuantityStepperProps) {
   const set = (next: number) => onChange(clampQuantity(next, min, max))
@@ -42,7 +43,7 @@ export function QuantityStepper({
         type="button"
         onClick={() => set(value - 1)}
         disabled={disabled || atMin}
-        aria-label="إنقاص الكمية"
+        aria-label={t('card.decrease')}
         className="inline-flex size-11 items-center justify-center rounded-s-md text-foreground hover:bg-muted disabled:opacity-40 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
       >
         <Minus className="size-5" aria-hidden="true" />
@@ -60,7 +61,7 @@ export function QuantityStepper({
         type="button"
         onClick={() => set(value + 1)}
         disabled={disabled || atMax}
-        aria-label="زيادة الكمية"
+        aria-label={t('cart.increase')}
         className="inline-flex size-11 items-center justify-center rounded-e-md text-foreground hover:bg-muted disabled:opacity-40 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
       >
         <Plus className="size-5" aria-hidden="true" />

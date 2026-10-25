@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { Eye, EyeOff } from 'lucide-react'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from '@/lib/i18nRouter'
 
 import { AuthLayout } from '@/components/layout/AuthLayout'
 import { Alert } from '@/components/ui/alert'
@@ -13,9 +13,10 @@ import { ApiError } from '@/lib/api'
 import { useRegister } from '@/lib/queries/auth'
 import { type RegisterInput, registerSchema } from '@/lib/schemas/auth'
 import { usePageTitle } from '@/lib/usePageTitle'
+import { t } from '@/lib/i18n'
 
 export default function RegisterPage() {
-  usePageTitle('إنشاء حساب', 'أنشئ حساباً جديداً في متجر نسائم ليبيا')
+  usePageTitle(t('register.title'), t('register.metaDescription'))
   const navigate = useNavigate()
   const signUp = useRegister()
   const [showPassword, setShowPassword] = useState(false)
@@ -24,7 +25,7 @@ export default function RegisterPage() {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<RegisterInput>({ resolver: zodResolver(registerSchema) })
+  } = useForm<RegisterInput>({ resolver: zodResolver(registerSchema()) })
 
   const onSubmit = handleSubmit(async (values) => {
     await signUp.mutateAsync(values)
@@ -36,13 +37,13 @@ export default function RegisterPage() {
 
   return (
     <AuthLayout
-      title="إنشاء حساب"
-      subtitle="يكفي رقم هاتف وكلمة مرور للبدء"
+      title={t('register.title')}
+      subtitle={t('register.subtitle')}
       footer={
         <>
-          لديك حساب بالفعل؟{' '}
+          {t('register.haveAccount')}{' '}
           <Link to="/login" className="-my-3 inline-flex min-h-11 items-center py-3 font-medium text-primary underline-offset-4 hover:underline">
-            سجّل الدخول
+            {t('register.signIn')}
           </Link>
         </>
       }
@@ -50,15 +51,15 @@ export default function RegisterPage() {
       <form onSubmit={onSubmit} noValidate className="space-y-5">
         {apiError ? <Alert tone="error">{apiError.message}</Alert> : null}
 
-        <Field id="name" label="الاسم" error={errors.name?.message ?? fieldErrors?.name?.[0]}>
+        <Field id="name" label={t('register.name')} error={errors.name?.message ?? fieldErrors?.name?.[0]}>
           {(field) => <Input {...field} {...register('name')} autoComplete="name" />}
         </Field>
 
         <Field
           id="phone"
-          label="رقم الهاتف"
+          label={t('login.phone')}
           error={errors.phone_number?.message ?? fieldErrors?.phone_number?.[0]}
-          hint="سنستخدمه لتسجيل الدخول ولتتبّع طلباتك"
+          hint={t('register.phoneHint')}
         >
           {(field) => (
             <Input
@@ -76,9 +77,9 @@ export default function RegisterPage() {
 
         <Field
           id="password"
-          label="كلمة المرور"
+          label={t('login.password')}
           error={errors.password?.message ?? fieldErrors?.password?.[0]}
-          hint="8 أحرف على الأقل، ولا تكون أرقاماً فقط"
+          hint={t('register.passHint')}
         >
           {(field) => (
             <div className="relative">
@@ -93,7 +94,7 @@ export default function RegisterPage() {
                 type="button"
                 onClick={() => setShowPassword((prev) => !prev)}
                 className="absolute end-0 top-0 flex h-full items-center px-3 text-muted-foreground hover:text-foreground focus:outline-hidden transition-colors"
-                aria-label={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+                aria-label={showPassword ? t('login.hidePass') : t('login.showPass')}
               >
                 {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
               </button>
@@ -102,7 +103,7 @@ export default function RegisterPage() {
         </Field>
 
         <Button type="submit" block size="lg" loading={isSubmitting || signUp.isPending}>
-          إنشاء الحساب
+          {t('register.submit')}
         </Button>
       </form>
     </AuthLayout>

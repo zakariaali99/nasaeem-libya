@@ -1,5 +1,5 @@
 import { Store } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link } from '@/lib/i18nRouter'
 
 import { EmptyState } from '@/components/storefront/EmptyState'
 import { ErrorState } from '@/components/storefront/ErrorState'
@@ -9,14 +9,15 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useStorefrontLayout } from '@/lib/queries/storefront'
 import { useSiteText } from '@/lib/siteText'
 import { usePageTitle } from '@/lib/usePageTitle'
+import { t } from '@/lib/i18n'
 
 /**
  * The homepage is entirely CMS-driven: one request returns the resolved layout
  * with every widget already populated.
  */
 export default function HomePage() {
-  usePageTitle('', 'نسائم ليبيا — عطور وزيوت وأطقم هدايا، توصيل إلى جميع مدن ليبيا.')
-  const t = useSiteText()
+  usePageTitle('', t('home.metaDescription'))
+  const siteText = useSiteText()
   const { data, isPending, isError, error, refetch } = useStorefrontLayout()
 
   if (isPending) return <HomeSkeleton />
@@ -36,14 +37,14 @@ export default function HomePage() {
     // most important screen, with nowhere to go next.
     return (
       <div className="mx-auto w-full max-w-6xl px-4 py-16">
-        <h1 className="sr-only">نسائم ليبيا</h1>
+        <h1 className="sr-only">{t('common.storeName')}</h1>
         <EmptyState
           icon={<Store className="size-8" aria-hidden="true" />}
-          title={t('home.empty.title') || 'نسائم ليبيا'}
-          description={t('home.empty.text')}
+          title={siteText('home.empty.title') || t('common.storeName')}
+          description={siteText('home.empty.text')}
           action={
             <Button asChild size="lg">
-              <Link to="/products">تصفّح كل المنتجات</Link>
+              <Link to="/products">{t('listing.browseAll')}</Link>
             </Button>
           }
         />
@@ -54,7 +55,7 @@ export default function HomePage() {
   return (
     <>
       {/* One h1 per page. The widgets carry h2 headings beneath it. */}
-      <h1 className="sr-only">نسائم ليبيا — عطور وأطقم هدايا</h1>
+      <h1 className="sr-only">{t('home.heading')}</h1>
       {/* `stagger`: each widget rises in as the page composes. The shells own
        * their width, so the wrapper stays style-free. */}
       <div className="stagger">
@@ -71,7 +72,7 @@ export default function HomePage() {
 function HomeSkeleton() {
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6" aria-busy="true">
-      <span className="sr-only">جارٍ تحميل الصفحة الرئيسية…</span>
+      <span className="sr-only">{t('home.loading')}</span>
       <Skeleton className="h-16 w-full" />
       <Skeleton className="aspect-[16/9] w-full sm:aspect-[21/9]" />
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">

@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils'
 import { discountPercent, formatPrice } from '@/lib/format'
+import { t } from '@/lib/i18n'
 
 export interface PriceProps {
   price: number | string | null | undefined
@@ -30,7 +31,7 @@ export function Price({ price, compareAtPrice, size = 'md', className }: PricePr
         {formatPrice(price)}
       </span>
       {onSale ? (
-        <s className="text-sm tabular-nums text-muted-foreground" aria-label="السعر قبل الخصم">
+        <s className="text-sm tabular-nums text-muted-foreground" aria-label={t('price.before')}>
           {formatPrice(compareAtPrice)}
         </s>
       ) : null}

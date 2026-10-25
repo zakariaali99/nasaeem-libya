@@ -1,6 +1,6 @@
 import { ArrowLeft } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from '@/lib/i18nRouter'
 
 import { cn } from '@/lib/utils'
 import type { WidgetStyle } from '@/types/api'
@@ -82,7 +82,7 @@ export function WidgetHeading({
           className="inline-flex min-h-11 shrink-0 items-center gap-1 px-2 text-xs font-bold text-primary transition-all hover:gap-1.5 sm:text-sm"
         >
           <span>{actionLabel}</span>
-          <ArrowLeft className="size-4" />
+          <ArrowLeft className="size-4 ltr:-scale-x-100" />
         </Link>
       ) : null}
     </div>

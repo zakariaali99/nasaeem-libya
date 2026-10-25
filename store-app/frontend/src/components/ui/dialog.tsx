@@ -3,6 +3,7 @@ import { X } from 'lucide-react'
 import * as React from 'react'
 
 import { cn } from '@/lib/utils'
+import { t } from '@/lib/i18n'
 
 export const Dialog = DialogPrimitive.Root
 export const DialogTrigger = DialogPrimitive.Trigger
@@ -29,7 +30,7 @@ export const DialogContent = React.forwardRef<
         {children}
         <DialogPrimitive.Close
           className="absolute end-4 top-4 inline-flex size-11 items-center justify-center rounded-md text-muted-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-          aria-label="إغلاق"
+          aria-label={t('common.close')}
         >
           <X className="size-5" aria-hidden="true" />
         </DialogPrimitive.Close>

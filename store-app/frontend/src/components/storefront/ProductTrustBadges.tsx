@@ -19,7 +19,7 @@ export function ProductTrustBadges() {
   if (badges.length === 0) return null
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
       {badges.map(({ Icon, title, text }) => (
         <div key={title} className="flex items-center gap-2.5 rounded-2xl border border-border bg-card p-3 shadow-2xs">
           <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">

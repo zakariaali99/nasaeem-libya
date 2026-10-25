@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from '@/lib/i18nRouter'
 
 import { BannerPicture, imageModeOf, type BannerVariant } from '@/components/storefront/widgets/Carousel'
 import { WidgetHeading } from '@/components/storefront/widgets/WidgetShell'

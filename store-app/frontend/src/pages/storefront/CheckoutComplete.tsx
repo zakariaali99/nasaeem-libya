@@ -1,6 +1,7 @@
 import { Building2, Check, CheckCircle2, Copy, MessageSquare, Smartphone } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
+import { Link } from '@/lib/i18nRouter'
 
 import { OrderSummary } from '@/components/storefront/OrderSummary'
 import { Button } from '@/components/ui/button'
@@ -11,9 +12,10 @@ import { useCheckoutOrder } from '@/lib/queries/cart'
 import { useStoreSettings } from '@/lib/queries/storeSettings'
 import { useSiteText } from '@/lib/siteText'
 import { usePageTitle } from '@/lib/usePageTitle'
+import { t } from '@/lib/i18n'
 
 export default function CheckoutCompletePage() {
-  usePageTitle('تم استلام طلبك — نسائم ليبيا', 'شكراً لك — تم تسجيل طلبك بنجاح.')
+  usePageTitle(t('complete.title'), t('complete.metaDescription'))
   const thanks = useSiteText()('order.thanks')
   const [params] = useSearchParams()
   const reference = params.get('order') ?? ''
@@ -43,11 +45,11 @@ export default function CheckoutCompletePage() {
         <span className="flex size-16 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
           <CheckCircle2 className="size-9" aria-hidden="true" />
         </span>
-        <h1 className="text-2xl font-bold sm:text-3xl text-foreground">تم استلام طلبك بنجاح</h1>
+        <h1 className="text-2xl font-bold sm:text-3xl text-foreground">{t('complete.heading')}</h1>
         {thanks && <p className="text-sm text-muted-foreground max-w-md">{thanks}</p>}
         {reference && (
           <div className="rounded-2xl border border-border bg-muted/40 px-4 py-2 text-xs sm:text-sm">
-            رقم الطلب: <bdi className="font-bold font-mono text-primary text-base">#{reference}</bdi>
+            {t('complete.orderNumber')} <bdi className="font-bold font-mono text-primary text-base">#{reference}</bdi>
           </div>
         )}
       </div>
@@ -56,8 +58,8 @@ export default function CheckoutCompletePage() {
       <div className="flex items-start gap-3 rounded-2xl border border-primary/30 bg-primary/5 p-4 text-xs leading-relaxed text-muted-foreground">
         <Smartphone className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
         <p>
-          <span className="font-bold text-foreground">طلباتك محفوظة في «طلباتي» على هذا الجهاز.</span>{' '}
-          تابع حالة طلبك من هناك في أي وقت، دون كلمة مرور.
+          <span className="font-bold text-foreground">{t('complete.savedHere')}</span>{' '}
+          {t('complete.followThere')}
         </p>
       </div>
 
@@ -66,10 +68,10 @@ export default function CheckoutCompletePage() {
         <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 sm:p-5 text-center space-y-3">
           <div className="flex items-center justify-center gap-2 text-emerald-800 dark:text-emerald-300 font-bold text-sm">
             <MessageSquare className="size-4" />
-            <span>تواصل معنا عبر واتساب (اختياري)</span>
+            <span>{t('complete.whatsappTitle')}</span>
           </div>
           <p className="text-xs text-muted-foreground">
-            يمكنك إرسال تفاصيل طلبك إلينا عبر واتساب لمتابعته بسرعة:
+            {t('complete.whatsappText')}
           </p>
           <a
             href={whatsappLink}
@@ -78,7 +80,7 @@ export default function CheckoutCompletePage() {
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 text-xs sm:text-sm font-bold shadow-md transition-colors"
           >
             <MessageSquare className="size-4" />
-            <span>إرسال الطلب عبر واتساب</span>
+            <span>{t('complete.whatsappSend')}</span>
           </a>
         </div>
       )}
@@ -88,12 +90,12 @@ export default function CheckoutCompletePage() {
         <div className="space-y-4">
           <div className="flex items-center gap-2 text-primary font-bold text-sm border-b border-border pb-2">
             <Building2 className="size-4" />
-            <span>بيانات الحساب المصرفي للتحويل المباشر</span>
+            <span>{t('complete.bankTitle')}</span>
           </div>
 
           {(storeSettings?.bank_accounts || []).length === 0 ? (
             <div className="rounded-2xl border border-primary/20 bg-card p-5 text-xs text-muted-foreground">
-              سيتواصل معك فريقنا لتزويدك ببيانات التحويل المصرفي.
+              {t('complete.bankLater')}
             </div>
           ) : (
             (storeSettings?.bank_accounts || []).map((acc) => (
@@ -106,19 +108,19 @@ export default function CheckoutCompletePage() {
                 </div>
                 <div className="grid gap-2 text-xs">
                   <div className="flex justify-between border-b border-border/40 pb-1.5">
-                    <span className="text-muted-foreground">اسم المستفيد:</span>
+                    <span className="text-muted-foreground">{t('complete.beneficiary')}</span>
                     <span className="font-bold text-foreground">{acc.account_holder}</span>
                   </div>
                   <div className="flex items-center justify-between border-b border-border/40 pb-1.5">
-                    <span className="text-muted-foreground">رقم الحساب:</span>
+                    <span className="text-muted-foreground">{t('complete.accountNumber')}</span>
                     <div className="flex items-center gap-2">
                       <span className="font-mono font-bold text-primary text-sm">{acc.account_number}</span>
                       <button
                         type="button"
                         onClick={() => copyToClipboard(acc.account_number, `acc-${acc.id}`)}
                         className="inline-flex size-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-primary"
-                        aria-label="نسخ رقم الحساب"
-                        title="نسخ رقم الحساب"
+                        aria-label={t('complete.copyAccount')}
+                        title={t('complete.copyAccount')}
                       >
                         {copiedField === `acc-${acc.id}` ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5" />}
                       </button>
@@ -126,15 +128,15 @@ export default function CheckoutCompletePage() {
                   </div>
                   {acc.iban && (
                     <div className="flex items-center justify-between pt-0.5">
-                      <span className="text-muted-foreground">رقم الآيبان (IBAN):</span>
+                      <span className="text-muted-foreground">{t('complete.iban')}</span>
                       <div className="flex items-center gap-2">
                         <span className="font-mono font-bold text-primary text-xs" dir="ltr">{acc.iban}</span>
                         <button
                           type="button"
                           onClick={() => copyToClipboard(acc.iban!, `iban-${acc.id}`)}
                           className="inline-flex size-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-primary"
-                          aria-label="نسخ رقم الآيبان"
-                          title="نسخ رقم الآيبان"
+                          aria-label={t('complete.copyIban')}
+                          title={t('complete.copyIban')}
                         >
                           {copiedField === `iban-${acc.id}` ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5" />}
                         </button>
@@ -148,7 +150,7 @@ export default function CheckoutCompletePage() {
 
           {storeSettings?.bank_transfer_note && (
             <p className="rounded-xl bg-muted/40 p-3 text-xs text-muted-foreground leading-relaxed">
-              💡 <span className="font-bold text-foreground">ملاحظة:</span> {storeSettings.bank_transfer_note}
+              💡 <span className="font-bold text-foreground">{t('complete.note')}</span> {storeSettings.bank_transfer_note}
             </p>
           )}
 
@@ -183,7 +185,7 @@ export default function CheckoutCompletePage() {
           />
           {order.shipping_address ? (
             <p className="rounded-2xl border border-border bg-muted/40 p-4 text-xs">
-              <span className="font-bold text-foreground">عنوان التوصيل:</span>{' '}
+              <span className="font-bold text-foreground">{t('complete.address')}</span>{' '}
               {[order.city_name, order.region_name].filter(Boolean).join(' · ')}
               {order.city_name || order.region_name ? ' — ' : ''}
               {order.shipping_address}
@@ -194,10 +196,10 @@ export default function CheckoutCompletePage() {
 
       <div className="flex flex-wrap justify-center gap-3 pt-2">
         <Button asChild size="lg" className="rounded-xl">
-          <Link to="/me/orders">متابعة طلباتي</Link>
+          <Link to="/me/orders">{t('complete.myOrders')}</Link>
         </Button>
         <Button asChild variant="outline" size="lg" className="rounded-xl">
-          <Link to="/products">مواصلة التسوّق</Link>
+          <Link to="/products">{t('cartPage.continue')}</Link>
         </Button>
       </div>
     </div>

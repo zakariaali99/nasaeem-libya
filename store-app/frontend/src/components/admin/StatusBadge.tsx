@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge'
 import { STAGE_BY_VALUE } from '@/lib/orderStages'
 import { cn } from '@/lib/utils'
 import type { OrderStage } from '@/types/api'
+import { t } from '@/lib/i18n'
 
 const LABELS: Record<string, string> = {
   pending: 'قيد الانتظار',
@@ -83,7 +84,7 @@ export function StageBadge({ stage }: { stage: OrderStage }) {
   return (
     <span className={cn('inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold', info.tone)}>
       <info.icon className="size-3 shrink-0" aria-hidden="true" />
-      <span>{info.label}</span>
+      <span>{t(`stage.${info.value}`)}</span>
     </span>
   )
 }

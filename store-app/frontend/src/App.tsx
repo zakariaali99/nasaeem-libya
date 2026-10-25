@@ -113,49 +113,67 @@ function withSuspense(element: React.ReactNode) {
   return <Suspense fallback={<RouteFallback />}>{element}</Suspense>
 }
 
-const router = createBrowserRouter([
+/**
+ * The storefront shell (header, footer, bottom navigation) and every
+ * customer-facing route, mounted at `base`: '' for Arabic, '/en' for English.
+ * The two trees are separate on purpose — switching language re-renders the
+ * whole page in the other language.
+ */
+function storefrontRoutes(base: '' | '/en') {
+  return [
+    {
+      path: base || '/',
+      // The key makes React rebuild the page rather than reuse it.
+      element: <StorefrontLayout key={base || 'ar'} />,
+      children: [
+        { index: true, element: <HomePage /> },
+        { path: 'products', element: <ProductsPage /> },
+        { path: 'products/:productSlug', element: <ProductDetailPage /> },
+        { path: 'search', element: <SearchPage /> },
+        { path: 'categories/:slug', element: <CategoryListingPage /> },
+        { path: 'collections/:slug', element: <CollectionListingPage /> },
+        { path: 'wishlist', element: withSuspense(<WishlistPage />) },
+        { path: 'cart', element: withSuspense(<CartPage />) },
+        { path: 'checkout/redirect', element: withSuspense(<CheckoutRedirectPage />) },
+        // A visitor buys without an account: the checkout form takes a name
+        // and a phone number, and the server opens the account. Behind
+        // RequireAuth these two pages sent every guest to the login screen
+        // after their basket had already been turned into an order.
+        { path: 'checkout/complete', element: withSuspense(<CheckoutCompletePage />) },
+        { path: 'checkout/:orderId', element: withSuspense(<CheckoutPage />) },
+        // A customer who bought on this device sees those orders without
+        // signing in; the server lists only the orders this device placed.
+        { path: 'track', element: withSuspense(<TrackOrderPage />) },
+        { path: 'me/orders', element: withSuspense(<MyOrdersPage />) },
+        { path: 'me/orders/:orderId', element: withSuspense(<MyOrderDetailPage />) },
+        {
+          element: <RequireAuth />,
+          children: [
+            { path: 'me', element: withSuspense(<AccountPage />) },
+            { path: 'me/addresses', element: withSuspense(<MyAddressesPage />) },
+          ],
+        },
+        // Any other address: the not-found page inside the store's header and footer.
+        { path: '*', element: withSuspense(<NotFoundPage />) },
+      ],
+    },
+    { path: `${base}/login`, element: withSuspense(<LoginPage />) },
+    { path: `${base}/register`, element: withSuspense(<RegisterPage />) },
+  ]
+}
+
+// Built on first render, not at import: main.tsx may first move the visitor
+// to the address in their language, and the router must start from that one.
+let router: ReturnType<typeof createBrowserRouter> | undefined
+
+const createRouter = () => createBrowserRouter([
   {
     element: <RootLayout />,
     errorElement: <RouteErrorBoundary />,
     children: [
-      // The storefront shell: header, footer and bottom navigation, shared by
-      // every customer-facing route.
-      {
-        element: <StorefrontLayout />,
-        children: [
-          { path: '/', element: <HomePage /> },
-          { path: '/products', element: <ProductsPage /> },
-          { path: '/products/:productSlug', element: <ProductDetailPage /> },
-          { path: '/search', element: <SearchPage /> },
-          { path: '/categories/:slug', element: <CategoryListingPage /> },
-          { path: '/collections/:slug', element: <CollectionListingPage /> },
-          { path: '/wishlist', element: withSuspense(<WishlistPage />) },
-          { path: '/cart', element: withSuspense(<CartPage />) },
-          { path: '/checkout/redirect', element: withSuspense(<CheckoutRedirectPage />) },
-          // A visitor buys without an account: the checkout form takes a name
-          // and a phone number, and the server opens the account. Behind
-          // RequireAuth these two pages sent every guest to the login screen
-          // after their basket had already been turned into an order.
-          { path: '/checkout/complete', element: withSuspense(<CheckoutCompletePage />) },
-          { path: '/checkout/:orderId', element: withSuspense(<CheckoutPage />) },
-          // A customer who bought on this device sees those orders without
-          // signing in; the server lists only the orders this device placed.
-          { path: '/track', element: withSuspense(<TrackOrderPage />) },
-          { path: '/me/orders', element: withSuspense(<MyOrdersPage />) },
-          { path: '/me/orders/:orderId', element: withSuspense(<MyOrderDetailPage />) },
-          {
-            element: <RequireAuth />,
-            children: [
-              { path: '/me', element: withSuspense(<AccountPage />) },
-              { path: '/me/addresses', element: withSuspense(<MyAddressesPage />) },
-            ],
-          },
-          // Any other address: the not-found page inside the store's header and footer.
-          { path: '*', element: withSuspense(<NotFoundPage />) },
-        ],
-      },
-      { path: '/login', element: withSuspense(<LoginPage />) },
-      { path: '/register', element: withSuspense(<RegisterPage />) },
+      // The storefront, once at the Arabic addresses and once under `/en/`.
+      ...storefrontRoutes(''),
+      ...storefrontRoutes('/en'),
       {
         element: <RequireAuth admin />,
         children: [
@@ -213,7 +231,7 @@ export default function App() {
   return (
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
-        <RouterProvider router={router} />
+        <RouterProvider router={(router ??= createRouter())} />
       </QueryClientProvider>
     </ThemeProvider>
   )

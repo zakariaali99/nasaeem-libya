@@ -8,24 +8,25 @@ import {
 
 import type { PerfumeDetails } from '@/types/api'
 import { cn } from '@/lib/utils'
+import { t, type MessageKey } from '@/lib/i18n'
 
 interface SensoryPerformanceRadarProps {
   details?: PerfumeDetails
 }
 
-const SEASON_TRANSLATIONS: Record<string, string> = {
-  winter: '❄️ الشتاء',
-  autumn: '🍂 الخريف',
-  spring: '🌸 الربيع',
-  summer: '☀️ الصيف',
+const LABELS: Record<string, MessageKey> = {
+  winter: 'radar.winter',
+  autumn: 'radar.autumn',
+  spring: 'radar.spring',
+  summer: 'radar.summer',
+  formal: 'radar.formal',
+  evening: 'radar.evening',
+  special_dates: 'radar.special_dates',
+  daily: 'radar.daily',
 }
 
-const OCCASION_TRANSLATIONS: Record<string, string> = {
-  formal: '💼 مناسبات ولقاءات رسمية',
-  evening: '👑 سهرات وحفلات مسائية',
-  special_dates: '💎 مناسبات خاصة فاخرة',
-  daily: '🌿 استخدام يومي راقي',
-}
+/** A season or occasion code in words; an unknown code is shown as it is. */
+const label = (code: string) => (LABELS[code] ? t(LABELS[code]) : code)
 
 export function SensoryPerformanceRadar({ details }: SensoryPerformanceRadarProps) {
   if (!details) return null
@@ -45,8 +46,8 @@ export function SensoryPerformanceRadar({ details }: SensoryPerformanceRadarProp
           <Activity className="size-4" />
         </span>
         <div>
-          <h3 className="text-base font-black text-foreground">مؤشرات الأداء الحسي والثبات</h3>
-          <p className="text-xs text-muted-foreground">تقييم قوة الفوحان ومدة الثبات على البشرة والأقمشة</p>
+          <h3 className="text-base font-black text-foreground">{t('radar.title')}</h3>
+          <p className="text-xs text-muted-foreground">{t('radar.subtitle')}</p>
         </div>
       </div>
 
@@ -56,7 +57,7 @@ export function SensoryPerformanceRadar({ details }: SensoryPerformanceRadarProp
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Clock className="size-4 text-primary" />
-              <span className="text-xs font-bold text-foreground">الثبات والدوام (Longevity)</span>
+              <span className="text-xs font-bold text-foreground">{t('radar.longevity')}</span>
             </div>
             <span className="font-mono text-xs font-bold text-primary">{longevityHours}</span>
           </div>
@@ -75,7 +76,7 @@ export function SensoryPerformanceRadar({ details }: SensoryPerformanceRadarProp
               />
             ))}
           </div>
-          <p className="text-[11px] text-muted-foreground">ثبات عالي جداً يدوم طوال اليوم على الملابس والأقمشة</p>
+          <p className="text-[11px] text-muted-foreground">{t('radar.longevityText')}</p>
         </div>
 
         {/* Sillage Meter */}
@@ -83,10 +84,10 @@ export function SensoryPerformanceRadar({ details }: SensoryPerformanceRadarProp
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Wind className="size-4 text-primary" />
-              <span className="text-xs font-bold text-foreground">قوة الفوحان (Sillage)</span>
+              <span className="text-xs font-bold text-foreground">{t('radar.sillage')}</span>
             </div>
             <span className="text-xs font-bold text-primary">
-              {sillageScore >= 4 ? 'فوحان عالي يلفت الانتباه' : 'فوحان معتدل أنيق'}
+              {sillageScore >= 4 ? t('radar.sillageHigh') : t('radar.sillageModerate')}
             </span>
           </div>
 
@@ -104,7 +105,7 @@ export function SensoryPerformanceRadar({ details }: SensoryPerformanceRadarProp
               />
             ))}
           </div>
-          <p className="text-[11px] text-muted-foreground">انتشار عطري ملحوظ يترك انطباعاً راقياً في المكان</p>
+          <p className="text-[11px] text-muted-foreground">{t('radar.sillageText')}</p>
         </div>
       </div>
 
@@ -115,7 +116,7 @@ export function SensoryPerformanceRadar({ details }: SensoryPerformanceRadarProp
           <div className="flex items-center justify-between py-1.5 border-b border-border/40">
             <span className="text-muted-foreground flex items-center gap-1.5">
               <Crown className="size-3.5 text-primary" />
-              <span>تركيز العطر:</span>
+              <span>{t('radar.concentration')}</span>
             </span>
             <span className="font-bold text-foreground">{concentration}</span>
           </div>
@@ -123,7 +124,7 @@ export function SensoryPerformanceRadar({ details }: SensoryPerformanceRadarProp
           <div className="flex items-center justify-between py-1.5 border-b border-border/40">
             <span className="text-muted-foreground flex items-center gap-1.5">
               <Globe className="size-3.5 text-primary" />
-              <span>بلد المنشأ:</span>
+              <span>{t('radar.origin')}</span>
             </span>
             <span className="font-bold text-foreground">{origin}</span>
           </div>
@@ -131,14 +132,14 @@ export function SensoryPerformanceRadar({ details }: SensoryPerformanceRadarProp
 
         {/* Seasons Badges */}
         <div className="space-y-2">
-          <span className="text-xs font-bold text-foreground block">الفصول والمناسبات المثالية:</span>
+          <span className="text-xs font-bold text-foreground block">{t('radar.seasons')}</span>
           <div className="flex flex-wrap gap-1.5">
             {seasons.map((s) => (
               <span
                 key={s}
                 className="rounded-lg bg-muted px-2.5 py-1 text-[11px] font-bold text-foreground border border-border/60"
               >
-                {SEASON_TRANSLATIONS[s] || s}
+                {label(s)}
               </span>
             ))}
             {occasions.map((o) => (
@@ -146,7 +147,7 @@ export function SensoryPerformanceRadar({ details }: SensoryPerformanceRadarProp
                 key={o}
                 className="rounded-lg bg-primary/10 px-2.5 py-1 text-[11px] font-bold text-primary border border-primary/25"
               >
-                {OCCASION_TRANSLATIONS[o] || o}
+                {label(o)}
               </span>
             ))}
           </div>

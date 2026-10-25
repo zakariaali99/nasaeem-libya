@@ -1,7 +1,9 @@
 import { AlertTriangle } from 'lucide-react'
-import { isRouteErrorResponse, useNavigate, useRouteError } from 'react-router-dom'
+import { isRouteErrorResponse, useRouteError } from 'react-router-dom'
+import { useNavigate } from '@/lib/i18nRouter'
 
 import { Button } from '@/components/ui/button'
+import { t } from '@/lib/i18n'
 
 /** A crash shows an Arabic message, never a white screen. */
 export function RouteErrorBoundary() {
@@ -14,20 +16,20 @@ export function RouteErrorBoundary() {
       <AlertTriangle className="size-12 text-warning" aria-hidden="true" />
       <div className="space-y-2">
         <h1 className="text-2xl font-bold text-foreground">
-          {notFound ? 'الصفحة غير موجودة' : 'حدث خطأ غير متوقع'}
+          {notFound ? t('error.notFoundTitle') : t('error.unexpectedTitle')}
         </h1>
         <p className="text-sm text-muted-foreground">
           {notFound
-            ? 'الرابط الذي فتحته غير صحيح أو تم حذف الصفحة.'
-            : 'تعذّر عرض هذه الصفحة. يمكنك المحاولة مرة أخرى أو العودة إلى الصفحة الرئيسية.'}
+            ? t('error.notFoundText')
+            : t('error.unexpectedText')}
         </p>
       </div>
       <div className="flex flex-wrap items-center justify-center gap-3">
         {!notFound ? (
-          <Button onClick={() => window.location.reload()}>إعادة المحاولة</Button>
+          <Button onClick={() => window.location.reload()}>{t('common.retry')}</Button>
         ) : null}
         <Button variant="outline" onClick={() => navigate('/')}>
-          الصفحة الرئيسية
+          {t('error.homePage')}
         </Button>
       </div>
     </main>

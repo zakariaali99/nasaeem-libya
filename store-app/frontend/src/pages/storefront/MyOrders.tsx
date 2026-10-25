@@ -1,16 +1,17 @@
-import { Link } from 'react-router-dom'
+import { Link } from '@/lib/i18nRouter'
 
 import { StageBadge } from '@/components/admin/StatusBadge'
 import { EmptyState } from '@/components/storefront/EmptyState'
 import { ErrorState } from '@/components/storefront/ErrorState'
 import { Skeleton } from '@/components/ui/skeleton'
-import { formatPrice } from '@/lib/format'
+import { formatPrice, formatShortDate } from '@/lib/format'
 import { useMe } from '@/lib/queries/auth'
 import { usePageTitle } from '@/lib/usePageTitle'
 import { useMyOrders } from '@/lib/queries/orders'
+import { t } from '@/lib/i18n'
 
 export default function MyOrders() {
-  usePageTitle('طلباتي')
+  usePageTitle(t('orders.title'))
   const { data, isPending, isError, refetch } = useMyOrders()
   const { data: user } = useMe()
 
@@ -26,27 +27,27 @@ export default function MyOrders() {
   const orders = data?.items ?? []
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-8">
-      <h1 className="mb-6 text-2xl font-bold">طلباتي</h1>
+      <h1 className="mb-6 text-2xl font-bold">{t('orders.title')}</h1>
       {!user && orders.length > 0 && (
         <p className="mb-4 rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
-          هذه الطلبات التي أتممتها من هذا الجهاز. لطلبات من جهاز آخر{' '}
-          <Link to="/track" className="font-semibold text-primary underline">تتبّع برقم الهاتف</Link>.
+          {t('orders.deviceNote')}{' '}
+          <Link to="/track" className="font-semibold text-primary underline">{t('orders.trackByPhone')}</Link>.
         </p>
       )}
       {orders.length === 0 ? (
         <EmptyState
-          title="لا توجد طلبات بعد"
+          title={t('orders.emptyTitle')}
           description={
             user
-              ? 'عند إتمام أول طلب سيظهر هنا مع حالته وتفاصيله.'
-              : 'تظهر هنا الطلبات التي أتممتها من هذا الجهاز. إن طلبت من جهاز آخر فابحث عنها برقم هاتفك.'
+              ? t('orders.emptySignedIn')
+              : t('orders.emptyGuest')
           }
           action={
             <div className="flex flex-wrap items-center justify-center gap-4">
               {!user && (
-                <Link to="/track" className="font-semibold text-primary underline">تتبّع برقم الهاتف</Link>
+                <Link to="/track" className="font-semibold text-primary underline">{t('orders.trackByPhone')}</Link>
               )}
-              <Link to="/products" className="font-semibold text-primary underline">تصفّح المنتجات</Link>
+              <Link to="/products" className="font-semibold text-primary underline">{t('checkout.browseProducts')}</Link>
             </div>
           }
         />
@@ -63,7 +64,7 @@ export default function MyOrders() {
                   <StageBadge stage={order.stage} />
                 </div>
                 <div className="mt-1 flex items-center justify-between text-sm text-muted-foreground">
-                  <span>{new Date(order.created_at).toLocaleDateString('ar-LY')}</span>
+                  <span>{formatShortDate(order.created_at)}</span>
                   <span className="font-semibold text-foreground">{formatPrice(order.total)}</span>
                 </div>
               </Link>

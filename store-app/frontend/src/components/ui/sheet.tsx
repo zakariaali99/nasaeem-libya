@@ -2,6 +2,7 @@ import * as SheetPrimitive from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
 import * as React from 'react'
 import { cn } from '@/lib/utils'
+import { t } from '@/lib/i18n'
 
 export const Sheet = SheetPrimitive.Root
 export const SheetTrigger = SheetPrimitive.Trigger
@@ -26,7 +27,8 @@ SheetOverlay.displayName = 'SheetOverlay'
 
 export interface SheetContentProps
   extends React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content> {
-  side?: 'top' | 'bottom' | 'left' | 'right'
+  /** `start`/`end` follow the page direction (right/left in Arabic, left/right in English). */
+  side?: 'top' | 'bottom' | 'left' | 'right' | 'start' | 'end'
 }
 
 export const SheetContent = React.forwardRef<
@@ -38,6 +40,8 @@ export const SheetContent = React.forwardRef<
     bottom: 'inset-x-0 bottom-0 border-t border-border',
     left: 'inset-y-0 left-0 h-full w-[82vw] max-w-[340px] border-e border-border sm:max-w-md',
     right: 'inset-y-0 right-0 h-full w-[82vw] max-w-[340px] border-s border-border sm:max-w-md',
+    start: 'inset-y-0 start-0 h-full w-[82vw] max-w-[340px] border-e border-border sm:max-w-md',
+    end: 'inset-y-0 end-0 h-full w-[82vw] max-w-[340px] border-s border-border sm:max-w-md',
   }
 
   return (
@@ -55,7 +59,7 @@ export const SheetContent = React.forwardRef<
         {children}
         <SheetPrimitive.Close
           className="absolute end-4 top-4 inline-flex size-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-          aria-label="إغلاق"
+          aria-label={t('common.close')}
         >
           <X className="size-5" aria-hidden="true" />
         </SheetPrimitive.Close>

@@ -1,5 +1,5 @@
 import { ArrowLeft, CheckCircle2, Gift, Sparkles } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link } from '@/lib/i18nRouter'
 
 import { Button } from '@/components/ui/button'
 
@@ -71,7 +71,7 @@ export function DiscoveryBoxBanner({
               <Link to={linkUrl || '/products'}>
                 <Gift className="size-4" />
                 <span>{buttonText}</span>
-                <ArrowLeft className="size-3.5" />
+                <ArrowLeft className="size-3.5 ltr:-scale-x-100" />
               </Link>
             </Button>
           </div>

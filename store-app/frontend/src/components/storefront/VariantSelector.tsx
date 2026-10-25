@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils'
 import type { ProductVariant } from '@/types/api'
+import { t } from '@/lib/i18n'
 
 export interface OptionGroup {
   id: string
@@ -138,7 +139,7 @@ export function VariantSelector({ variants, selection, onChange, picked, onToggl
                   )}
                 >
                   {value.value}
-                  {available ? null : <span className="sr-only"> — غير متوفر</span>}
+                  {available ? null : <span className="sr-only">{t('stock.unavailableSuffix')}</span>}
                 </button>
               )
             })}

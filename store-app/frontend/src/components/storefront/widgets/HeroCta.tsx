@@ -1,5 +1,5 @@
 import { ArrowLeft, ShoppingBag, Sparkles } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link } from '@/lib/i18nRouter'
 
 import { Carousel, imageModeOf, type BannerVariant } from '@/components/storefront/widgets/Carousel'
 import { Button } from '@/components/ui/button'
@@ -167,7 +167,7 @@ export function HeroCta({
                 className="inline-flex h-12 items-center gap-2 rounded-2xl border border-white/30 bg-white/10 px-6 text-sm font-bold backdrop-blur-sm transition-all hover:bg-white/20"
               >
                 <span>{secondaryLabel}</span>
-                <ArrowLeft className="size-4" />
+                <ArrowLeft className="size-4 ltr:-scale-x-100" />
               </Link>
             ) : null}
           </div>

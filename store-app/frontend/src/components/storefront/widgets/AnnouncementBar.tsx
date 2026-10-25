@@ -1,8 +1,9 @@
 import { ArrowLeft, Bell, Gift, Info, Megaphone, Sparkles, Star, Tag, X } from 'lucide-react'
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from '@/lib/i18nRouter'
 
 import type { Widget } from '@/types/api'
+import { t } from '@/lib/i18n'
 
 const ICONS = {
   megaphone: Megaphone,
@@ -70,7 +71,7 @@ export function AnnouncementBar({ widget }: { widget: Widget }) {
               className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-xs font-bold text-primary-foreground shadow-2xs hover:bg-primary/90 transition-all hover:gap-2"
             >
               <span>{linkLabel}</span>
-              <ArrowLeft className="size-3.5 rtl:rotate-0" />
+              <ArrowLeft className="size-3.5 ltr:-scale-x-100" />
             </Link>
           ) : null}
 
@@ -78,7 +79,7 @@ export function AnnouncementBar({ widget }: { widget: Widget }) {
             <button
               type="button"
               onClick={close}
-              aria-label="إغلاق الإعلان"
+              aria-label={t('announcement.close')}
               className="inline-flex size-11 min-h-11 min-w-11 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors"
             >
               <X className="size-4" aria-hidden="true" />

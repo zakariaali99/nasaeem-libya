@@ -5,25 +5,26 @@ import {
   Sparkles,
   Truck,
 } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link } from '@/lib/i18nRouter'
 
 import { useStoreSettings } from '@/lib/queries/storeSettings'
 import { formatLibyanPhone } from '@/lib/format'
 import { useSiteText } from '@/lib/siteText'
+import { isEnglish, t as tr } from '@/lib/i18n'
 
 const STORE_LINKS = [
-  { to: '/products', label: 'كل العطور والمنتجات' },
-  { to: '/wishlist', label: 'قائمة المفضلة' },
-  { to: '/search', label: 'البحث المتقدم' },
-  { to: '/cart', label: 'سلة المشتريات' },
-]
+  { to: '/products', label: 'footer.allProducts' },
+  { to: '/wishlist', label: 'footer.wishlist' },
+  { to: '/search', label: 'footer.search' },
+  { to: '/cart', label: 'footer.cart' },
+] as const
 
 const ACCOUNT_LINKS = [
-  { to: '/track', label: 'تتبّع طلب' },
-  { to: '/me/orders', label: 'طلباتي' },
-  { to: '/me/addresses', label: 'عناويني المحفوظة' },
-  { to: '/me', label: 'الملف الشخصي' },
-]
+  { to: '/track', label: 'footer.track' },
+  { to: '/me/orders', label: 'footer.myOrders' },
+  { to: '/me/addresses', label: 'footer.addresses' },
+  { to: '/me', label: 'footer.profile' },
+] as const
 
 const TRUST_ICONS = [Sparkles, Truck, ShieldCheck]
 
@@ -31,10 +32,11 @@ export function Footer() {
   const currentYear = new Date().getFullYear()
   const { data: settings } = useStoreSettings()
 
-  const storeName = settings?.store_name || 'نسائم ليبيا'
+  // The store's name and legal name are Arabic content; English pages use the English name.
+  const storeName = isEnglish() ? tr('common.storeName') : settings?.store_name || tr('common.storeName')
   const storeAddress = settings?.address || ''
   const phone = settings?.phone || ''
-  const legalName = settings?.legal_name || 'نسائم ليبيا'
+  const legalName = isEnglish() ? tr('common.storeName') : settings?.legal_name || tr('common.storeName')
   const t = useSiteText()
   // Wording comes from the dashboard; a line left empty there is not drawn.
   const trust = [1, 2, 3]
@@ -101,7 +103,7 @@ export function Footer() {
         </div>
 
         {/* Store Links */}
-        <nav aria-label="روابط المتجر">
+        <nav aria-label={tr('footer.storeLinks')}>
           <h3 className="mb-3 text-sm font-bold text-foreground">{t('footer.shop.title')}</h3>
           <ul className="space-y-1.5">
             {STORE_LINKS.map((link) => (
@@ -111,7 +113,7 @@ export function Footer() {
                   viewTransition
                   className="inline-flex min-h-11 items-center text-xs font-medium text-muted-foreground hover:text-primary transition-colors"
                 >
-                  {link.label}
+                  {tr(link.label)}
                 </Link>
               </li>
             ))}
@@ -119,7 +121,7 @@ export function Footer() {
         </nav>
 
         {/* Account & Support Links */}
-        <nav aria-label="خدمات العملاء">
+        <nav aria-label={tr('footer.customerLinks')}>
           <h3 className="mb-3 text-sm font-bold text-foreground">{t('footer.account.title')}</h3>
           <ul className="space-y-1.5">
             {ACCOUNT_LINKS.map((link) => (
@@ -129,7 +131,7 @@ export function Footer() {
                   viewTransition
                   className="inline-flex min-h-11 items-center text-xs font-medium text-muted-foreground hover:text-primary transition-colors"
                 >
-                  {link.label}
+                  {tr(link.label)}
                 </Link>
               </li>
             ))}

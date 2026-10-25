@@ -1,6 +1,6 @@
 import { ArrowRight, Check, Percent, ShieldCheck, ShoppingBag, Trash2, Truck } from 'lucide-react'
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from '@/lib/i18nRouter'
 
 import { DiscoveryBoxBanner } from '@/components/storefront/DiscoveryBoxBanner'
 import { EmptyState } from '@/components/storefront/EmptyState'
@@ -25,9 +25,10 @@ import { useSiteText } from '@/lib/siteText'
 import { usePageTitle } from '@/lib/usePageTitle'
 import { FEATURES } from '@/lib/features'
 import type { CartLine } from '@/types/api'
+import { t, tCount } from '@/lib/i18n'
 
 export default function CartPage() {
-  usePageTitle('سلة المشتريات — نسائم ليبيا', 'راجع المنتجات والعطور المختارة قبل إتمام الدفع.')
+  usePageTitle(t('cartPage.title'), t('cartPage.metaDescription'))
   const secureNote = useSiteText()('cart.secure')
 
   const navigate = useNavigate()
@@ -44,7 +45,7 @@ export default function CartPage() {
   if (isError) {
     return (
       <div className="mx-auto w-full max-w-4xl px-4 py-10">
-        <h1 className="mb-4 text-2xl font-bold">سلة التسوّق</h1>
+        <h1 className="mb-4 text-2xl font-bold">{t('cartPage.heading')}</h1>
         <ErrorState error={error} onRetry={() => refetch()} />
       </div>
     )
@@ -53,14 +54,14 @@ export default function CartPage() {
   if (!cart || cart.items.length === 0) {
     return (
       <div className="mx-auto w-full max-w-4xl px-4 py-14">
-        <h1 className="mb-6 text-2xl font-bold">سلة التسوّق</h1>
+        <h1 className="mb-6 text-2xl font-bold">{t('cartPage.heading')}</h1>
         <EmptyState
           icon={<ShoppingBag className="size-8" aria-hidden="true" />}
-          title="سلة التسوّق فارغة"
-          description="لم تُضف أي عطور إلى سلتك بعد. تصفّح تشكيلة نسائم ليبيا الفاخرة واختر ما يناسب ذوقك."
+          title={t('cartPage.emptyTitle')}
+          description={t('cartPage.emptyText')}
           action={
             <Button asChild size="lg" className="rounded-xl font-bold">
-              <Link to="/products">تصفّح العطور الآن</Link>
+              <Link to="/products">{t('cartPage.browse')}</Link>
             </Button>
           }
         />
@@ -75,7 +76,7 @@ export default function CartPage() {
       navigate(`/checkout/${order.id}`)
     } catch (failure) {
       setCheckoutError(
-        failure instanceof ApiError ? failure.message : 'تعذّر إنشاء الطلب، حاول مرة أخرى',
+        failure instanceof ApiError ? failure.message : t('cartPage.orderFailed'),
       )
     }
   }
@@ -84,18 +85,16 @@ export default function CartPage() {
     <div className="mx-auto w-full max-w-5xl px-4 py-8 animate-fade-rise space-y-6">
       <div className="flex items-center justify-between border-b border-border/80 pb-4">
         <div className="space-y-1">
-          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">سلة المشتريات</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">{t('cartPage.title')}</h1>
           <p className="text-xs sm:text-sm text-muted-foreground">
-            {cart.items.length === 1 ? 'في سلتك صنف واحد' : cart.items.length === 2 ? 'في سلتك صنفان' : (
-              <>في سلتك <span className="font-bold text-foreground font-mono">{cart.items.length}</span> {cart.items.length <= 10 ? 'أصناف' : 'صنفاً'}</>
-            )}
+            {tCount('cartPage.lines', cart.items.length)}
           </p>
         </div>
         <Link
           to="/products"
           className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline"
         >
-          <span>إضافة المزيد من العطور</span>
+          <span>{t('cartPage.addMore')}</span>
           <ArrowRight className="size-3.5 rtl:rotate-180" />
         </Link>
       </div>
@@ -113,7 +112,7 @@ export default function CartPage() {
           {FEATURES.shipping ? (
             <div className="flex items-center gap-2 rounded-2xl border border-border bg-muted/20 p-4 text-xs text-muted-foreground">
               <Truck className="size-5 text-primary shrink-0" />
-              <span>يتم احتساب رسوم التوصيل الدقيقة بناءً على مدينتك في الخطوة التالية.</span>
+              <span>{t('cartPage.shippingNext')}</span>
             </div>
           ) : null}
         </div>
@@ -129,7 +128,7 @@ export default function CartPage() {
               discountTotal={cart.discount_total}
               shippingTotal={cart.shipping_total}
               total={cart.total}
-              shippingNote="يُحدد حسب المدينة عند الدفع"
+              shippingNote={t('cartPage.shippingByCity')}
             />
 
             {checkoutError ? (
@@ -145,11 +144,11 @@ export default function CartPage() {
               onClick={proceed}
               className="rounded-xl font-bold text-sm h-12 shadow-sm"
             >
-              متابعة الشراء
+              {t('cartPage.checkout')}
             </Button>
 
             <Button asChild variant="outline" block className="rounded-xl font-semibold text-xs h-10">
-              <Link to="/products">مواصلة التسوّق</Link>
+              <Link to="/products">{t('cartPage.continue')}</Link>
             </Button>
 
             <div className="border-t border-border/80 pt-3 text-center space-y-1">
@@ -224,11 +223,11 @@ function CartLineItem({ line }: { line: CartLine }) {
               <p className="text-xs text-muted-foreground font-medium mt-0.5">{line.variant_label}</p>
             ) : null}
             <p className="text-xs text-muted-foreground font-mono mt-0.5">
-              سعر القطعة: {formatPrice(line.unit_price)}
+              {t('cartPage.unitPrice', { price: formatPrice(line.unit_price) })}
             </p>
             {gone ? (
               <p className="mt-1 text-xs font-semibold text-destructive">
-                لم يعد متاحاً، احذفه من السلة لإكمال الطلب.
+                {t('cartPage.unavailable')}
               </p>
             ) : null}
           </div>
@@ -236,7 +235,7 @@ function CartLineItem({ line }: { line: CartLine }) {
           <button
             type="button"
             onClick={() => remove.mutate(line.id)}
-            aria-label={`حذف ${line.name} من السلة`}
+            aria-label={t('cartPage.removeItem', { name: line.name })}
             className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
           >
             <Trash2 className="size-4" aria-hidden="true" />
@@ -248,7 +247,7 @@ function CartLineItem({ line }: { line: CartLine }) {
             value={line.quantity}
             max={gone ? line.quantity : line.available_stock ?? undefined}
             onChange={(quantity) => update.mutate({ id: line.id, quantity })}
-            label={`كمية ${line.name}`}
+            label={t('cartPage.quantityOf', { name: line.name })}
           />
           <span className="font-mono text-sm sm:text-base font-extrabold text-price">
             {formatPrice(line.total_price)}
@@ -281,14 +280,14 @@ function DiscountForm({
     >
       <div className="flex items-center gap-1.5 text-xs font-bold text-foreground">
         <Percent className="size-3.5 text-primary" />
-        <span>هل لديك كوبون خصم؟</span>
+        <span>{t('cartPage.couponQuestion')}</span>
       </div>
       <div className="flex gap-2">
         <Input
           value={code}
           onChange={(event) => setCode(event.target.value)}
-          placeholder="أدخل كود الخصم…"
-          aria-label="كود الخصم"
+          placeholder={t('cartPage.couponPlaceholder')}
+          aria-label={t('cartPage.couponLabel')}
           autoComplete="off"
           autoCapitalize="characters"
           className="h-10 rounded-xl font-mono uppercase text-xs"
@@ -300,13 +299,13 @@ function DiscountForm({
           disabled={!code.trim()}
           className="rounded-xl text-xs font-bold px-4 h-10 shrink-0"
         >
-          تطبيق
+          {t('cartPage.apply')}
         </Button>
       </div>
       {currentCode && !message && (
         <p className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
           <Check className="size-3" />
-          <span>تم تطبيق الكوبون بنجاح ({currentCode})</span>
+          <span>{t('cartPage.couponApplied', { code: currentCode ?? '' })}</span>
         </p>
       )}
       {message ? (

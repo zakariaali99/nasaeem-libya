@@ -1,6 +1,6 @@
 import { Heart, Minus, Plus, ShoppingBag } from 'lucide-react'
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from '@/lib/i18nRouter'
 
 import { DiscountBadge } from '@/components/storefront/DiscountBadge'
 import { Price } from '@/components/storefront/Price'
@@ -12,6 +12,7 @@ import { useAddToCart, useCart, useUpdateCartItem } from '@/lib/queries/cart'
 import { useToggleWishlist, useWishlistIds } from '@/lib/queries/wishlist'
 import { cn } from '@/lib/utils'
 import type { Product } from '@/types/api'
+import { t } from '@/lib/i18n'
 
 export interface ProductCardProps {
   product: Product
@@ -109,7 +110,7 @@ export function ProductCard({ product, priority = false, sizes }: ProductCardPro
           {!product.in_stock && (
             <div className="absolute inset-0 bg-background/70 backdrop-blur-xs flex items-center justify-center">
               <span className="rounded-full bg-destructive/10 text-destructive border border-destructive/20 px-3 py-1 text-xs font-bold shadow-xs">
-                نفدت الكمية
+                {t('card.soldOut')}
               </span>
             </div>
           )}
@@ -123,7 +124,7 @@ export function ProductCard({ product, priority = false, sizes }: ProductCardPro
           <button
             type="button"
             onClick={handleToggleWishlist}
-            aria-label={isWishlisted ? 'إزالة من المفضلة' : 'إضافة إلى المفضلة'}
+            aria-label={isWishlisted ? t('card.removeWishlist') : t('card.addWishlist')}
             className={cn(
               'absolute end-2.5 top-2.5 z-10 flex min-h-11 min-w-11 size-11 items-center justify-center rounded-full backdrop-blur-md transition-all shadow-xs focus-visible:outline-2 focus-visible:outline-ring',
               isWishlisted
@@ -157,7 +158,7 @@ export function ProductCard({ product, priority = false, sizes }: ProductCardPro
 
         {onlyChoice ? (
           <p className="text-[11px] text-muted-foreground">
-            الحجم: <span className="font-bold text-foreground">{onlyChoice.label}</span>
+            {t('card.size')} <span className="font-bold text-foreground">{onlyChoice.label}</span>
           </p>
         ) : null}
 
@@ -165,7 +166,7 @@ export function ProductCard({ product, priority = false, sizes }: ProductCardPro
         {product.in_stock && (
           <div className="space-y-2 pt-1">
             {showPicker ? (
-              <div role="group" aria-label="اختر حجماً أو أكثر" className="flex flex-wrap gap-1.5">
+              <div role="group" aria-label={t('card.pickSizes')} className="flex flex-wrap gap-1.5">
                 {choices.map((choice) => {
                   const isChosen = chosenIds.includes(choice.id)
                   const inCart = inCartFor(choice.id)?.quantity ?? 0
@@ -175,7 +176,7 @@ export function ProductCard({ product, priority = false, sizes }: ProductCardPro
                       type="button"
                       aria-pressed={isChosen}
                       disabled={!choice.in_stock}
-                      title={inCart ? `في السلة: ${inCart}` : undefined}
+                      title={inCart ? t('card.inCartTitle', { n: inCart }) : undefined}
                       onClick={(e) => {
                         e.preventDefault()
                         toggleChoice(choice.id)
@@ -193,10 +194,10 @@ export function ProductCard({ product, priority = false, sizes }: ProductCardPro
                       {inCart ? (
                         <span className="ms-1 rounded-full bg-emerald-600 px-1.5 text-[10px] text-white">
                           {inCart}
-                          <span className="sr-only"> في السلة</span>
+                          <span className="sr-only">{t('card.inCartSr')}</span>
                         </span>
                       ) : null}
-                      {choice.in_stock ? null : <span className="sr-only"> — غير متوفر</span>}
+                      {choice.in_stock ? null : <span className="sr-only">{t('stock.unavailableSuffix')}</span>}
                     </button>
                   )
                 })}
@@ -206,7 +207,7 @@ export function ProductCard({ product, priority = false, sizes }: ProductCardPro
             {!canAddFromCard ? (
               <Button asChild variant="outline" className="w-full min-h-[44px] h-11 text-xs font-bold rounded-xl shadow-2xs">
                 <Link to={`/products/${encodeURIComponent(product.slug)}`}>
-                  اختيار الحجم والخيارات
+                  {t('card.chooseOptions')}
                 </Link>
               </Button>
             ) : quantity > 0 ? (
@@ -221,11 +222,11 @@ export function ProductCard({ product, priority = false, sizes }: ProductCardPro
                     })
                   }}
                   className="flex size-9 items-center justify-center rounded-lg bg-card text-foreground hover:bg-muted transition-colors shadow-2xs"
-                  aria-label="إنقاص الكمية"
+                  aria-label={t('card.decrease')}
                 >
                   <Minus className="size-4" />
                 </button>
-                <span className="text-xs font-bold text-primary font-mono">{quantity} في السلة</span>
+                <span className="text-xs font-bold text-primary font-mono">{t('card.inCart', { n: quantity })}</span>
                 <button
                   type="button"
                   onClick={(e) => {
@@ -236,7 +237,7 @@ export function ProductCard({ product, priority = false, sizes }: ProductCardPro
                     })
                   }}
                   className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-2xs"
-                  aria-label="زيادة الكمية"
+                  aria-label={t('cart.increase')}
                 >
                   <Plus className="size-4" />
                 </button>
@@ -252,12 +253,12 @@ export function ProductCard({ product, priority = false, sizes }: ProductCardPro
                 <ShoppingBag className="size-4" />
                 <span>
                   {justAdded
-                    ? 'تمت الإضافة ✓'
+                    ? t('card.added')
                     : showPicker && chosenMany.length === 0
-                      ? 'اختر الحجم أولاً'
+                      ? t('card.chooseSizeFirst')
                       : chosenMany.length > 1
-                        ? `أضف ${chosenMany.length} أحجام للسلة`
-                        : 'أضف للسلة'}
+                        ? t('card.addSizes', { n: chosenMany.length })
+                        : t('card.addToCart')}
                 </span>
               </Button>
             )}

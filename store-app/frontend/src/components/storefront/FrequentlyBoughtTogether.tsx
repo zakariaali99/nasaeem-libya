@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { formatPrice } from '@/lib/format'
 import { useAddToCart } from '@/lib/queries/cart'
 import type { Product, ProductBundle } from '@/types/api'
+import { t } from '@/lib/i18n'
 
 interface FrequentlyBoughtTogetherProps {
   product: Product
@@ -82,7 +83,7 @@ export function FrequentlyBoughtTogether({ product, bundle }: FrequentlyBoughtTo
                   />
                 ) : (
                   <div className="size-14 rounded-xl bg-muted flex items-center justify-center text-muted-foreground font-mono text-xs">
-                    عطر
+                    {t('bundle.perfume')}
                   </div>
                 )}
                 <div className="space-y-0.5 max-w-[140px]">
@@ -107,7 +108,7 @@ export function FrequentlyBoughtTogether({ product, bundle }: FrequentlyBoughtTo
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-primary/20 bg-primary/5 p-4">
         <div className="space-y-1">
           <div className="flex items-center gap-2.5">
-            <span className="text-xs font-bold text-foreground">سعر الحزمة الشاملة:</span>
+            <span className="text-xs font-bold text-foreground">{t('bundle.price')}</span>
             <span className="font-mono text-lg font-black text-primary">
               {formatPrice(bundle.bundle_price)}
             </span>
@@ -117,7 +118,7 @@ export function FrequentlyBoughtTogether({ product, bundle }: FrequentlyBoughtTo
           </div>
           <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
             <Sparkles className="size-3" />
-            <span>توفير مؤكد بقيمة {formatPrice(bundle.savings_amount)}</span>
+            <span>{t('bundle.saving', { amount: formatPrice(bundle.savings_amount) })}</span>
           </p>
         </div>
 
@@ -129,12 +130,12 @@ export function FrequentlyBoughtTogether({ product, bundle }: FrequentlyBoughtTo
           {added ? (
             <>
               <Check className="size-4" />
-              <span>تمت إضافة الحزمة للسلة!</span>
+              <span>{t('bundle.added')}</span>
             </>
           ) : (
             <>
               <ShoppingBag className="size-4" />
-              <span>{addToCart.isPending ? 'جاري الإضافة...' : 'إضافة الحزمة كاملة للسلة بنقرة واحدة'}</span>
+              <span>{addToCart.isPending ? t('bundle.adding') : t('bundle.add')}</span>
             </>
           )}
         </Button>

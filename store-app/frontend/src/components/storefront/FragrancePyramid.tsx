@@ -2,6 +2,7 @@ import { Citrus, Flame, Flower2, Sparkles, Trees, Wind } from 'lucide-react'
 import * as React from 'react'
 
 import type { PerfumeDetails, PerfumeNote } from '@/types/api'
+import { t } from '@/lib/i18n'
 
 interface FragrancePyramidProps {
   details?: PerfumeDetails
@@ -49,10 +50,10 @@ export function FragrancePyramid({ details }: FragrancePyramidProps) {
             <span className="flex size-7 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <Sparkles className="size-4" />
             </span>
-            <h3 className="text-base font-black text-foreground">الهرم العطري الملكي (Olfactory Pyramid)</h3>
+            <h3 className="text-base font-black text-foreground">{t('pyramid.title')}</h3>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            رحلة تحول وتطور النوتات العطرية من اللحظة الأولى وحتى استقرار الأثر
+            {t('pyramid.subtitle')}
           </p>
         </div>
 
@@ -72,10 +73,10 @@ export function FragrancePyramid({ details }: FragrancePyramidProps) {
               <span className="flex size-6 items-center justify-center rounded-lg bg-primary/15 text-primary text-xs font-black">
                 ▲
               </span>
-              <h4 className="text-xs font-black text-foreground">قمة العطر (Top Notes)</h4>
+              <h4 className="text-xs font-black text-foreground">{t('pyramid.top')}</h4>
             </div>
             <span className="text-[11px] font-bold text-muted-foreground">
-              الانطباع الأول: أول 15 - 30 دقيقة
+              {t('pyramid.topTime')}
             </span>
           </div>
 
@@ -104,10 +105,10 @@ export function FragrancePyramid({ details }: FragrancePyramidProps) {
               <span className="flex size-6 items-center justify-center rounded-lg bg-primary text-primary-foreground text-xs font-black">
                 ◆
               </span>
-              <h4 className="text-xs font-black text-foreground">قلب العطر (Heart Notes)</h4>
+              <h4 className="text-xs font-black text-foreground">{t('pyramid.heart')}</h4>
             </div>
             <span className="text-[11px] font-bold text-primary">
-              روح العطر وسحره: 4 - 6 ساعات
+              {t('pyramid.heartTime')}
             </span>
           </div>
 
@@ -136,10 +137,10 @@ export function FragrancePyramid({ details }: FragrancePyramidProps) {
               <span className="flex size-6 items-center justify-center rounded-lg bg-muted text-foreground text-xs font-black border border-border">
                 ■
               </span>
-              <h4 className="text-xs font-black text-foreground">قاعدة العطر (Base Notes)</h4>
+              <h4 className="text-xs font-black text-foreground">{t('pyramid.base')}</h4>
             </div>
             <span className="text-[11px] font-bold text-muted-foreground">
-              الأثر والعمق الدائم: 12 - 24 ساعة
+              {t('pyramid.baseTime')}
             </span>
           </div>
 
@@ -168,7 +169,7 @@ export function FragrancePyramid({ details }: FragrancePyramidProps) {
           <div className="flex items-center gap-2">
             <Sparkles className="size-4 text-primary shrink-0" />
             <span className="text-foreground">
-              <strong className="text-primary font-bold">{activeNote.name}:</strong> {activeNote.desc || 'نوتة عطرية طبيعية فاخرة تعزز توازن وثبات التركيبة.'}
+              <strong className="text-primary font-bold">{activeNote.name}:</strong> {activeNote.desc || t('pyramid.noteFallback')}
             </span>
           </div>
           <button
@@ -176,7 +177,7 @@ export function FragrancePyramid({ details }: FragrancePyramidProps) {
             onClick={() => setActiveNote(null)}
             className="flex min-h-11 items-center px-3 text-xs font-bold text-primary hover:underline ms-2 shrink-0"
           >
-            إغلاق
+            {t('common.close')}
           </button>
         </div>
       )}

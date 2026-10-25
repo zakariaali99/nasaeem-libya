@@ -1,5 +1,6 @@
 import { Badge } from '@/components/ui/badge'
 import { discountPercent, formatPercent } from '@/lib/format'
+import { t } from '@/lib/i18n'
 
 export interface DiscountBadgeProps {
   price: number | string | null | undefined
@@ -16,8 +17,8 @@ export function DiscountBadge({ price, compareAtPrice }: DiscountBadgeProps) {
   if (percent === null) return null
 
   return (
-    <Badge tone="discount" aria-label={`خصم ${percent} بالمئة`}>
-      خصم {formatPercent(percent)}
+    <Badge tone="discount" aria-label={t('discount.label', { n: percent })}>
+      {t('discount.badge', { n: formatPercent(percent) })}
     </Badge>
   )
 }

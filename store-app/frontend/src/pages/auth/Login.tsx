@@ -2,7 +2,8 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { Eye, EyeOff } from 'lucide-react'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
+import { Link, useNavigate } from '@/lib/i18nRouter'
 
 import { AuthLayout } from '@/components/layout/AuthLayout'
 import { Alert } from '@/components/ui/alert'
@@ -14,9 +15,10 @@ import { useLogin } from '@/lib/queries/auth'
 import { type LoginInput, loginSchema } from '@/lib/schemas/auth'
 import { usePageTitle } from '@/lib/usePageTitle'
 import { isAdminRole } from '@/types/api'
+import { t } from '@/lib/i18n'
 
 export default function LoginPage() {
-  usePageTitle('تسجيل الدخول', 'سجّل الدخول إلى حسابك في نسائم ليبيا')
+  usePageTitle(t('login.title'), t('login.metaDescription'))
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const login = useLogin()
@@ -26,7 +28,7 @@ export default function LoginPage() {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<LoginInput>({ resolver: zodResolver(loginSchema) })
+  } = useForm<LoginInput>({ resolver: zodResolver(loginSchema()) })
 
   const onSubmit = handleSubmit(async (values) => {
     const user = await login.mutateAsync(values)
@@ -46,13 +48,13 @@ export default function LoginPage() {
 
   return (
     <AuthLayout
-      title="تسجيل الدخول"
-      subtitle="أدخل رقم هاتفك وكلمة المرور للمتابعة"
+      title={t('login.title')}
+      subtitle={t('login.subtitle')}
       footer={
         <>
-          ليس لديك حساب؟{' '}
+          {t('login.noAccount')}{' '}
           <Link to="/register" className="-my-3 inline-flex min-h-11 items-center py-3 font-medium text-primary underline-offset-4 hover:underline">
-            أنشئ حساباً جديداً
+            {t('login.create')}
           </Link>
         </>
       }
@@ -60,7 +62,7 @@ export default function LoginPage() {
       <form onSubmit={onSubmit} noValidate className="space-y-5">
         {serverMessage ? <Alert tone="error">{serverMessage}</Alert> : null}
 
-        <Field id="phone" label="رقم الهاتف" error={errors.phone_number?.message} hint="مثال: 0912345678">
+        <Field id="phone" label={t('login.phone')} error={errors.phone_number?.message} hint={t('login.phoneHint')}>
           {(field) => (
             <Input
               {...field}
@@ -75,7 +77,7 @@ export default function LoginPage() {
           )}
         </Field>
 
-        <Field id="password" label="كلمة المرور" error={errors.password?.message}>
+        <Field id="password" label={t('login.password')} error={errors.password?.message}>
           {(field) => (
             <div className="relative">
               <Input
@@ -89,7 +91,7 @@ export default function LoginPage() {
                 type="button"
                 onClick={() => setShowPassword((prev) => !prev)}
                 className="absolute end-0 top-0 flex h-full items-center px-3 text-muted-foreground hover:text-foreground focus:outline-hidden transition-colors"
-                aria-label={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+                aria-label={showPassword ? t('login.hidePass') : t('login.showPass')}
               >
                 {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
               </button>
@@ -98,16 +100,16 @@ export default function LoginPage() {
         </Field>
 
         <Button type="submit" block size="lg" loading={isSubmitting || login.isPending}>
-          تسجيل الدخول
+          {t('login.submit')}
         </Button>
 
         {/* Buyers get no password at checkout; their device keeps their orders. */}
         <p className="rounded-lg bg-muted/50 p-3 text-xs leading-relaxed text-muted-foreground">
-          اشتريت منّا دون كلمة مرور؟ طلباتك تظهر في{' '}
-          <Link to="/me/orders" className="font-semibold text-primary underline-offset-4 hover:underline">«طلباتي»</Link>{' '}
-          على الجهاز الذي طلبت منه، ومن أي جهاز عبر{' '}
-          <Link to="/track" className="font-semibold text-primary underline-offset-4 hover:underline">تتبّع الطلب</Link>.
-          نسيت كلمة المرور؟ تواصل معنا ونضبط لك كلمة جديدة.
+          {t('login.guestNote1')}{' '}
+          <Link to="/me/orders" className="font-semibold text-primary underline-offset-4 hover:underline">{t('login.guestMyOrders')}</Link>{' '}
+          {t('login.guestNote2')}{' '}
+          <Link to="/track" className="font-semibold text-primary underline-offset-4 hover:underline">{t('login.guestTrack')}</Link>.
+          {t('login.forgot')}
         </p>
       </form>
     </AuthLayout>

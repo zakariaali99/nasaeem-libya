@@ -1,5 +1,5 @@
 import { Heart, ShoppingBag } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link } from '@/lib/i18nRouter'
 
 import { EmptyState } from '@/components/storefront/EmptyState'
 import { ProductCard } from '@/components/storefront/ProductCard'
@@ -7,9 +7,10 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useWishlist } from '@/lib/queries/wishlist'
 import { usePageTitle } from '@/lib/usePageTitle'
+import { t, tCount } from '@/lib/i18n'
 
 export default function WishlistPage() {
-  usePageTitle('قائمة المفضلة — نسائم ليبيا')
+  usePageTitle(t('wishlist.title'))
   const { data: items, isPending } = useWishlist()
 
   return (
@@ -21,15 +22,15 @@ export default function WishlistPage() {
             <div className="flex size-8 items-center justify-center rounded-lg bg-rose-500/10 text-rose-500">
               <Heart className="size-4 fill-rose-500" />
             </div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">قائمة المفضلة</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">{t('wishlist.title')}</h1>
           </div>
           <p className="text-xs sm:text-sm text-muted-foreground">
-            المنتجات والعطور الفاخرة التي قمت بحفظها للرجوع إليها لاحقاً
+            {t('wishlist.subtitle')}
           </p>
         </div>
         {items && items.length > 0 && (
           <span className="text-xs font-mono font-bold bg-muted px-3 py-1.5 rounded-full text-foreground">
-            {items.length} منتج في المفضلة
+            {tCount('wishlist.count', items.length)}
           </span>
         )}
       </div>
@@ -44,13 +45,13 @@ export default function WishlistPage() {
       ) : !items || items.length === 0 ? (
         <EmptyState
           icon={<Heart className="size-8 text-rose-500" aria-hidden="true" />}
-          title="قائمة المفضلة فارغة حالياً"
-          description="لم تقم بإضافة أي عطور إلى قائمتك المفضلة بعد. تصفح تشكيلتنا الفاخرة وأضف ما يعجبك بنقرة زر."
+          title={t('wishlist.emptyTitle')}
+          description={t('wishlist.emptyText')}
           action={
             <Button asChild className="rounded-xl font-bold gap-2">
               <Link to="/">
                 <ShoppingBag className="size-4" />
-                <span>تصفح العطور الآن</span>
+                <span>{t('wishlist.browse')}</span>
               </Link>
             </Button>
           }

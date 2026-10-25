@@ -1,6 +1,7 @@
 import { Search as SearchIcon } from 'lucide-react'
 import { useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
+import { Link } from '@/lib/i18nRouter'
 
 import { FragranceFinderQuizModal } from '@/components/storefront/FragranceFinderQuizModal'
 import { NotesBrowserBar } from '@/components/storefront/NotesBrowserBar'
@@ -10,6 +11,7 @@ import { SearchBox } from '@/components/layout/Header'
 import { Button } from '@/components/ui/button'
 import { useCategories } from '@/lib/queries/catalog'
 import { usePageTitle } from '@/lib/usePageTitle'
+import { t } from '@/lib/i18n'
 
 /**
  * New work, not a port: the reference had a search *button* and a panel, but no
@@ -23,7 +25,7 @@ export default function SearchPage() {
   const term = (params.get('q') ?? '').trim()
   const { data: categories } = useCategories()
 
-  usePageTitle(term ? `نتائج البحث عن ${term}` : 'البحث', 'ابحث في متجر نسائم ليبيا.')
+  usePageTitle(term ? t('searchPage.resultsTitle', { q: term }) : t('searchPage.title'), t('searchPage.metaDescription'))
 
   return (
     <div>
@@ -40,22 +42,22 @@ export default function SearchPage() {
 
       {term ? (
         <ProductListing
-          heading={`نتائج البحث عن «${term}»`}
+          heading={t('searchPage.heading', { q: term })}
           fixedParams={{ search: term }}
-          emptyTitle={`لم نجد نتائج لـ «${term}»`}
-          emptyDescription="تحقّق من الإملاء، أو جرّب كلمة أقصر، أو تصفّح العلامات التجارية أدناه."
+          emptyTitle={t('searchPage.emptyTitle', { q: term })}
+          emptyDescription={t('searchPage.emptyText')}
         />
       ) : (
         <div className="mx-auto w-full max-w-6xl space-y-8 px-4 py-10">
-          <h1 className="sr-only">البحث</h1>
+          <h1 className="sr-only">{t('searchPage.title')}</h1>
           <EmptyState
             icon={<SearchIcon className="size-8" aria-hidden="true" />}
-            title="ابحث عن عطر أو علامة تجارية"
-            description="اكتب اسم المنتج أو العلامة في الحقل أعلاه."
+            title={t('searchPage.promptTitle')}
+            description={t('searchPage.promptText')}
           />
           {(categories ?? []).length > 0 ? (
             <section>
-              <h2 className="mb-3 text-lg font-semibold">تصفّح العلامات التجارية</h2>
+              <h2 className="mb-3 text-lg font-semibold">{t('searchPage.brands')}</h2>
               <ul className="flex flex-wrap gap-2">
                 {(categories ?? []).map((category) => (
                   <li key={category.id}>

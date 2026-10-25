@@ -295,7 +295,7 @@ def _bootstrap_block(request, path: str) -> str:
     except Exception:
         logger.exception("SPA shell: categories bootstrap failed")
 
-    if path in ("", "/"):
+    if path in ("", "/", "en", "en/"):
         try:
             layout, widgets = storefront_services.cached_layout_rows()
             if layout is not None:
@@ -329,7 +329,7 @@ def render_shell(request, path: str = ""):
     gets the shell verbatim (its default head is already correct)."""
     html = _read_index()
 
-    match = re.match(r"^products/(?P<slug>[^/]+)/?$", path)
+    match = re.match(r"^(?:en/)?products/(?P<slug>[^/]+)/?$", path)
     if match:
         raw_slug = match.group("slug")
         slug = raw_slug

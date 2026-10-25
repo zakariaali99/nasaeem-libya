@@ -1,6 +1,8 @@
 import { useLayoutEffect } from 'react'
 import { Outlet, useLocation, useNavigationType } from 'react-router-dom'
 
+import { applyDocumentLang } from '@/lib/i18n'
+
 /**
  * Every new page starts at the top. Without this the SPA keeps the previous
  * page's scroll offset, so opening a product from the bottom of a listing
@@ -23,6 +25,9 @@ export function ScrollToTop() {
 
 /** Root route element: the scroll reset, then whichever layout matched. */
 export function RootLayout() {
+  const { pathname } = useLocation()
+  // Before paint, so an English page never flashes right-to-left.
+  useLayoutEffect(() => applyDocumentLang(pathname), [pathname])
   return (
     <>
       <ScrollToTop />

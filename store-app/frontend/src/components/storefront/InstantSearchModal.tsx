@@ -7,12 +7,13 @@ import {
   X,
 } from 'lucide-react'
 import * as React from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from '@/lib/i18nRouter'
 
 import { Button } from '@/components/ui/button'
 import { formatPrice } from '@/lib/format'
 import { useCategories } from '@/lib/queries/catalog'
 import { usePredictiveSearch } from '@/lib/queries/search'
+import { t } from '@/lib/i18n'
 
 interface InstantSearchModalProps {
   open: boolean
@@ -72,7 +73,7 @@ export function InstantSearchModal({ open, onClose }: InstantSearchModalProps) {
         className="w-full max-w-2xl rounded-3xl border border-border bg-card shadow-2xl overflow-hidden flex flex-col max-h-[80vh]"
         role="dialog"
         aria-modal="true"
-        aria-label="البحث اللحظي الفوري"
+        aria-label={t('search.dialogLabel')}
       >
         {/* Search Input Bar */}
         <div className="flex items-center gap-3 border-b border-border p-4 px-5 bg-muted/20">
@@ -85,8 +86,8 @@ export function InstantSearchModal({ open, onClose }: InstantSearchModalProps) {
             onKeyDown={(e) => {
               if (e.key === 'Enter') handleFullSearch(query)
             }}
-            placeholder="ابحث باسم العطر أو الماركة…"
-            aria-label="ابحث في المتجر"
+            placeholder={t('search.modalPlaceholder')}
+            aria-label={t('search.inputLabel')}
             className="flex-1 bg-transparent text-sm sm:text-base font-medium text-foreground placeholder:text-muted-foreground outline-hidden"
           />
           {isPending && <Loader2 className="size-4 animate-spin text-primary shrink-0" />}
@@ -95,7 +96,7 @@ export function InstantSearchModal({ open, onClose }: InstantSearchModalProps) {
               type="button"
               onClick={() => setQuery('')}
               className="flex min-h-11 items-center px-2 text-muted-foreground hover:text-foreground"
-              aria-label="مسح البحث"
+              aria-label={t('search.clear')}
             >
               <X className="size-4" />
             </button>
@@ -105,7 +106,7 @@ export function InstantSearchModal({ open, onClose }: InstantSearchModalProps) {
             onClick={onClose}
             className="flex min-h-11 items-center rounded-xl border border-border bg-card px-3 text-xs font-bold text-muted-foreground hover:text-foreground shadow-2xs"
           >
-            إغلاق
+            {t('common.close')}
           </button>
         </div>
 
@@ -118,7 +119,7 @@ export function InstantSearchModal({ open, onClose }: InstantSearchModalProps) {
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-xs font-bold text-foreground">
                 <FolderTree className="size-4 text-primary" aria-hidden="true" />
-                <span>تصفّح حسب القسم:</span>
+                <span>{t('search.browseByCategory')}</span>
               </div>
               <div className="flex flex-wrap gap-2">
                 {brands.map((category) => (
@@ -140,7 +141,7 @@ export function InstantSearchModal({ open, onClose }: InstantSearchModalProps) {
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
                 <FolderTree className="size-3.5" />
-                <span>الأقسام والمجموعات المطابقة:</span>
+                <span>{t('search.matchingCategories')}</span>
               </div>
               <div className="flex flex-wrap gap-2">
                 {categories.map((cat) => (
@@ -171,15 +172,15 @@ export function InstantSearchModal({ open, onClose }: InstantSearchModalProps) {
           {query && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-foreground">العطور المطابقة:</span>
+                <span className="text-xs font-bold text-foreground">{t('search.matchingProducts')}</span>
                 {products.length > 0 && (
                   <button
                     type="button"
                     onClick={() => handleFullSearch(query)}
                     className="flex items-center gap-1 text-xs font-bold text-primary hover:underline"
                   >
-                    <span>عرض كافة النتائج ({products.length})</span>
-                    <ArrowLeft className="size-3" />
+                    <span>{t('search.viewAllCount', { n: products.length })}</span>
+                    <ArrowLeft className="size-3 ltr:-scale-x-100" />
                   </button>
                 )}
               </div>
@@ -187,8 +188,8 @@ export function InstantSearchModal({ open, onClose }: InstantSearchModalProps) {
               {products.length === 0 && !isPending && (
                 <div className="text-center py-8 space-y-2">
                   <Package className="size-8 text-muted-foreground/50 mx-auto" />
-                  <p className="text-sm font-bold text-foreground">لم يتم العثور على عطور تطابق "{query}"</p>
-                  <p className="text-xs text-muted-foreground">جرّب كلمة أقصر، أو اكتب اسم الماركة.</p>
+                  <p className="text-sm font-bold text-foreground">{t('search.noMatch', { q: query })}</p>
+                  <p className="text-xs text-muted-foreground">{t('search.noMatchHint')}</p>
                 </div>
               )}
 
@@ -233,7 +234,7 @@ export function InstantSearchModal({ open, onClose }: InstantSearchModalProps) {
                           )}
                         </div>
                         <span className="text-[10px] text-muted-foreground block truncate">
-                          {p.categories?.[0]?.name || 'عطور فاخرة'}
+                          {p.categories?.[0]?.name || t('search.fallbackCategory')}
                         </span>
                       </div>
                     </Link>
@@ -247,14 +248,14 @@ export function InstantSearchModal({ open, onClose }: InstantSearchModalProps) {
         {/* Footer Full Search Button */}
         {query && products.length > 0 && (
           <div className="border-t border-border p-3 px-5 bg-muted/10 flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">اضغط Enter للبحث المتقدم</span>
+            <span className="text-xs text-muted-foreground">{t('search.enterHint')}</span>
             <Button
               size="sm"
               onClick={() => handleFullSearch(query)}
               className="gap-1.5 rounded-xl font-bold text-xs"
             >
-              <span>عرض جميع النتائج</span>
-              <ArrowLeft className="size-3.5" />
+              <span>{t('search.viewAll')}</span>
+              <ArrowLeft className="size-3.5 ltr:-scale-x-100" />
             </Button>
           </div>
         )}

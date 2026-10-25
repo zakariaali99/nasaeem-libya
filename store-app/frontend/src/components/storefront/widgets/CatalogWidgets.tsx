@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from '@/lib/i18nRouter'
 
 import { ProductGrid } from '@/components/storefront/ProductGrid'
 import { WidgetHeading } from '@/components/storefront/widgets/WidgetShell'

@@ -1,0 +1,235 @@
+{
+  "_note": "Edit texts, numbers and links here only, then run: python3 company-site/build.py",
+  "site": {
+    "domain": "https://nasaeemlibya.ly",
+    "store_url": "https://shop.nasaeemlibya.ly/",
+    "founded": 2015,
+    "phone": "0911773270",
+    "whatsapp": "218911773270",
+    "email": "info@nasaeemlibya.ly",
+    "map_plus_code": "85X6+W3V",
+    "map_embed_query": "85X6+W3V Misrata, Libya",
+    "social": [
+      {"id": "facebook", "label": "Facebook", "url": "https://www.facebook.com/Sterlinglibya2020/"},
+      {"id": "tiktok", "label": "TikTok", "url": "https://www.tiktok.com/@nsaymlibya"},
+      {"id": "instagram", "label": "Instagram", "url": "https://www.instagram.com/nasaaemlibya"}
+    ]
+  },
+
+  "_photos_note": "Owner photos pending (old-site part 2 package). Put a file in assets/img/photos/ and set its path here, e.g. \"/assets/img/photos/about.jpg\". Empty = CSS pattern is shown instead.",
+  "photos": {
+    "hero": "",
+    "about": ""
+  },
+
+  "brands": [
+    {"file": "armaf.svg", "ar": "أرماف", "en": "Armaf"},
+    {"file": "afnan.svg", "ar": "أفنان", "en": "Afnan"},
+    {"file": "rasasi.svg", "ar": "الرصاصي", "en": "Rasasi"},
+    {"file": "zimaya.png", "ar": "زمايا", "en": "Zimaya"},
+    {"file": "smart.svg", "ar": "سمارت كولكشن", "en": "Smart Collection"},
+    {"file": "hamidi.svg", "ar": "حميدي", "en": "Hamidi"},
+    {"file": "estiara.svg", "ar": "استيارا", "en": "Estiara"},
+    {"file": "risala.svg", "ar": "رسالة", "en": "Risala"},
+    {"file": "ruebroca.svg", "ar": "رو بروكا", "en": "Rue Broca"},
+    {"file": "tadangel.svg", "ar": "تاد أنجل", "en": "Tad Angel"},
+    {"file": "ebhar.svg", "ar": "إبهار", "en": "Ebhar"},
+    {"file": "assaf.png", "ar": "عساف", "en": "Assaf"},
+    {"file": "laverne.png", "ar": "لافيرن", "en": "Laverne"}
+  ],
+
+  "_distributors_note": "List from the old site (June 2023). Phones in local format; the build turns them into +218 tel: links.",
+  "distributors": [
+    {
+      "ar": {"city": "مصراتة", "name": "نسيم ليبيا", "address": "الرويسات - شارع الجملة"},
+      "en": {"city": "Misrata", "name": "Naseem Libya", "address": "Al-Ruwaisat, Al-Jumla Street"},
+      "phones": ["0923636332", "0913636333", "0918666897"]
+    },
+    {
+      "ar": {"city": "طرابلس", "name": "نسيم ليبيا الكريمية", "address": "طريق دبي - الشارع العام، محل رقم 70"},
+      "en": {"city": "Tripoli", "name": "Naseem Libya Al-Karimiya", "address": "Dubai Road, main street, shop no. 70"},
+      "phones": ["0916658499", "0925058012"]
+    },
+    {
+      "ar": {"city": "طرابلس", "name": "نسيم ليبيا", "address": "الكريمية - أربع شوارع باتجاه السراج، على اليسار"},
+      "en": {"city": "Tripoli", "name": "Naseem Libya", "address": "Al-Karimiya, Four Streets towards Al-Sarraj, on the left"},
+      "phones": ["0914091100", "0915505453"]
+    },
+    {
+      "ar": {"city": "طرابلس", "name": "عطور راكان", "address": "جنزور، أمام مستشفى المعاقين بالقرب من محلات سبورت (الدور الثاني)"},
+      "en": {"city": "Tripoli", "name": "Rakan Perfumes", "address": "Janzour, opposite the Disabled Persons Hospital, near the Sport shops (second floor)"},
+      "phones": ["0927919820"]
+    },
+    {
+      "ar": {"city": "بنغازي", "name": "المنظر", "address": "السلماني - البطحاء، شارع المنظر - سوق العرب، محل رقم 56 ج"},
+      "en": {"city": "Benghazi", "name": "Al-Manzar", "address": "Al-Salmani, Al-Bat'ha, Al-Manzar Street, Souq Al-Arab, shop no. 56C"},
+      "phones": ["0913266517"]
+    },
+    {
+      "ar": {"city": "طبرق", "name": "محلات عائلية", "address": "سوق النسر، بالقرب من سوق السيارات"},
+      "en": {"city": "Tobruk", "name": "Family Stores", "address": "Souq Al-Nesr, near the car market"},
+      "phones": ["0913326293"]
+    },
+    {
+      "ar": {"city": "سرت", "name": "عطر فلورا", "address": "شارع دبي، مقابل الفتحة الأمامية لمسجد الرباط"},
+      "en": {"city": "Sirte", "name": "Flora Perfume", "address": "Dubai Street, opposite the front entrance of Al-Ribat Mosque"},
+      "phones": ["0928703860"]
+    },
+    {
+      "ar": {"city": "زوارة", "name": "محلات عطور أدوس", "address": "الطريق الساحلي، مقابل مقهى تابوني"},
+      "en": {"city": "Zuwara", "name": "Adous Perfume Stores", "address": "Coastal Road, opposite Tabouni Café"},
+      "phones": ["0912505404"]
+    },
+    {
+      "ar": {"city": "أجدابيا", "name": "محل أجدابيا المميز", "address": "حي دمشق - شارع أرحومة القذافي"},
+      "en": {"city": "Ajdabiya", "name": "Ajdabiya Al-Mumayaz Store", "address": "Damascus district, Arhouma Al-Gaddafi Street"},
+      "phones": []
+    },
+    {
+      "ar": {"city": "البيضاء", "name": "نسيم الشرق لمواد التنظيف والعطور", "address": "حي الزيتونة - شارع الجامعة الأسمرية، مقابل مدرسة الملكة"},
+      "en": {"city": "Al Bayda", "name": "Naseem Al-Sharq Cleaning Materials & Perfumes", "address": "Al-Zaytouna district, Al-Asmariya University Street, opposite Al-Malika School"},
+      "phones": ["0926980132"]
+    },
+    {
+      "ar": {"city": "المرج", "name": "محلات رانيا لمواد التنظيف", "address": "حي 500، بالقرب من مدرسة النور"},
+      "en": {"city": "Al Marj", "name": "Rania Cleaning Materials Stores", "address": "Hay 500, near Al-Nour School"},
+      "phones": ["0914892922", "0923620835"]
+    }
+  ],
+
+  "ar": {
+    "lang": "ar",
+    "dir": "rtl",
+    "path": "/",
+    "og_locale": "ar_LY",
+    "title": "نسائم ليبيا لاستيراد العطور ومواد التنظيف",
+    "description": "نسائم ليبيا لاستيراد العطور ومواد التنظيف شركة رائدة في مجال العطور والنظافة في ليبيا منذ 2015، بموزعين في مصراتة وطرابلس وبنغازي وأنحاء البلاد.",
+    "name": "نسائم ليبيا",
+    "full_name": "نسائم ليبيا لاستيراد العطور ومواد التنظيف",
+    "skip_link": "انتقل إلى المحتوى",
+    "intro_skip": "تخطّي",
+    "nav_label": "أقسام الصفحة",
+    "nav": {"about": "من نحن", "brands": "الماركات", "distributors": "الموزعون", "contact": "تواصل معنا"},
+    "lang_switch": {"label": "English", "aria": "Read this page in English", "hreflang": "en"},
+    "cta_shop": "تسوّق الآن",
+    "hero_kicker": "مصراتة، ليبيا — منذ 2015",
+    "hero_title": "نسائم ليبيا",
+    "hero_tagline": "شركة رائدة في استيراد وتوزيع العطور الفاخرة ومواد التنظيف في ليبيا.",
+    "hero_secondary": "اعثر على موزّع قريب",
+    "stats": [
+      {"value": "+25", "label": "سنة من الخبرة"},
+      {"value": "2015", "label": "سنة التأسيس"},
+      {"value": "{distributors}", "label": "نقطة توزيع"},
+      {"value": "{brands}", "label": "ماركة"}
+    ],
+    "about_title": "من نحن",
+    "about_text": "شركة نسائم ليبيا لاستيراد العطور ومواد التنظيف هي شركة رائدة في مجال العطور ومواد التنظيف في دولة ليبيا، وبناءً على أكثر من ربع قرن من الخبرة في هذا المجال وعلى عدة أسماء تجارية، تأسست شركة نسائم ليبيا في عام 2015 لتكون الاسم البارز الذي يهدف إلى تحقيق أعلى معايير الجودة وتقديم أفضل المنتجات.",
+    "goals_title": "أهدافنا",
+    "goals_intro": "توفير منتجات وخدمات فريدة من نوعها تمنحنا ميزة تنافسية في السوق:",
+    "goals": [
+      "تحقيق رضا العملاء وولائهم.",
+      "توسيع أعمالنا وتواجدنا في أسواق جديدة.",
+      "العمل المستمر على تطوير حلول ومنتجات جديدة تلبي تطلعات السوق.",
+      "المشاركة الفعالة في دعم المبادرات الاجتماعية والبيئية لتحقيق الاستدامة.",
+      "التطوير المستمر للشركة ومواكبة السوق."
+    ],
+    "services_title": "خدماتنا",
+    "services": [
+      "استيراد وتوزيع مجموعة متنوعة من العطور الفاخرة.",
+      "توفير منتجات التنظيف والعناية بالجسم والبشرة.",
+      "توفير نقاط توزيع متكاملة منتشرة في كافة أنحاء الدولة.",
+      "التخطيط لإنتاج العطور ومواد التنظيف محلياً.",
+      "تحقيق شراكات طويلة الأمد مع كل من الموردين والموزعين للمنتجات.",
+      "كما أننا نحافظ على قائمة خدماتنا مفتوحة للتطلع إلى المستقبل."
+    ],
+    "about_photo_alt": "مخزن نسائم ليبيا",
+    "brands_title": "الماركات",
+    "brands_intro": "ماركات عالمية نستوردها ونوزّعها، وتجدونها كلها في متجرنا.",
+    "brands_cta": "تصفّح الماركات في المتجر",
+    "distributors_title": "الموزعون",
+    "distributors_intro": "قوموا بزيارة أقرب نقطة توزيع إليكم.",
+    "map_button": "عرض على الخريطة",
+    "map_button_aria": "عرض {name} في {city} على خريطة Google",
+    "call_aria": "اتصل بالرقم {phone}",
+    "no_phone": "لا يوجد رقم هاتف مسجّل",
+    "contact_title": "تواصل معنا",
+    "contact_intro": "هل لديكم سؤال؟ نحن في خدمتكم 7 أيام في الأسبوع!",
+    "whatsapp_button": "راسلنا على واتساب",
+    "contact_labels": {"phone": "الهاتف", "email": "البريد الإلكتروني", "address": "العنوان", "social": "تابعونا"},
+    "address": "ليبيا - مصراتة - طريق النقل الثقيل",
+    "map_title": "خريطة المخزن الرئيسي لشركة نسائم ليبيا في مصراتة",
+    "map_open": "فتح الموقع في خرائط Google",
+    "closing_title": "عطرك المفضّل على بُعد نقرة",
+    "closing_text": "تصفّحوا تشكيلة العطور ومواد التنظيف كاملة في متجر نسائم ليبيا.",
+    "footer_rights": "جميع الحقوق محفوظة.",
+    "footer_store": "متجر نسائم ليبيا"
+  },
+
+  "en": {
+    "lang": "en",
+    "dir": "ltr",
+    "path": "/en/",
+    "og_locale": "en_US",
+    "title": "Nasaeem Libya — Perfume & Cleaning Products Importer",
+    "description": "Nasaeem Libya imports and distributes luxury perfumes and cleaning products across Libya. Founded in 2015 in Misrata, with distributors in Tripoli, Benghazi and beyond.",
+    "name": "Nasaeem Libya",
+    "full_name": "Nasaeem Libya for Importing Perfumes and Cleaning Materials",
+    "skip_link": "Skip to content",
+    "intro_skip": "Skip",
+    "nav_label": "Page sections",
+    "nav": {"about": "About", "brands": "Brands", "distributors": "Distributors", "contact": "Contact"},
+    "lang_switch": {"label": "العربية", "aria": "اقرأ هذه الصفحة بالعربية", "hreflang": "ar"},
+    "cta_shop": "Shop now",
+    "hero_kicker": "Misrata, Libya — since 2015",
+    "hero_title": "Nasaeem Libya",
+    "hero_tagline": "A leading importer and distributor of luxury perfumes and cleaning products in Libya.",
+    "hero_secondary": "Find a distributor",
+    "stats": [
+      {"value": "25+", "label": "years of experience"},
+      {"value": "2015", "label": "founded"},
+      {"value": "{distributors}", "label": "distribution points"},
+      {"value": "{brands}", "label": "brands"}
+    ],
+    "about_title": "About us",
+    "about_text": "Nasaeem Libya for Importing Perfumes and Cleaning Materials is a leading name in perfumes and cleaning products in Libya. Building on more than a quarter of a century of experience in the trade, across several business names, the company was founded in 2015 to become a standout name committed to the highest quality standards and the best products.",
+    "goals_title": "Our goals",
+    "goals_intro": "To offer unique products and services that give us a competitive edge in the market:",
+    "goals": [
+      "Earn the satisfaction and loyalty of our customers.",
+      "Grow our business and expand into new markets.",
+      "Keep developing new solutions and products that meet the market's expectations.",
+      "Take an active part in social and environmental initiatives that support sustainability.",
+      "Keep improving as a company and keep pace with the market."
+    ],
+    "services_title": "Our services",
+    "services": [
+      "Importing and distributing a wide range of luxury perfumes.",
+      "Supplying cleaning, body care and skin care products.",
+      "A complete network of distribution points across the country.",
+      "Planning local production of perfumes and cleaning materials.",
+      "Building long-term partnerships with suppliers and distributors alike.",
+      "And we keep our list of services open as we look to the future."
+    ],
+    "about_photo_alt": "Nasaeem Libya warehouse",
+    "brands_title": "Our brands",
+    "brands_intro": "International brands we import and distribute — all available in our online store.",
+    "brands_cta": "Browse brands in the store",
+    "distributors_title": "Distributors",
+    "distributors_intro": "Visit the distribution point nearest to you.",
+    "map_button": "View on map",
+    "map_button_aria": "View {name} in {city} on Google Maps",
+    "call_aria": "Call {phone}",
+    "no_phone": "No phone number listed",
+    "contact_title": "Contact us",
+    "contact_intro": "Have a question? We are here for you 7 days a week.",
+    "whatsapp_button": "Message us on WhatsApp",
+    "contact_labels": {"phone": "Phone", "email": "Email", "address": "Address", "social": "Follow us"},
+    "address": "Heavy Transport Road (Al-Naql Al-Thaqeel), Misrata, Libya",
+    "map_title": "Map of the Nasaeem Libya main warehouse in Misrata",
+    "map_open": "Open in Google Maps",
+    "closing_title": "Your favourite fragrance is one click away",
+    "closing_text": "Browse the full range of perfumes and cleaning products in the Nasaeem Libya store.",
+    "footer_rights": "All rights reserved.",
+    "footer_store": "Nasaeem Libya store"
+  }
+}

@@ -72,7 +72,7 @@ touch tmp/restart.txt
 
 # 5. publish the frontend to the subdomain root — keeps ~/shop/.htaccess (server config), deletes nothing
 cp -a ~/shop ~/shop-backup-$(date +%F)
-cd dist && tar cf - --exclude='./.htaccess' . | (cd ~/shop && tar xf -) && cd ..
+cd dist && tar cf - --exclude='./.htaccess' --exclude='./media' . | (cd ~/shop && tar xf -) && cd ..
 
 # 6. verify
 curl -sI https://shop.nasaeemlibya.ly/ | grep -i "^last-modified"   # today's date

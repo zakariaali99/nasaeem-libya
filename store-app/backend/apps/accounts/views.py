@@ -23,7 +23,7 @@ from apps.core.pagination import StandardPagination
 from apps.core.views import CsrfProtectedAPIView
 from django.utils.translation import gettext as _
 
-from .permissions import IsAdminRole, IsManagerOrAbove
+from .permissions import IsAdminOrOwner, IsAdminRole, IsManagerOrAbove
 from .phone import normalise_phone
 from .serializers import (
     AdminUserUpdateSerializer,
@@ -313,7 +313,7 @@ class AdminUserCRMDetailView(APIView):
             )
 
         from . import crm
-        from apps.orders.models import Discount, Order
+        from apps.orders.models import Order
         from apps.orders.stage_service import stage_of
 
         metrics = crm.compute_customer_metrics(user)
@@ -343,10 +343,12 @@ class AdminUserCRMDetailView(APIView):
             .order_by("-created_at")[:50]
         )
 
-        active_coupons = (
-            Discount.objects.filter(is_active=True)
-            .values("id", "code", "type", "value", "min_order_amount")[:15]
-        )
+        # Only coupons the customer could really use (dates, limit): the
+        # birthday and VIP messages must never promise a dead code.
+        active_coupons = crm.active_coupons().values("id", "code", "type", "value", "min_order_amount")[:15]
+        from apps.core.store_settings import get_store_settings
+
+        store_settings = get_store_settings()
 
         return Response({
             "data": {
@@ -355,6 +357,9 @@ class AdminUserCRMDetailView(APIView):
                 "recent_orders": recent_orders,
                 "interactions": CustomerInteractionSerializer(interactions, many=True).data,
                 "active_coupons": list(active_coupons),
+                # Wording from «نصوص المتجر» (د-4); the drawer fills the variables.
+                "whatsapp_templates": crm.whatsapp_templates(store_settings),
+                "store_name": store_settings.store_name,
             }
         })
 
@@ -495,9 +500,9 @@ class AdminUserInteractionListCreateView(APIView):
 
 
 class AdminCustomerInteractionDetailView(APIView):
-    """Manager, Admin, Owner can delete a communication note."""
+    """Only an administrator (or the owner) deletes a log line; nobody edits one (د-3)."""
 
-    permission_classes = [IsManagerOrAbove]
+    permission_classes = [IsAdminOrOwner]
 
     def delete(self, request, interaction_id):
         interaction = CustomerInteraction.objects.filter(pk=interaction_id).first()

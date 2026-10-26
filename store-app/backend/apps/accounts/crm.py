@@ -23,13 +23,13 @@ import io
 import re
 
 from django.db import models
-from django.db.models import Count, Max, Q, Sum, Value
+from django.db.models import Count, F, Max, OuterRef, Q, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
 from django.http import HttpResponse
 from django.utils import timezone
 
 from apps.core.models import CustomerInteraction, CustomerTag, Role, StoreSettings, User
-from apps.orders.models import Order, OrderStatus, ShippingStatus
+from apps.orders.models import Discount, Order, OrderStatus
 
 
 def get_crm_thresholds() -> dict[str, int | Decimal]:
@@ -109,9 +109,12 @@ def compute_customer_metrics(user: User, thresholds: dict | None = None) -> dict
     if thresholds is None:
         thresholds = get_crm_thresholds()
 
-    orders_qs = Order.objects.filter(user=user)
+    # `placed()`: a basket that reached «Continue to checkout» but was never
+    # confirmed is not an order (see OrderQuerySet). Delivered means the
+    # «تم التسليم» stage, which is stored as status=completed.
+    orders_qs = Order.objects.placed().filter(user=user)
     non_cancelled = orders_qs.exclude(status=OrderStatus.CANCELLED)
-    delivered = orders_qs.filter(shipping_status=ShippingStatus.DELIVERED)
+    delivered = orders_qs.filter(status=OrderStatus.COMPLETED)
 
     total_orders = non_cancelled.count()
     delivered_count = delivered.count()
@@ -195,24 +198,33 @@ def filter_and_annotate_users_queryset(queryset, params: dict, thresholds: dict 
             Q(addresses__city_id=city_id) | Q(orders__shipping_city_id=city_id)
         ).distinct()
 
-    # Conditional aggregations (portable across SQLite and Postgres)
+    # One subquery per figure (portable across SQLite and Postgres). Not a
+    # join: a join on addresses (the city filter) or on tags multiplied the
+    # Sum, and a filter on orders placed before annotate() restricted the
+    # Count to the filtered rows only.
+    counted = Order.objects.placed().exclude(status=OrderStatus.CANCELLED).filter(user=OuterRef("pk"))
+    delivered = Order.objects.placed().filter(status=OrderStatus.COMPLETED, user=OuterRef("pk"))
+
+    def per_customer(qs, aggregate):
+        return Subquery(qs.order_by().values("user").annotate(v=aggregate).values("v")[:1])
+
     annotated = queryset.annotate(
-        crm_total_orders=Count(
-            "orders",
-            filter=~Q(orders__status=OrderStatus.CANCELLED),
-            distinct=True,
+        crm_total_orders=Coalesce(
+            per_customer(counted, Count("id")), Value(0), output_field=models.IntegerField()
         ),
         crm_lifetime_spend=Coalesce(
-            Sum(
-                "orders__total",
-                filter=Q(orders__shipping_status=ShippingStatus.DELIVERED),
-            ),
+            per_customer(delivered, Sum("total")),
             Value(Decimal("0.00")),
             output_field=models.DecimalField(max_digits=12, decimal_places=2),
         ),
-        crm_last_order_date=Max(
-            "orders__created_at",
-            filter=~Q(orders__status=OrderStatus.CANCELLED),
+        crm_last_order_date=Subquery(
+            counted.order_by().values("user").annotate(v=Max("created_at")).values("v")[:1],
+            output_field=models.DateTimeField(),
+        ),
+        # The city of the latest order, for customers with no saved address
+        # (most of them: the checkout asks for an address, not an account).
+        crm_last_city=Subquery(
+            counted.filter(shipping_city__isnull=False).order_by("-created_at").values("shipping_city__name")[:1]
         ),
     )
 
@@ -348,9 +360,11 @@ def export_customers_csv(queryset) -> HttpResponse:
         birthday_str = user.birthday.isoformat() if user.birthday else ""
         date_joined_str = user.date_joined.strftime("%Y-%m-%d")
 
-        # Top city
-        addr = user.addresses.select_related("city").filter(is_default=True).first() or user.addresses.select_related("city").first()
-        city_str = addr.city.name if addr and addr.city else ""
+        # City: the latest order's, else the saved address
+        city_str = getattr(user, "crm_last_city", None) or ""
+        if not city_str:
+            addr = user.addresses.select_related("city").filter(is_default=True).first() or user.addresses.select_related("city").first()
+            city_str = addr.city.name if addr and addr.city else ""
 
         writer.writerow([
             user.name or "عميل بدون اسم",
@@ -379,3 +393,65 @@ def format_whatsapp_phone(raw_phone: str) -> str:
     if digits.startswith("218"):
         return digits
     return digits
+
+
+# ---- WhatsApp templates (Plan 08, د-4) ---------------------------------------
+
+TEMPLATE_KEYS = {
+    "follow_up": "crm.whatsapp.followup",
+    "vip_offer": "crm.whatsapp.vip",
+    "birthday": "crm.whatsapp.birthday",
+}
+
+TEMPLATE_LABELS = {
+    "follow_up": "متابعة بعد الشراء",
+    "vip_offer": "عرض VIP",
+    "birthday": "تهنئة عيد ميلاد",
+}
+
+# The built-in wording. The operator's own is stored in StoreSettings.texts
+# under the keys above (edited from «نصوص المتجر»); kept in step with
+# `frontend/src/lib/siteText.ts`. Variables: {الاسم} {المتجر} {الكوبون} {رقم_الطلب}
+TEMPLATE_DEFAULTS = {
+    "follow_up": "مرحباً {الاسم}، شكراً لطلبك رقم {رقم_الطلب} من {المتجر}. نتمنى أن يكون قد أعجبك، ويسعدنا رأيك أو أي ملاحظة.",
+    "vip_offer": "مرحباً {الاسم}، أنت من عملاء {المتجر} المميزين. لك خصم خاص بالكود {الكوبون} على طلبك القادم.",
+    "birthday": "كل عام وأنت بخير {الاسم}! هديتنا لك من {المتجر} بمناسبة عيد ميلادك: كود خصم {الكوبون}.",
+}
+
+
+def whatsapp_templates(settings: StoreSettings | None = None) -> list[dict]:
+    """The three templates as the dashboard shows them: the operator's wording
+    when typed, otherwise the built-in one."""
+    if settings is None:
+        settings = StoreSettings.objects.filter(pk=1).first()
+    texts = (settings.texts if settings else None) or {}
+    rows = []
+    for key, text_key in TEMPLATE_KEYS.items():
+        stored = texts.get(text_key)
+        text = stored if isinstance(stored, str) and stored.strip() else TEMPLATE_DEFAULTS[key]
+        rows.append({"key": key, "label": TEMPLATE_LABELS[key], "text": text})
+    return rows
+
+
+def render_template(text: str, *, name: str, store: str, coupon: str = "", order_number: str = "") -> str:
+    return (
+        text.replace("{الاسم}", name or "عميلنا العزيز")
+        .replace("{المتجر}", store)
+        .replace("{الكوبون}", coupon or "")
+        .replace("{رقم_الطلب}", order_number or "")
+        .strip()
+    )
+
+
+def active_coupons():
+    """Coupons a customer could use right now: active, with a code, inside
+    their dates and under their usage limit. No made-up codes."""
+    now = timezone.now()
+    return (
+        Discount.objects.filter(is_active=True, code__isnull=False)
+        .exclude(code="")
+        .filter(Q(start_date__isnull=True) | Q(start_date__lte=now))
+        .filter(Q(end_date__isnull=True) | Q(end_date__gte=now))
+        .filter(Q(usage_limit__isnull=True) | Q(usage_count__lt=F("usage_limit")))
+        .order_by("code")
+    )

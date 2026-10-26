@@ -350,6 +350,18 @@ def normalise_arabic(text: str) -> str:
     return text.strip()
 
 
+SQLITE_NORMALISE_FUNCTION = "nasaeem_normalise_arabic"
+
+
+def register_sqlite_normaliser(sender=None, connection=None, **kwargs):
+    """Makes `normalise_arabic` callable from SQL on SQLite, where there is no
+    `regexp_replace`. Wired to `connection_created` in `CatalogConfig.ready`."""
+    if connection is not None and connection.vendor == "sqlite":
+        connection.connection.create_function(
+            SQLITE_NORMALISE_FUNCTION, 1, lambda text: normalise_arabic(text or "")
+        )
+
+
 def _normalised_column(field):
     """The same three rules, applied in SQL to a column."""
     from django.db.models import Func, TextField, Value
@@ -383,19 +395,26 @@ def search_products(queryset, term):
     if connection.vendor != "postgresql":
         # SQLite (the production host) has no full-text ranking, but callers
         # order by `relevance` — without the annotation every search was a 500.
-        # A match in the name outranks one in the description.
-        from django.db.models import Case, FloatField, Value, When
+        # A match in the name outranks one in the description. The stored
+        # name is normalised the same way as the term (`sqlite_normalise`,
+        # registered on every connection), so «الاصيل» finds «الأصيل» here too.
+        from django.db.models import Case, F, FloatField, Func, TextField, Value, When
 
-        return queryset.filter(
-            Q(name__icontains=term)
-            | Q(description__icontains=term)
+        def norm(field):
+            return Func(F(field), function=SQLITE_NORMALISE_FUNCTION, output_field=TextField())
+
+        return queryset.annotate(
+            name_n=norm("name"), description_n=norm("description"),
+        ).filter(
+            Q(name_n__icontains=term)
+            | Q(description_n__icontains=term)
             | Q(sku__icontains=term)
             | Q(name_en__icontains=term)
             | Q(description_en__icontains=term)
         ).annotate(
             relevance=Case(
-                When(Q(name__istartswith=term) | Q(name_en__istartswith=term), then=Value(3.0)),
-                When(Q(name__icontains=term) | Q(name_en__icontains=term), then=Value(2.0)),
+                When(Q(name_n__istartswith=term) | Q(name_en__istartswith=term), then=Value(3.0)),
+                When(Q(name_n__icontains=term) | Q(name_en__icontains=term), then=Value(2.0)),
                 default=Value(1.0),
                 output_field=FloatField(),
             )

@@ -1,1 +1,0 @@
-import{r as s,j as a}from"./react-3y-dyNal.js";import{R as e}from"./radix-yHU08sg4.js";import{C as m}from"./index-BtrmCXx2.js";const f=s.forwardRef(({className:o,...r},t)=>a.jsx(e,{ref:t,className:m("block text-sm font-medium text-foreground",o),...r}));f.displayName="Label";export{f as L};

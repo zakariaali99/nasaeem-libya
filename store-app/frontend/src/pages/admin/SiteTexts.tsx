@@ -103,7 +103,7 @@ export default function SiteTexts() {
                       ) : (
                         <Badge tone="neutral" className="text-[11px]">الصيغة الافتراضية</Badge>
                       )}
-                      {!hidden && value && (
+                      {!hidden && value && !entry.adminOnly && (
                         <Button type="button" size="sm" variant="outline" className="h-8 gap-1 text-xs" onClick={() => change(entry.key, '')}>
                           <EyeOff className="size-3.5" /> إخفاء
                         </Button>
@@ -126,7 +126,7 @@ export default function SiteTexts() {
                   ) : (
                     <Input id={inputId} value={value} onChange={(e) => change(entry.key, e.target.value)} />
                   )}
-                  {!hidden && (
+                  {!hidden && !entry.adminOnly && (
                     <div className="flex items-center gap-2">
                       <label htmlFor={`${inputId}-en`} className="shrink-0 text-xs font-bold text-muted-foreground">بالإنجليزية</label>
                       <Input

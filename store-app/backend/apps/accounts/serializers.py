@@ -10,6 +10,8 @@ Two rules govern every message in this file:
    it was a total authentication bypass.
 """
 
+from decimal import Decimal
+
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -92,19 +94,26 @@ class UserSerializer(serializers.ModelSerializer):
             tier = determine_customer_tier(total_orders, spend, last_order)
             today = timezone.localdate()
             is_bday = bool(obj.birthday and obj.birthday.month == today.month and obj.birthday.day == today.day)
-            addr = obj.addresses.select_related("city").filter(is_default=True).first() or obj.addresses.select_related("city").first()
+            city = getattr(obj, "crm_last_city", None) or ""
+            if not city:
+                addr = obj.addresses.select_related("city").filter(is_default=True).first() or obj.addresses.select_related("city").first()
+                city = addr.city.name if addr and addr.city else ""
             return {
                 "total_orders": total_orders,
-                "lifetime_spend": str(spend),
+                "lifetime_spend": f"{Decimal(spend or 0):.2f}",
                 "last_order_date": last_order.isoformat() if last_order else None,
                 "tier": tier,
                 "tier_label": TIER_LABELS.get(tier, tier),
                 "tier_short_label": TIER_SHORT_LABELS.get(tier, tier),
-                "city": addr.city.name if addr and addr.city else "",
+                "city": city,
                 "is_birthday_today": is_bday,
                 "birthday": obj.birthday.isoformat() if obj.birthday else None,
             }
-        return compute_customer_metrics(obj)
+        # Five queries per user otherwise — and this serializer answers every
+        # /auth/me/ and login. The figures are computed only where asked for.
+        if self.context.get("crm"):
+            return compute_customer_metrics(obj)
+        return None
 
 
 class RegisterSerializer(serializers.Serializer):

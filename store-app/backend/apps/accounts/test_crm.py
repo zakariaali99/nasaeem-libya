@@ -14,6 +14,16 @@ from apps.orders.models import Order, OrderStatus, ShippingStatus
 from . import crm
 
 
+def placed_order(user, number, total, status, shipping_status, city=None):
+    """An order the customer actually confirmed: it has an address and a
+    confirmation time, so `Order.objects.placed()` counts it."""
+    return Order.objects.create(
+        user=user, order_number=number, total=Decimal(total), subtotal=Decimal(total),
+        status=status, shipping_status=shipping_status,
+        shipping_address="شارع", finalised_at=timezone.now(), shipping_city=city,
+    )
+
+
 @pytest.fixture
 def manager(db):
     user = User.objects.create(
@@ -101,36 +111,60 @@ class TestCustomerTierClassification:
 
     def test_spend_counts_delivered_orders_only(self, customer):
         # 1 Delivered order (200 LYD)
-        Order.objects.create(
-            user=customer,
-            order_number="ORD-101",
-            status=OrderStatus.COMPLETED,
-            shipping_status=ShippingStatus.DELIVERED,
-            total=Decimal("200.00"),
-        )
+        placed_order(customer, "ORD-101", "200.00", OrderStatus.COMPLETED, ShippingStatus.DELIVERED)
         # 1 Cancelled order (500 LYD) -> should be excluded entirely
-        Order.objects.create(
-            user=customer,
-            order_number="ORD-102",
-            status=OrderStatus.CANCELLED,
-            shipping_status=ShippingStatus.CANCELLED,
-            total=Decimal("500.00"),
-        )
+        placed_order(customer, "ORD-102", "500.00", OrderStatus.CANCELLED, ShippingStatus.CANCELLED)
         # 1 Pending order (150 LYD) -> counts toward total orders, but NOT lifetime spend
-        Order.objects.create(
-            user=customer,
-            order_number="ORD-103",
-            status=OrderStatus.PENDING,
-            shipping_status=ShippingStatus.PENDING,
-            total=Decimal("150.00"),
-        )
+        placed_order(customer, "ORD-103", "150.00", OrderStatus.PENDING, ShippingStatus.PENDING)
+        # A basket that reached «Continue to checkout» and was abandoned: no
+        # address, never confirmed. Not an order (OrderQuerySet.placed).
+        Order.objects.create(user=customer, order_number="DRAFT-1", status=OrderStatus.PENDING, total=Decimal("900.00"))
+        # Handed to the courier, not yet confirmed delivered: not spend yet.
+        placed_order(customer, "ORD-104", "70.00", OrderStatus.PROCESSING, ShippingStatus.DELIVERED)
 
         metrics = crm.compute_customer_metrics(customer)
-        assert metrics["total_orders"] == 2  # ORD-101 and ORD-103
+        assert metrics["total_orders"] == 3  # ORD-101, ORD-103, ORD-104
         assert Decimal(metrics["lifetime_spend"]) == Decimal("200.00")
         assert metrics["delivered_orders_count"] == 1
         assert Decimal(metrics["average_order_value"]) == Decimal("200.00")
         assert metrics["tier"] == "repeat"
+
+    def test_the_list_agrees_with_the_dossier_and_a_city_filter_does_not_double_spend(self, manager, customer, city):
+        """The list's annotations and the dossier's figures are the same
+        numbers; a join on addresses (the city filter) must not multiply them."""
+        from apps.core.models import UserAddress
+
+        UserAddress.objects.create(user=customer, city=city, address="أ")
+        UserAddress.objects.create(user=customer, city=city, address="ب")
+        placed_order(customer, "ORD-201", "100.00", OrderStatus.COMPLETED, ShippingStatus.DELIVERED, city=city)
+        placed_order(customer, "ORD-202", "100.00", OrderStatus.COMPLETED, ShippingStatus.DELIVERED, city=city)
+        client = APIClient()
+        client.force_authenticate(user=manager)
+        for params in ({}, {"city_id": city.id}, {"tier": "repeat"}):
+            rows = client.get("/api/admin/users/", {"role": "customer", **params}).json()["data"]
+            row = next(r for r in rows if r["id"] == str(customer.id))
+            assert row["crm"]["total_orders"] == 2, params
+            assert Decimal(row["crm"]["lifetime_spend"]) == Decimal("200.00"), params
+
+    def test_limits_through_the_endpoint(self, manager, customer):
+        """4 orders → repeat, 5 → VIP; 499 → repeat, 500 → VIP (د-8)."""
+        client = APIClient()
+        client.force_authenticate(user=manager)
+
+        def tier():
+            return client.get(f"/api/admin/users/{customer.id}/crm/").json()["data"]["crm"]["tier"]
+
+        for i in range(4):
+            placed_order(customer, f"ORD-3{i}", "10.00", OrderStatus.COMPLETED, ShippingStatus.DELIVERED)
+        assert tier() == "repeat"
+        placed_order(customer, "ORD-35", "10.00", OrderStatus.COMPLETED, ShippingStatus.DELIVERED)
+        assert tier() == "vip"
+        Order.objects.filter(user=customer).delete()
+        placed_order(customer, "ORD-36", "250.00", OrderStatus.COMPLETED, ShippingStatus.DELIVERED)
+        placed_order(customer, "ORD-37", "249.00", OrderStatus.COMPLETED, ShippingStatus.DELIVERED)
+        assert tier() == "repeat"
+        placed_order(customer, "ORD-38", "1.00", OrderStatus.COMPLETED, ShippingStatus.DELIVERED)
+        assert tier() == "vip"
 
 
 @pytest.mark.django_db
@@ -214,16 +248,46 @@ class TestCRMAdminAPI:
         assert log_resp.status_code == 201
         interaction_id = log_resp.json()["data"]["id"]
 
-        # Support CANNOT delete an interaction (Decision 3 & d-3: manager/admin/owner only)
+        # Nobody but an administrator deletes a line (د-3): support and the
+        # manager are refused, the administrator succeeds.
         del_resp_support = client_support.delete(f"/api/admin/interactions/{interaction_id}/")
         assert del_resp_support.status_code == 403
-
-        # Manager CAN delete an interaction
         client_mgr = APIClient()
         client_mgr.force_authenticate(user=manager)
-        del_resp_mgr = client_mgr.delete(f"/api/admin/interactions/{interaction_id}/")
-        assert del_resp_mgr.status_code == 204
+        assert client_mgr.delete(f"/api/admin/interactions/{interaction_id}/").status_code == 403
+
+        admin = User.objects.create(phone_number="0917777777", name="مدير", role=Role.ADMIN, is_staff=True)
+        client_admin = APIClient()
+        client_admin.force_authenticate(user=admin)
+        assert client_admin.delete(f"/api/admin/interactions/{interaction_id}/").status_code == 204
         assert not CustomerInteraction.objects.filter(id=interaction_id).exists()
+
+    def test_templates_come_from_store_texts_and_dead_coupons_are_hidden(self, manager, customer):
+        """د-4: the wording is the operator's, with the variables; a coupon
+        that is expired, switched off or used up is not offered."""
+        from apps.orders.models import Discount, DiscountType
+
+        settings_row, _ = StoreSettings.objects.get_or_create(pk=1)
+        settings_row.store_name = "نسائم"
+        settings_row.texts = {"crm.whatsapp.vip": "يا {الاسم} كودك {الكوبون} من {المتجر}"}
+        settings_row.save()
+        now = timezone.now()
+        Discount.objects.create(code="LIVE10", name="حي", type=DiscountType.PERCENTAGE, percentage=10, is_active=True)
+        Discount.objects.create(code="OLD10", name="منتهي", type=DiscountType.PERCENTAGE, percentage=10, is_active=True,
+                                end_date=now - timedelta(days=1))
+        Discount.objects.create(code="OFF10", name="موقوف", type=DiscountType.PERCENTAGE, percentage=10, is_active=False)
+        Discount.objects.create(code="FULL", name="مستهلك", type=DiscountType.FIXED, value=5, is_active=True,
+                                usage_limit=1, usage_count=1)
+
+        client = APIClient()
+        client.force_authenticate(user=manager)
+        data = client.get(f"/api/admin/users/{customer.id}/crm/").json()["data"]
+        assert [c["code"] for c in data["active_coupons"]] == ["LIVE10"]
+        templates = {t["key"]: t["text"] for t in data["whatsapp_templates"]}
+        assert templates["vip_offer"] == "يا {الاسم} كودك {الكوبون} من {المتجر}"
+        assert templates["birthday"] == crm.TEMPLATE_DEFAULTS["birthday"]
+        assert data["store_name"] == "نسائم"
+        assert crm.render_template(templates["vip_offer"], name="علي", store="نسائم", coupon="LIVE10") == "يا علي كودك LIVE10 من نسائم"
 
     def test_csv_export_permissions_and_bom(self, manager, support, customer):
         # Support CANNOT export (Decision 3: manager, admin, owner only)

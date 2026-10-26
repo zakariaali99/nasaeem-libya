@@ -65,6 +65,9 @@ interface CRMDetailResponse {
     created_at: string
   }>
   interactions: CustomerInteraction[]
+  /** The three templates as worded in «نصوص المتجر», variables unfilled. */
+  whatsapp_templates: Array<{ key: 'follow_up' | 'vip_offer' | 'birthday'; label: string; text: string }>
+  store_name: string
   active_coupons: Array<{
     id: string
     code: string
@@ -113,8 +116,9 @@ const INTERACTION_CONFIG: Record<
 export function CustomerDrawer({ customerId, open, onOpenChange }: CustomerDrawerProps) {
   const queryClient = useQueryClient()
   const { data: currentUser } = useMe()
+  // د-3: a log line is deleted by the administrator (or the owner) only.
   const canDeleteInteractions = Boolean(
-    currentUser?.role && ['manager', 'admin', 'owner'].includes(currentUser.role)
+    currentUser?.role && ['admin', 'owner'].includes(currentUser.role)
   )
 
   const [copiedPhone, setCopiedPhone] = useState(false)
@@ -206,23 +210,21 @@ export function CustomerDrawer({ customerId, open, onOpenChange }: CustomerDrawe
     setTimeout(() => setCopiedPhone(false), 2000)
   }
 
-  // Pre-fill WhatsApp templates
+  // Fills a template's variables: {الاسم} {المتجر} {الكوبون} {رقم_الطلب}.
+  // The wording itself comes from «نصوص المتجر» through the dossier.
+  const renderTemplate = (type: 'follow_up' | 'vip_offer' | 'birthday', coupon: string) => {
+    const text = data?.whatsapp_templates?.find((t) => t.key === type)?.text ?? ''
+    return text
+      .replaceAll('{الاسم}', user?.name || 'عميلنا العزيز')
+      .replaceAll('{المتجر}', data?.store_name || 'نسائم ليبيا')
+      .replaceAll('{الكوبون}', coupon)
+      .replaceAll('{رقم_الطلب}', data?.recent_orders?.[0]?.order_number || '')
+      .trim()
+  }
+
   const selectTemplate = (type: 'follow_up' | 'vip_offer' | 'birthday') => {
     setActiveTemplateType(type)
-    const name = user?.name || 'عميلنا العزيز'
-    const store = 'نسائم ليبيا'
-    const coupon = selectedCoupon || (data?.active_coupons?.[0]?.code ?? 'VIP10')
-    const latestOrder = data?.recent_orders?.[0]?.order_number || 'طلبك الأخير'
-
-    let template = ''
-    if (type === 'follow_up') {
-      template = `مرحباً ${name}، شكراً لتسوقك من ${store}. طلبك رقم ${latestOrder} في طريقه إليك. نتمنى أن ينال إعجابك!`
-    } else if (type === 'vip_offer') {
-      template = `مرحباً ${name}، تقديراً لولائك لـ ${store}، يسعدنا أن نهديك كود خصم خاص: ${coupon} صالح لطلبك القادم!`
-    } else if (type === 'birthday') {
-      template = `كل عام وأنت بألف خير يا ${name} بمناسبة عيد ميلادك! 🎉 هدية خاصة من ${store}: كود الخصم ${coupon} لتستمتع بأجمل العطور.`
-    }
-    setCustomMsg(template)
+    setCustomMsg(renderTemplate(type, selectedCoupon || (data?.active_coupons?.[0]?.code ?? '')))
   }
 
   const handleSendWhatsApp = async () => {
@@ -567,21 +569,8 @@ export function CustomerDrawer({ customerId, open, onOpenChange }: CustomerDrawe
                     value={selectedCoupon}
                     onChange={(e) => {
                       setSelectedCoupon(e.target.value)
-                      if (activeTemplateType) {
-                        // re-apply template with new coupon
-                        const name = user?.name || 'عميلنا العزيز'
-                        const store = 'نسائم ليبيا'
-                        const c = e.target.value
-                        if (activeTemplateType === 'vip_offer') {
-                          setCustomMsg(
-                            `مرحباً ${name}، تقديراً لولائك لـ ${store}، يسعدنا أن نهديك كود خصم خاص: ${c} صالح لطلبك القادم!`
-                          )
-                        } else if (activeTemplateType === 'birthday') {
-                          setCustomMsg(
-                            `كل عام وأنت بألف خير يا ${name} بمناسبة عيد ميلادك! 🎉 هدية خاصة من ${store}: كود الخصم ${c} لتستمتع بأجمل العطور.`
-                          )
-                        }
-                      }
+                      // re-apply the template with the new coupon
+                      if (activeTemplateType) setCustomMsg(renderTemplate(activeTemplateType, e.target.value))
                     }}
                     className="h-7 rounded-lg border border-border bg-background px-2 text-[11px] font-mono font-bold text-foreground"
                     title="اختر كود الخصم لإدراجه في الرسالة"

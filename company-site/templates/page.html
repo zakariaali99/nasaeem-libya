@@ -24,6 +24,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
+<link rel="preload" href="/assets/fonts/{{font_preload}}" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/css/site.css?v={{version}}">
 <script>
 /* Decide before first paint whether the intro plays: once per session, never under reduced motion. */
@@ -52,9 +53,12 @@
 </svg>
 
 <div class="intro" id="intro">
+  <div class="intro__mist" aria-hidden="true"></div>
   <div class="intro__mark" aria-hidden="true">
+    <span class="intro__ring"></span><span class="intro__ring"></span><span class="intro__ring"></span>
     <img src="/assets/img/logo-light.svg" alt="" width="120" height="120">
     <span class="intro__name">{{name}}</span>
+    <span class="intro__line">{{intro_line}}</span>
   </div>
   <button type="button" class="intro__skip" id="intro-skip">{{intro_skip}}</button>
 </div>

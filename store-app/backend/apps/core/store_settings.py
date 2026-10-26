@@ -14,7 +14,7 @@ def _shared_cache() -> bool:
     a day. One primary-key read is cheaper than that."""
     from django.conf import settings as django_settings
 
-    return "locmem" not in django_settings.CACHES["default"]["BACKEND"].lower()
+    return django_settings.CACHE_IS_SHARED
 
 
 def get_store_settings() -> StoreSettings:

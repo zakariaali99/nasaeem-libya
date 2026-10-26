@@ -209,8 +209,8 @@ class OrderSerializer(serializers.ModelSerializer):
     shipping_status_label = serializers.CharField(
         source="get_shipping_status_display", read_only=True
     )
-    city_name = serializers.CharField(source="shipping_city.name", read_only=True, default="")
-    region_name = serializers.CharField(source="shipping_region.name", read_only=True, default="")
+    city_name = serializers.SerializerMethodField()
+    region_name = serializers.SerializerMethodField()
     delivery_method_name = serializers.CharField(
         source="delivery_method.name", read_only=True, default=""
     )
@@ -242,6 +242,17 @@ class OrderSerializer(serializers.ModelSerializer):
     def _payments(order):
         # Sorted in Python so the `payments` prefetch is reused, not re-queried.
         return sorted(order.payments.all(), key=lambda p: p.created_at, reverse=True)
+
+    def _place_name(self, place):
+        if place is None:
+            return ""
+        return english_or(place, "name", wants_english(self.context.get("request")))
+
+    def get_city_name(self, obj):
+        return self._place_name(obj.shipping_city)
+
+    def get_region_name(self, obj):
+        return self._place_name(obj.shipping_region)
 
     def get_payment_status(self, order):
         payments = self._payments(order)

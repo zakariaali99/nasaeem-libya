@@ -9,8 +9,8 @@ from datetime import timedelta
 from decimal import Decimal
 
 import pytest
-from django.conf import settings
 from django.core.cache import cache
+from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -285,11 +285,7 @@ def test_widgets_come_back_in_order(layout, client):
     assert orders == [0, 1, 2]
 
 
-@pytest.mark.skipif(
-    any(name in settings.CACHES["default"]["BACKEND"].lower() for name in ("locmem", "dummy")),
-    reason="the layout is cached only in a shared cache (Redis); without one "
-           "cached_layout_rows() skips the cache on purpose",
-)
+@override_settings(CACHE_IS_SHARED=True)
 def test_saving_a_widget_invalidates_the_cached_layout(layout, client):
     """Phase 8's gate is 'the change is visible immediately after a save'. A
     cache with no invalidation is exactly how that gate fails."""

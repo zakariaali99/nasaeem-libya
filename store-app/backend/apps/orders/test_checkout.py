@@ -510,6 +510,50 @@ class TestOrderAdminPatch:
         assert order.tracking_number == "VX-0001"
 
 
+class TestTheLastUnit:
+    def test_the_database_not_the_python_check_decides_who_gets_it(self, buyer_api, product, region, monkeypatch):
+        """SQLite ignores select_for_update(), so the Python-side stock check
+        can pass for two buyers at once. The reservation is a conditional
+        UPDATE: when the shelf is already empty it affects no row and the
+        checkout answers 409 instead of overselling."""
+        product.stock = 1
+        product.save(update_fields=["stock"])
+        buyer_api.post(reverse("cart"), {"product_id": str(product.id)}, format="json")
+        # The other buyer takes the unit between our check and our reservation:
+        # the first look at the shelf still sees it, the real shelf is empty.
+        real_available_stock = services.available_stock
+        looks = iter([lambda *_: 5])
+        monkeypatch.setattr(
+            services, "available_stock",
+            lambda *args: next(looks, real_available_stock)(*args),
+        )
+        Product.objects.filter(pk=product.pk).update(reserved_stock=1)
+
+        response = buyer_api.post(reverse("cart-checkout"), {
+            "region_id": region.id, "address": "شارع", "payment_method": "moamalat",
+        }, format="json")
+
+        assert response.status_code == 409
+        assert "هي 0 فقط" in response.json()["message"]  # what is left now, not before the race
+        assert not Order.objects.exclude(status=OrderStatus.CANCELLED).exists()
+        product.refresh_from_db()
+        assert product.reserved_stock == 1  # not 2
+
+    def test_the_english_order_names_its_city_in_english(self, buyer_api, product, region):
+        region.city.name_en = "Tripoli"
+        region.city.save(update_fields=["name_en"])
+        buyer_api.post(reverse("cart"), {"product_id": str(product.id)}, format="json")
+        number = buyer_api.post(reverse("cart-checkout"), {
+            "region_id": region.id, "address": "شارع", "payment_method": "moamalat",
+        }, format="json").json()["data"]["order_number"]
+
+        english = buyer_api.get(reverse("order-detail", args=[number]), {"lang": "en"}).json()["data"]
+        arabic = buyer_api.get(reverse("order-detail", args=[number])).json()["data"]
+        assert english["city_name"] == "Tripoli"
+        assert english["region_name"] == "قرقارش"  # no English name yet: Arabic
+        assert arabic["city_name"] == "طرابلس"
+
+
 class TestOrderNumbers:
     def test_the_format_is_preserved(self, buyer_api, product, region):
         buyer_api.post(reverse("cart"), {"product_id": str(product.id)}, format="json")

@@ -1,5 +1,6 @@
 from decimal import Decimal
 import pytest
+from django.test import override_settings
 from django.core.cache import cache
 from rest_framework.test import APIClient
 
@@ -39,6 +40,7 @@ def sample_product(db):
 
 
 @pytest.mark.django_db
+@override_settings(CACHE_IS_SHARED=True)
 def test_category_tree_caching_and_invalidation(api_client, admin_user):
     cache.clear()
 
@@ -59,6 +61,7 @@ def test_category_tree_caching_and_invalidation(api_client, admin_user):
 
 
 @pytest.mark.django_db
+@override_settings(CACHE_IS_SHARED=True)
 def test_product_detail_caching_and_invalidation(api_client, admin_user, sample_product):
     cache.clear()
 
@@ -80,6 +83,7 @@ def test_product_detail_caching_and_invalidation(api_client, admin_user, sample_
 
 
 @pytest.mark.django_db
+@override_settings(CACHE_IS_SHARED=True)
 def test_active_cart_promotion_caching_and_invalidation(api_client, admin_user):
     cache.clear()
 
@@ -105,6 +109,20 @@ def test_active_cart_promotion_caching_and_invalidation(api_client, admin_user):
     )
     assert put_res.status_code == 200
     assert cache.get("store:promotions:active") is None
+
+
+@pytest.mark.django_db
+def test_without_a_shared_cache_the_product_page_shows_stock_changes_at_once(api_client, sample_product):
+    """The live host has no Redis. A per-process copy of the page outlived a
+    stock adjustment by six hours, so there the page is not cached at all."""
+    cache.clear()
+    url = f"/api/products/by-slug/{sample_product.slug}/"
+    assert api_client.get(url).json()["data"]["available_stock"] == 15
+    assert cache.get(f"store:product:{sample_product.slug}") is None
+
+    sample_product.stock = 3
+    sample_product.save(update_fields=["stock"])
+    assert api_client.get(url).json()["data"]["available_stock"] == 3
 
 
 def test_image_pipeline_derivatives_generation():

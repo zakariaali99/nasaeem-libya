@@ -678,7 +678,7 @@ def cached_layout_rows():
     # holds its own copy and a save only clears the one that handled it: the
     # other processes kept serving the old homepage for five minutes. Two
     # indexed queries are cheaper than that confusion, so skip the cache.
-    shared = "locmem" not in settings.CACHES["default"]["BACKEND"].lower()
+    shared = settings.CACHE_IS_SHARED
     cached = cache.get(LAYOUT_CACHE_KEY) if shared else None
     if cached is not None:
         layout_id, widget_ids = cached

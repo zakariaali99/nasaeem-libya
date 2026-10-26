@@ -222,14 +222,17 @@ class ProductDetailView(APIView):
         if product is None:
             return Response({"message": _("المنتج غير موجود")}, status=status.HTTP_404_NOT_FOUND)
 
+        # The page carries stock, and a sale or a stock adjustment does not clear
+        # it, so it is cached only where one delete reaches every process.
         cache_key = lang_key(f"store:product:{product.id}", request)
-        if not admin:
+        cacheable = not admin and settings.CACHE_IS_SHARED
+        if cacheable:
             cached_data = cache.get(cache_key)
             if cached_data is not None:
                 return Response({"data": cached_data})
 
         serialized_data = ProductDetailSerializer(product, context={"request": request}).data
-        if not admin:
+        if cacheable:
             cache.set(cache_key, serialized_data, 21600)
         return Response({"data": serialized_data})
 
@@ -305,13 +308,14 @@ class ProductBySlugView(APIView):
             return Response({"message": _("المنتج غير موجود")}, status=status.HTTP_404_NOT_FOUND)
 
         cache_key = lang_key(f"store:product:{product.slug}", request)
-        if not admin:
+        cacheable = not admin and settings.CACHE_IS_SHARED
+        if cacheable:
             cached_data = cache.get(cache_key)
             if cached_data is not None:
                 return Response({"data": cached_data})
 
         serialized_data = ProductDetailSerializer(product, context={"request": request}).data
-        if not admin:
+        if cacheable:
             cache.set(cache_key, serialized_data, 21600)
             if str(slug) != str(product.slug):
                 cache.set(lang_key(f"store:product:{slug}", request), serialized_data, 21600)
@@ -338,13 +342,13 @@ def category_tree(request=None, *, admin=False):
 
     roots = by_parent.get(None, [])
     data = CategorySerializer(roots, many=True, context={"request": request}).data
-    if not admin:
+    if not admin and settings.CACHE_IS_SHARED:
         cache.set(lang_key("store:categories:tree", request), data, 86400)
     return data, len(categories)
 
 
 def public_category_tree(request=None):
-    cached = cache.get(lang_key("store:categories:tree", request))
+    cached = cache.get(lang_key("store:categories:tree", request)) if settings.CACHE_IS_SHARED else None
     if cached is not None:
         return cached
     return category_tree(request)[0]
@@ -356,7 +360,7 @@ class CategoryListView(APIView):
 
     def get(self, request):
         admin = bool(request.user.is_authenticated and getattr(request.user, "is_admin_role", False))
-        if not admin:
+        if not admin and settings.CACHE_IS_SHARED:
             cached = cache.get(lang_key("store:categories:tree", request))
             if cached is not None:
                 return Response({"data": cached, "meta": {"total": len(cached)}})

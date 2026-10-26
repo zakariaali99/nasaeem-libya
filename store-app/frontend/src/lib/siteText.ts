@@ -23,6 +23,8 @@ export interface SiteTextEntry {
   /** The built-in English wording, shown on `/en/` pages. */
   fallbackEn: string
   multiline?: boolean
+  /** Dashboard wording (staff only): no English twin, never shown in the store. */
+  adminOnly?: boolean
 }
 
 export const SITE_TEXTS: SiteTextEntry[] = [
@@ -65,6 +67,16 @@ export const SITE_TEXTS: SiteTextEntry[] = [
   // ---- homepage with no layout --------------------------------------------
   { key: 'home.empty.title', group: 'الصفحة الرئيسية بدون تخطيط', label: 'العنوان', fallback: 'مرحباً بك في متجرنا', fallbackEn: 'Welcome to our store' },
   { key: 'home.empty.text', group: 'الصفحة الرئيسية بدون تخطيط', label: 'النص', fallback: 'كل المنتجات متاحة للتصفّح الآن.', fallbackEn: 'Every product is ready to browse now.' },
+
+  // ---- WhatsApp templates in the customer file (dashboard only) -----------
+  // Kept in step with TEMPLATE_DEFAULTS in backend/apps/accounts/crm.py.
+  // Variables: {الاسم} {المتجر} {الكوبون} {رقم_الطلب}
+  { key: 'crm.whatsapp.followup', group: 'رسائل واتساب لملف العميل (لوحة التحكم)', label: 'متابعة بعد الشراء — المتغيرات: {الاسم} {المتجر} {رقم_الطلب}', multiline: true, adminOnly: true,
+    fallback: 'مرحباً {الاسم}، شكراً لطلبك رقم {رقم_الطلب} من {المتجر}. نتمنى أن يكون قد أعجبك، ويسعدنا رأيك أو أي ملاحظة.', fallbackEn: '' },
+  { key: 'crm.whatsapp.vip', group: 'رسائل واتساب لملف العميل (لوحة التحكم)', label: 'عرض VIP — المتغيرات: {الاسم} {المتجر} {الكوبون}', multiline: true, adminOnly: true,
+    fallback: 'مرحباً {الاسم}، أنت من عملاء {المتجر} المميزين. لك خصم خاص بالكود {الكوبون} على طلبك القادم.', fallbackEn: '' },
+  { key: 'crm.whatsapp.birthday', group: 'رسائل واتساب لملف العميل (لوحة التحكم)', label: 'تهنئة عيد ميلاد — المتغيرات: {الاسم} {المتجر} {الكوبون}', multiline: true, adminOnly: true,
+    fallback: 'كل عام وأنت بخير {الاسم}! هديتنا لك من {المتجر} بمناسبة عيد ميلادك: كود خصم {الكوبون}.', fallbackEn: '' },
 ]
 
 const FALLBACKS: Record<string, string> = Object.fromEntries(SITE_TEXTS.map((t) => [t.key, t.fallback]))

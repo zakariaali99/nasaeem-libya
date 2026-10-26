@@ -1,5 +1,6 @@
-import { CheckCircle2, ChevronLeft, Eye, EyeOff, Heart, KeyRound, Lock, MapPin, Package, User } from 'lucide-react'
+import { Cake, CheckCircle2, ChevronLeft, Eye, EyeOff, Heart, KeyRound, Lock, MapPin, Package, User } from 'lucide-react'
 import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from '@/lib/i18nRouter'
 
 import { Alert } from '@/components/ui/alert'
@@ -8,7 +9,7 @@ import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { api, ApiError } from '@/lib/api'
 import { formatDate } from '@/lib/format'
-import { useLogout, useMe } from '@/lib/queries/auth'
+import { authKeys, useLogout, useMe } from '@/lib/queries/auth'
 import { usePageTitle } from '@/lib/usePageTitle'
 import { t } from '@/lib/i18n'
 
@@ -26,7 +27,25 @@ export default function AccountPage() {
   const [passError, setPassError] = useState<string | null>(null)
   const [passSuccess, setPassSuccess] = useState<string | null>(null)
 
+  const queryClient = useQueryClient()
+  const [birthday, setBirthday] = useState<string | null>(null)
+  const [birthdayState, setBirthdayState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+
   if (!user) return null
+
+  // Optional: lets the store send a birthday greeting. Saved when the field is
+  // left; an empty value clears it.
+  const saveBirthday = async (value: string) => {
+    if (value === (user.birthday ?? '')) return
+    setBirthdayState('saving')
+    try {
+      await api.patch('/auth/me/', { birthday: value || null })
+      await queryClient.invalidateQueries({ queryKey: authKeys.me })
+      setBirthdayState('saved')
+    } catch {
+      setBirthdayState('error')
+    }
+  }
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -130,6 +149,27 @@ export default function AccountPage() {
               <dd className="font-bold text-foreground font-mono">{value}</dd>
             </div>
           ))}
+          <div className="flex flex-wrap items-center justify-between gap-3 p-4 text-xs sm:text-sm">
+            <dt className="flex items-center gap-1.5 text-muted-foreground">
+              <Cake className="size-4 text-primary" aria-hidden="true" />
+              <label htmlFor="birthday">{t('account.birthday')}</label>
+            </dt>
+            <dd className="flex items-center gap-2">
+              <Input
+                id="birthday"
+                type="date"
+                dir="ltr"
+                value={birthday ?? user.birthday ?? ''}
+                max={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => { setBirthday(e.target.value); setBirthdayState('idle') }}
+                onBlur={(e) => saveBirthday(e.target.value)}
+                className="h-10 w-44 rounded-xl text-xs font-mono"
+              />
+              <span className="text-[11px] text-muted-foreground" aria-live="polite">
+                {birthdayState === 'saving' ? t('account.birthdaySaving') : birthdayState === 'saved' ? t('account.birthdaySaved') : birthdayState === 'error' ? t('account.birthdayFailed') : t('account.birthdayHint')}
+              </span>
+            </dd>
+          </div>
         </dl>
       </section>
 

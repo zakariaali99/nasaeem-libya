@@ -15,7 +15,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
-from apps.core.models import User
+from apps.core.models import CustomerInteraction, CustomerTag, User
 
 from .phone import INVALID_PHONE, normalise_phone
 
@@ -41,12 +41,54 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             "id", "phone_number", "phone_verified", "name", "email",
-            "role", "is_active", "date_joined",
+            "role", "is_active", "date_joined", "birthday",
             "loyalty_points", "lifetime_spend", "vip_tier",
             "is_cod_blacklisted", "cod_rejections_count", "cod_blacklist_reason",
             "banned", "ban_reason", "ban_expires_at",
         ]
         read_only_fields = fields
+
+
+class CustomerTagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomerTag
+        fields = ["id", "name", "color"]
+        read_only_fields = ["id"]
+
+    def validate_name(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("اكتب اسم الوسم")
+        return value
+
+    def validate_color(self, value):
+        import re
+
+        value = (value or "").strip().lower()
+        if not re.fullmatch(r"#[0-9a-f]{6}", value):
+            raise serializers.ValidationError("اللون بصيغة #rrggbb")
+        return value
+
+
+class CustomerInteractionSerializer(serializers.ModelSerializer):
+    kind_label = serializers.CharField(source="get_kind_display", read_only=True)
+    staff_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CustomerInteraction
+        fields = ["id", "kind", "kind_label", "text", "staff_name", "created_at"]
+        read_only_fields = ["id", "created_at"]
+
+    def get_staff_name(self, obj) -> str:
+        if not obj.staff_id:
+            return ""
+        return obj.staff.name or obj.staff.phone_number
+
+    def validate_text(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("اكتب نص التواصل")
+        return value
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -108,13 +150,23 @@ class AdminUserUpdateSerializer(serializers.ModelSerializer):
         fields = [
             "role", "is_active", "banned", "ban_reason", "ban_expires_at", "name",
             "is_cod_blacklisted", "cod_blacklist_reason",
+            "birthday", "tags",
         ]
+        extra_kwargs = {"birthday": {"allow_null": True}, "tags": {"required": False}}
 
 
 class ProfileUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ["name", "email"]
+        fields = ["name", "email", "birthday"]
+        extra_kwargs = {"birthday": {"allow_null": True, "required": False}}
+
+    def validate_birthday(self, value):
+        from django.utils import timezone
+
+        if value and value > timezone.localdate():
+            raise serializers.ValidationError(_("تاريخ الميلاد لا يكون في المستقبل"))
+        return value
 
 
 class AddressSerializer(serializers.ModelSerializer):

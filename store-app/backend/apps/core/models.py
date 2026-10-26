@@ -84,7 +84,15 @@ class User(AbstractBaseUser, PermissionsMixin):
     legacy_id = models.CharField(
         max_length=64, null=True, blank=True, unique=True, editable=False, default=None
     )
-    # VIP Loyalty & Points Engine
+    # Customer file (CRM). The birthday is optional and may be typed by the
+    # customer or by staff; tags are the coloured labels staff put on a file.
+    birthday = models.DateField("تاريخ الميلاد", null=True, blank=True)
+    tags = models.ManyToManyField(
+        "CustomerTag", blank=True, related_name="customers", verbose_name="الوسوم"
+    )
+    # VIP Loyalty & Points Engine — legacy. Nothing updates these three fields
+    # any more; the customer file computes its numbers from the orders
+    # (`accounts/crm.py`). Kept, not removed, so old rows and backups still load.
     loyalty_points = models.PositiveIntegerField("نقاط الولاء", default=0)
     lifetime_spend = models.DecimalField(
         "إجمالي المشتريات (د.ل)", max_digits=12, decimal_places=2, default=Decimal("0.00")
@@ -143,6 +151,59 @@ class User(AbstractBaseUser, PermissionsMixin):
         if self.ban_expires_at is None:
             return True
         return self.ban_expires_at > timezone.now()
+
+
+class CustomerTag(models.Model):
+    """A coloured label staff put on a customer's file («يحب العود»,
+    «تاجر جملة»). Created from the file itself; used to filter the list."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField("الوسم", max_length=40, unique=True)
+    color = models.CharField("اللون", max_length=7, default="#6b7280")  # #rrggbb
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "وسم عميل"
+        verbose_name_plural = "وسوم العملاء"
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
+class InteractionKind(models.TextChoices):
+    CALL = "call", "مكالمة"
+    WHATSAPP = "whatsapp", "واتساب"
+    COMPLAINT = "complaint", "شكوى"
+    FOLLOWUP = "followup", "متابعة"
+    NOTE = "note", "ملاحظة"
+
+
+class CustomerInteraction(models.Model):
+    """One line in a customer's contact log. Written once: it is never edited
+    after saving, and only an administrator may delete it."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    customer = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="interactions", verbose_name="العميل"
+    )
+    kind = models.CharField(
+        "النوع", max_length=12, choices=InteractionKind.choices, default=InteractionKind.NOTE
+    )
+    text = models.CharField("النص", max_length=600)
+    staff = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+        verbose_name="الموظف",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        verbose_name = "تواصل مع عميل"
+        verbose_name_plural = "سجل التواصل"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.get_kind_display()} — {self.customer_id}"
 
 
 class LoyaltyTransaction(models.Model):
@@ -285,6 +346,13 @@ class StoreSettings(models.Model):
     # badges…), keyed by the ids in the frontend's `lib/siteText.ts`. A key
     # that is absent uses the built-in wording; an empty string hides the line.
     texts = models.JSONField("نصوص المتجر", default=dict, blank=True)
+    # Customer segments (`accounts/crm.py`): VIP at this many orders OR this
+    # much spent on delivered orders; inactive after this many days without one.
+    crm_vip_min_orders = models.PositiveIntegerField("طلبات VIP", default=5)
+    crm_vip_min_spend = models.DecimalField(
+        "إنفاق VIP (د.ل)", max_digits=10, decimal_places=2, default=Decimal("500.00")
+    )
+    crm_inactive_days = models.PositiveIntegerField("أيام الخمول", default=60)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

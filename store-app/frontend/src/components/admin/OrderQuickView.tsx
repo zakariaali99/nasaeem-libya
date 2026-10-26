@@ -1,6 +1,8 @@
 import { ArrowUpRight, MapPin, MessageCircle, Phone, Printer } from 'lucide-react'
+import * as React from 'react'
 import { Link } from 'react-router-dom'
 
+import { CustomerDrawer } from '@/components/admin/CustomerDrawer'
 import { OrderStageSelect } from '@/components/admin/OrderStageSelect'
 import { Button } from '@/components/ui/button'
 import { LineThumb } from '@/components/ui/line-thumb'
@@ -23,8 +25,11 @@ export function OrderQuickView({
   const { data: order, isPending } = useOrder(orderId ?? undefined)
   const phone = order?.user?.phone_number ?? ''
   const chat = phone ? whatsappUrl(phone) : null
+  const [customer, setCustomer] = React.useState<string | null>(null)
 
   return (
+    <>
+    <CustomerDrawer customerId={customer} onOpenChange={(open) => !open && setCustomer(null)} />
     <Sheet open={Boolean(orderId)} onOpenChange={onOpenChange}>
       <SheetContent side="left" className="w-[92vw] max-w-md overflow-y-auto sm:max-w-md">
         {isPending || !order ? (
@@ -45,7 +50,18 @@ export function OrderQuickView({
             <OrderStageSelect order={order} onChanged={(stage) => onChanged?.(`#${order.order_number}: ${STAGE_BY_VALUE[stage].label}`)} />
 
             <section className="space-y-2 rounded-xl border border-border p-4 text-sm">
-              <p className="font-bold text-foreground">{order.user?.name || 'عميل المتجر'}</p>
+              {order.user ? (
+                <button
+                  type="button"
+                  onClick={() => setCustomer(order.user!.id)}
+                  className="font-bold text-foreground underline-offset-4 hover:text-primary hover:underline"
+                  title="فتح ملف العميل"
+                >
+                  {order.user.name || 'عميل المتجر'}
+                </button>
+              ) : (
+                <p className="font-bold text-foreground">عميل المتجر</p>
+              )}
               {phone ? (
                 <div className="flex flex-wrap items-center gap-2">
                   <a href={`tel:${phone}`} className="inline-flex min-h-11 items-center gap-1.5 font-mono text-muted-foreground hover:text-primary">
@@ -158,5 +174,6 @@ export function OrderQuickView({
         )}
       </SheetContent>
     </Sheet>
+    </>
   )
 }

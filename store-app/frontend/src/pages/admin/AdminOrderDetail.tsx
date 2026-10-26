@@ -19,6 +19,7 @@ import {
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
+import { CustomerDrawer } from '@/components/admin/CustomerDrawer'
 import { OrderEditDialog } from '@/components/admin/OrderEditDialog'
 import { OrderStageSelect } from '@/components/admin/OrderStageSelect'
 import { OrderTrackingTimeline } from '@/components/admin/OrderTrackingTimeline'
@@ -59,6 +60,7 @@ export default function AdminOrderDetail() {
   const [copiedTracking, setCopiedTracking] = useState(false)
   const [refundModalOpen, setRefundModalOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
+  const [customerOpen, setCustomerOpen] = useState(false)
   const [notesDraft, setNotesDraft] = useState<string | null>(null)
   const [stageMessage, setStageMessage] = useState<string | null>(null)
   const change = useChangeStage(order?.id ?? '')
@@ -399,12 +401,29 @@ export default function AdminOrderDetail() {
                   {order.user?.name ? order.user.name.charAt(0) : <User className="size-4" />}
                 </div>
                 <div className="min-w-0">
-                  <p className="font-bold text-sm text-foreground truncate">{order.user?.name || (order.user ? 'عميل بلا اسم' : 'طلب بلا حساب عميل')}</p>
+                  {order.user ? (
+                    <button
+                      type="button"
+                      onClick={() => setCustomerOpen(true)}
+                      className="block truncate text-start font-bold text-sm text-foreground underline-offset-4 hover:text-primary hover:underline"
+                      title="فتح ملف العميل"
+                    >
+                      {order.user.name || 'عميل بلا اسم'}
+                    </button>
+                  ) : (
+                    <p className="font-bold text-sm text-foreground truncate">طلب بلا حساب عميل</p>
+                  )}
                   <p className="font-mono text-xs text-muted-foreground">{order.user?.phone_number || '—'}</p>
                 </div>
               </div>
+              {order.user ? (
+                <Button type="button" variant="outline" size="sm" className="h-9 w-full rounded-xl text-xs font-bold" onClick={() => setCustomerOpen(true)}>
+                  ملف العميل: التصنيف والوسوم وسجل التواصل
+                </Button>
+              ) : null}
             </div>
           </div>
+          {order.user ? <CustomerDrawer customerId={customerOpen ? order.user.id : null} onOpenChange={(open) => !open && setCustomerOpen(false)} /> : null}
 
           {/* Delivery Address & Tracking Details Card */}
           <div className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-xs space-y-4">

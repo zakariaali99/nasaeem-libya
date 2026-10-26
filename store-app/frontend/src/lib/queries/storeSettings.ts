@@ -26,6 +26,10 @@ export interface StoreSettingsData {
   bank_transfer_note: string
   /** Overrides for the storefront's fixed wording — see `lib/siteText.ts`. */
   texts?: Record<string, string>
+  /** Customer segments (admin only): VIP at this many orders or this much spent; inactive after this many days. */
+  crm_vip_min_orders?: number
+  crm_vip_min_spend?: string
+  crm_inactive_days?: number
   bank_accounts?: BankAccountItem[]
   updated_at?: string
 }

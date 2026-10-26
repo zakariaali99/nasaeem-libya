@@ -9,6 +9,8 @@ export interface User {
   role: Role
   is_active: boolean
   date_joined: string
+  /** Optional, `YYYY-MM-DD`; typed by the customer or by staff. */
+  birthday?: string | null
 }
 
 export const ADMIN_ROLES: readonly Role[] = ['staff', 'manager', 'admin', 'owner']

@@ -1,8 +1,6 @@
 import {
   ArrowRight,
-  Calendar,
   CheckCircle2,
-  DollarSign,
   KeyRound,
   Mail,
   MessageSquare,
@@ -18,13 +16,14 @@ import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
+import { CustomerProfilePanel } from '@/components/admin/CustomerProfilePanel'
 import { StatusBadge } from '@/components/admin/StatusBadge'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
-import { formatDateTime, formatNumber, formatPrice } from '@/lib/format'
+import { formatDateTime, formatPrice } from '@/lib/format'
 import { usePageTitle } from '@/lib/usePageTitle'
 import type { Order } from '@/types/api'
 
@@ -129,7 +128,6 @@ export default function AdminUserDetail() {
 
   const orders = ordersQuery.data?.items ?? []
   const totalOrders = ordersQuery.data?.meta.total ?? 0
-  const totalSpend = orders.reduce((sum, o) => sum + Number(o.total || 0), 0)
 
   return (
     <div className="space-y-6 animate-fade-rise">
@@ -158,37 +156,11 @@ export default function AdminUserDetail() {
         </div>
       </div>
 
-      {/* Customer Quick Metric Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
-        <div className="rounded-2xl border border-border bg-card p-4 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>إجمالي الطلبات</span>
-            <Package className="size-4 text-primary" />
-          </div>
-          <p className="font-mono text-xl sm:text-2xl font-black text-foreground">{formatNumber(totalOrders)}</p>
-          <p className="text-[11px] text-muted-foreground">طلب مسجل</p>
-        </div>
-
-        <div className="rounded-2xl border border-border bg-card p-4 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>إجمالي المشتريات (آخر 10)</span>
-            <DollarSign className="size-4 text-emerald-500" />
-          </div>
-          <p className="font-mono text-xl sm:text-2xl font-black text-price">{formatPrice(totalSpend)}</p>
-          <p className="text-[11px] text-muted-foreground">قيمة المشتريات</p>
-        </div>
-
-        <div className="col-span-2 sm:col-span-1 rounded-2xl border border-border bg-card p-4 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>تاريخ التسجيل</span>
-            <Calendar className="size-4 text-sky-500" />
-          </div>
-          <p className="font-mono text-sm sm:text-base font-bold text-foreground">
-            {new Date(user.date_joined).toLocaleDateString('ar-LY', { year: 'numeric', month: 'short', day: 'numeric' })}
-          </p>
-          <p className="text-[11px] text-muted-foreground">عضو منذ التسجيل</p>
-        </div>
-      </div>
+      {/* The customer file: numbers, segment, tags, birthday, WhatsApp, contact log.
+          Numbers are computed from the orders on the server (plan 8, phase د). */}
+      <section className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-xs">
+        <CustomerProfilePanel customerId={user.id} />
+      </section>
 
       {/* Main Grid: Details + Orders */}
       <div className="grid gap-6 lg:grid-cols-3">

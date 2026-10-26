@@ -27,12 +27,10 @@
 <link rel="preload" href="/assets/fonts/cairo-arabic.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/css/site.css?v=272942b8">
 <script>
-/* Decide before first paint whether the intro plays: once per session, never under reduced motion. */
+/* Decide before first paint whether the intro plays: on every open and refresh, never under reduced motion. */
 (function () {
   try {
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    if (sessionStorage.getItem('nl-intro')) return;
-    sessionStorage.setItem('nl-intro', '1');
     document.documentElement.classList.add('intro-on');
   } catch (e) {}
 })();

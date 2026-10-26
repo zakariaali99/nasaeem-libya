@@ -15,7 +15,7 @@
 ```bash
 python3 company-site/build.py
 ```
-يحذف `dist/` ويولّده من جديد: `dist/index.html` و`dist/en/index.html` والأصول و`sitemap.xml` و`robots.txt`.
+يحذف `dist/` ويولّده من جديد: `dist/index.html` و`dist/en/index.html` والأصول و`.htaccess` (من `templates/htaccess`) و`sitemap.xml` و`robots.txt`.
 للمعاينة: `python3 -m http.server 8090 --directory company-site/dist` ثم `http://localhost:8090/`.
 
 ## الرفع (صاحب المتجر)

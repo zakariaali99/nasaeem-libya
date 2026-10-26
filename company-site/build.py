@@ -200,6 +200,7 @@ def main():
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(render_page(template, content, lang, version), encoding="utf-8")
 
+    shutil.copyfile(ROOT / "templates" / "htaccess", DIST / ".htaccess")
     (DIST / "robots.txt").write_text(
         f"User-agent: *\nAllow: /\nSitemap: {content['site']['domain'].rstrip('/')}/sitemap.xml\n",
         encoding="utf-8",

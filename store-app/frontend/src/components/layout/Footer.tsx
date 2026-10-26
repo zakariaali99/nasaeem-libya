@@ -34,10 +34,11 @@ export function Footer() {
 
   // The store's name and legal name are Arabic content; English pages use the English name.
   const storeName = isEnglish() ? tr('common.storeName') : settings?.store_name || tr('common.storeName')
-  const storeAddress = settings?.address || ''
   const phone = settings?.phone || ''
   const legalName = isEnglish() ? tr('common.storeName') : settings?.legal_name || tr('common.storeName')
   const t = useSiteText()
+  // The address in settings has no English twin; the store text carries it.
+  const storeAddress = t('footer.address') || settings?.address || ''
   // Wording comes from the dashboard; a line left empty there is not drawn.
   const trust = [1, 2, 3]
     .map((n, index) => ({

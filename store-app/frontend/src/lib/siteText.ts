@@ -44,6 +44,7 @@ export const SITE_TEXTS: SiteTextEntry[] = [
   { key: 'footer.shop.title', group: 'التذييل', label: 'عنوان عمود روابط المتجر', fallback: 'المتجر والتسوق', fallbackEn: 'Shop' },
   { key: 'footer.account.title', group: 'التذييل', label: 'عنوان عمود روابط الحساب', fallback: 'خدمات الحساب', fallbackEn: 'Your account' },
   { key: 'footer.rights', group: 'التذييل', label: 'عبارة الحقوق بعد اسم الشركة', fallback: 'جميع الحقوق محفوظة.', fallbackEn: 'All rights reserved.' },
+  { key: 'footer.address', group: 'التذييل', label: 'عنوان المتجر — فارغاً يُؤخذ من إعدادات المتجر؛ الخانة الإنجليزية تظهر في المتجر الإنجليزي', fallback: '', fallbackEn: '' },
 
   // ---- product page -------------------------------------------------------
   { key: 'product.badge.1.title', group: 'صفحة المنتج — المزايا الأربع', label: 'الميزة 1 — العنوان', fallback: 'منتج أصلي', fallbackEn: 'Genuine product' },

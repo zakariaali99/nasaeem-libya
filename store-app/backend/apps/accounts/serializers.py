@@ -10,12 +10,14 @@ Two rules govern every message in this file:
    it was a total authentication bypass.
 """
 
+from decimal import Decimal
+
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
-from apps.core.models import CustomerInteraction, CustomerTag, User
+from apps.core.models import User
 
 from .phone import INVALID_PHONE, normalise_phone
 
@@ -36,59 +38,82 @@ class PhoneField(serializers.CharField):
         return phone
 
 
+class CustomerTagSerializer(serializers.ModelSerializer):
+    class Meta:
+        from apps.core.models import CustomerTag
+
+        model = CustomerTag
+        fields = ["id", "name", "color", "created_at"]
+        read_only_fields = ["id", "created_at"]
+
+
+class CustomerInteractionSerializer(serializers.ModelSerializer):
+    staff_name = serializers.SerializerMethodField()
+    interaction_type_display = serializers.CharField(source="get_interaction_type_display", read_only=True)
+
+    class Meta:
+        from apps.core.models import CustomerInteraction
+
+        model = CustomerInteraction
+        fields = [
+            "id", "customer", "staff", "staff_name",
+            "interaction_type", "interaction_type_display",
+            "notes", "created_at",
+        ]
+        read_only_fields = ["id", "customer", "staff", "staff_name", "interaction_type_display", "created_at"]
+
+    def get_staff_name(self, obj) -> str:
+        if obj.staff:
+            return obj.staff.name or obj.staff.phone_number
+        return "النظام"
+
+
 class UserSerializer(serializers.ModelSerializer):
+    tags = CustomerTagSerializer(many=True, read_only=True)
+    crm = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = [
             "id", "phone_number", "phone_verified", "name", "email",
-            "role", "is_active", "date_joined", "birthday",
+            "role", "is_active", "date_joined", "birthday", "tags", "crm",
             "loyalty_points", "lifetime_spend", "vip_tier",
             "is_cod_blacklisted", "cod_rejections_count", "cod_blacklist_reason",
             "banned", "ban_reason", "ban_expires_at",
         ]
         read_only_fields = fields
 
+    def get_crm(self, obj):
+        from django.utils import timezone
+        from .crm import TIER_LABELS, TIER_SHORT_LABELS, compute_customer_metrics, determine_customer_tier
 
-class CustomerTagSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = CustomerTag
-        fields = ["id", "name", "color"]
-        read_only_fields = ["id"]
-
-    def validate_name(self, value):
-        value = value.strip()
-        if not value:
-            raise serializers.ValidationError("اكتب اسم الوسم")
-        return value
-
-    def validate_color(self, value):
-        import re
-
-        value = (value or "").strip().lower()
-        if not re.fullmatch(r"#[0-9a-f]{6}", value):
-            raise serializers.ValidationError("اللون بصيغة #rrggbb")
-        return value
-
-
-class CustomerInteractionSerializer(serializers.ModelSerializer):
-    kind_label = serializers.CharField(source="get_kind_display", read_only=True)
-    staff_name = serializers.SerializerMethodField()
-
-    class Meta:
-        model = CustomerInteraction
-        fields = ["id", "kind", "kind_label", "text", "staff_name", "created_at"]
-        read_only_fields = ["id", "created_at"]
-
-    def get_staff_name(self, obj) -> str:
-        if not obj.staff_id:
-            return ""
-        return obj.staff.name or obj.staff.phone_number
-
-    def validate_text(self, value):
-        value = value.strip()
-        if not value:
-            raise serializers.ValidationError("اكتب نص التواصل")
-        return value
+        if hasattr(obj, "crm_lifetime_spend"):
+            spend = getattr(obj, "crm_lifetime_spend", Decimal("0.00"))
+            total_orders = getattr(obj, "crm_total_orders", 0)
+            last_order = getattr(obj, "crm_last_order_date", None)
+            tier = determine_customer_tier(total_orders, spend, last_order)
+            today = timezone.localdate()
+            is_bday = bool(obj.birthday and obj.birthday.month == today.month and obj.birthday.day == today.day)
+            city = getattr(obj, "crm_last_city", None) or ""
+            if not city:
+                addr = obj.addresses.select_related("city").filter(is_default=True).first() or obj.addresses.select_related("city").first()
+                city = addr.city.name if addr and addr.city else ""
+            return {
+                "total_orders": total_orders,
+                "lifetime_spend": f"{Decimal(spend or 0):.2f}",
+                "last_order_date": last_order.isoformat() if last_order else None,
+                "tier": tier,
+                "tier_label": TIER_LABELS.get(tier, tier),
+                "tier_short_label": TIER_SHORT_LABELS.get(tier, tier),
+                "city": city,
+                "is_birthday_today": is_bday,
+                "birthday": obj.birthday.isoformat() if obj.birthday else None,
+            }
+        # Five queries per user otherwise — and this serializer answers every
+        # /auth/me/ and login. The figures are computed only where asked for.
+        if self.context.get("crm"):
+            return compute_customer_metrics(obj)
+        return None
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -149,24 +174,14 @@ class AdminUserUpdateSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             "role", "is_active", "banned", "ban_reason", "ban_expires_at", "name",
-            "is_cod_blacklisted", "cod_blacklist_reason",
-            "birthday", "tags",
+            "birthday", "is_cod_blacklisted", "cod_blacklist_reason",
         ]
-        extra_kwargs = {"birthday": {"allow_null": True}, "tags": {"required": False}}
 
 
 class ProfileUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ["name", "email", "birthday"]
-        extra_kwargs = {"birthday": {"allow_null": True, "required": False}}
-
-    def validate_birthday(self, value):
-        from django.utils import timezone
-
-        if value and value > timezone.localdate():
-            raise serializers.ValidationError(_("تاريخ الميلاد لا يكون في المستقبل"))
-        return value
 
 
 class AddressSerializer(serializers.ModelSerializer):

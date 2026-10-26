@@ -1,5 +1,41 @@
 export type Role = 'customer' | 'staff' | 'manager' | 'admin' | 'owner'
 
+export type CustomerTier = 'vip' | 'repeat' | 'new' | 'inactive'
+
+export interface CustomerTag {
+  id: string
+  name: string
+  color: string
+  created_at?: string
+}
+
+export interface CustomerMetrics {
+  total_orders: number
+  delivered_orders_count?: number
+  lifetime_spend: string
+  average_order_value?: string
+  last_order_date: string | null
+  tier: CustomerTier
+  tier_label: string
+  tier_short_label: string
+  city: string
+  is_birthday_today: boolean
+  birthday: string | null
+}
+
+export type InteractionType = 'call' | 'whatsapp' | 'complaint' | 'follow_up' | 'note'
+
+export interface CustomerInteraction {
+  id: string
+  customer: string
+  staff: string | null
+  staff_name: string
+  interaction_type: InteractionType
+  interaction_type_display: string
+  notes: string
+  created_at: string
+}
+
 export interface User {
   id: string
   phone_number: string
@@ -9,8 +45,18 @@ export interface User {
   role: Role
   is_active: boolean
   date_joined: string
-  /** Optional, `YYYY-MM-DD`; typed by the customer or by staff. */
   birthday?: string | null
+  tags?: CustomerTag[]
+  crm?: CustomerMetrics
+  loyalty_points?: number
+  lifetime_spend?: string
+  vip_tier?: string
+  is_cod_blacklisted?: boolean
+  cod_rejections_count?: number
+  cod_blacklist_reason?: string
+  banned?: boolean
+  ban_reason?: string
+  ban_expires_at?: string | null
 }
 
 export const ADMIN_ROLES: readonly Role[] = ['staff', 'manager', 'admin', 'owner']

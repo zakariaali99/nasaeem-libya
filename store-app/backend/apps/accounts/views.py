@@ -5,7 +5,6 @@ Every error message is Arabic, because the client shows it verbatim.
 """
 
 import logging
-from decimal import Decimal
 
 from django.contrib.auth import login as django_login
 from django.contrib.auth import logout as django_logout
@@ -19,12 +18,12 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.core.models import User, Role
+from apps.core.models import User, Role, CustomerTag, CustomerInteraction
 from apps.core.pagination import StandardPagination
 from apps.core.views import CsrfProtectedAPIView
 from django.utils.translation import gettext as _
 
-from .permissions import IsAdminRole
+from .permissions import IsAdminOrOwner, IsAdminRole, IsManagerOrAbove
 from .phone import normalise_phone
 from .serializers import (
     AdminUserUpdateSerializer,
@@ -33,6 +32,8 @@ from .serializers import (
     UserSerializer,
     AddressSerializer,
     ProfileUpdateSerializer,
+    CustomerTagSerializer,
+    CustomerInteractionSerializer,
 )
 from .throttling import LoginThrottle, RegisterThrottle
 
@@ -281,14 +282,247 @@ class AdminUserListView(APIView):
     permission_classes = [IsAdminRole]
 
     def get(self, request):
-        users = User.objects.order_by("-date_joined")
-        if search := request.query_params.get("search", "").strip():
-            users = users.filter(
-                Q(phone_number__icontains=search) | Q(name__icontains=search)
-            )
+        role = request.query_params.get("role", "").strip()
+        if role:
+            users = User.objects.filter(role=role)
+        else:
+            users = User.objects.all()
+
+        from . import crm
+        users = crm.filter_and_annotate_users_queryset(users, request.query_params)
+
         paginator = StandardPagination()
         page = paginator.paginate_queryset(users, request, view=self)
         return paginator.get_paginated_response(UserSerializer(page, many=True).data)
+
+
+class AdminUserCRMDetailView(APIView):
+    """Full CRM customer dossier for CustomerDrawer and User Detail page."""
+
+    permission_classes = [IsAdminRole]
+
+    def get(self, request, user_id):
+        user = (
+            User.objects.filter(pk=user_id)
+            .prefetch_related("tags", "addresses__city")
+            .first()
+        )
+        if user is None:
+            return Response(
+                {"message": _("المستخدم غير موجود")}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        from . import crm
+        from apps.orders.models import Order
+        from apps.orders.stage_service import stage_of
+
+        metrics = crm.compute_customer_metrics(user)
+
+        from apps.orders.models import OrderStage
+        orders = (
+            Order.objects.filter(user=user)
+            .select_related("shipping_city")
+            .order_by("-created_at")[:15]
+        )
+        recent_orders = [
+            {
+                "id": str(o.id),
+                "order_number": o.order_number,
+                "stage": stage_of(o),
+                "stage_label": OrderStage(stage_of(o)).label if stage_of(o) in OrderStage.values else stage_of(o),
+                "total": str(o.total),
+                "total_amount": str(o.total),
+                "city": o.shipping_city.name if o.shipping_city else "",
+                "created_at": o.created_at.isoformat(),
+            }
+            for o in orders
+        ]
+
+        interactions = (
+            user.interactions.select_related("staff")
+            .order_by("-created_at")[:50]
+        )
+
+        # Only coupons the customer could really use (dates, limit): the
+        # birthday and VIP messages must never promise a dead code.
+        active_coupons = crm.active_coupons().values("id", "code", "type", "value", "min_order_amount")[:15]
+        from apps.core.store_settings import get_store_settings
+
+        store_settings = get_store_settings()
+
+        return Response({
+            "data": {
+                "user": UserSerializer(user).data,
+                "crm": metrics,
+                "recent_orders": recent_orders,
+                "interactions": CustomerInteractionSerializer(interactions, many=True).data,
+                "active_coupons": list(active_coupons),
+                # Wording from «نصوص المتجر» (د-4); the drawer fills the variables.
+                "whatsapp_templates": crm.whatsapp_templates(store_settings),
+                "store_name": store_settings.store_name,
+            }
+        })
+
+
+class AdminUserExportCSVView(APIView):
+    """Export customers list as CSV with UTF-8 BOM. Gated to Manager, Admin, Owner."""
+
+    permission_classes = [IsManagerOrAbove]
+
+    def get(self, request):
+        role = request.query_params.get("role", "customer").strip()
+        users = User.objects.filter(role=role) if role else User.objects.all()
+
+        from . import crm
+        annotated = crm.filter_and_annotate_users_queryset(users, request.query_params)
+        return crm.export_customers_csv(annotated)
+
+
+class AdminCustomerTagListView(APIView):
+    """List and create CRM customer tags."""
+
+    permission_classes = [IsAdminRole]
+
+    def get(self, request):
+        from django.db.models import Count
+        tags = CustomerTag.objects.all().annotate(users_count=Count("users")).order_by("name")
+        return Response({
+            "data": [
+                {
+                    "id": str(t.id),
+                    "name": t.name,
+                    "color": t.color,
+                    "users_count": t.users_count,
+                }
+                for t in tags
+            ]
+        })
+
+    def post(self, request):
+        name = str(request.data.get("name") or "").strip()
+        color = str(request.data.get("color") or "#64748b").strip()
+        if not name:
+            return Response(
+                {"message": "اسم الوسم مطلوب"}, status=status.HTTP_400_BAD_REQUEST
+            )
+        tag, created = CustomerTag.objects.get_or_create(
+            name=name, defaults={"color": color}
+        )
+        if not created and color and tag.color != color:
+            tag.color = color
+            tag.save(update_fields=["color"])
+        return Response(
+            {"data": CustomerTagSerializer(tag).data, "message": "تم حفظ الوسم بنجاح"},
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+
+class AdminUserTagManageView(APIView):
+    """Assign or remove a tag from a customer."""
+
+    permission_classes = [IsAdminRole]
+
+    def post(self, request, user_id):
+        user = User.objects.filter(pk=user_id).first()
+        if user is None:
+            return Response(
+                {"message": _("المستخدم غير موجود")}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        tag_id = request.data.get("tag_id")
+        action = str(request.data.get("action") or "add").strip().lower()
+        tag = CustomerTag.objects.filter(pk=tag_id).first()
+        if tag is None:
+            return Response(
+                {"message": "الوسم غير موجود"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        if action == "remove":
+            user.tags.remove(tag)
+        else:
+            user.tags.add(tag)
+
+        return Response({
+            "data": CustomerTagSerializer(user.tags.all(), many=True).data,
+            "message": "تم تحديث وسوم العميل بنجاح",
+        })
+
+
+class AdminUserInteractionListCreateView(APIView):
+    """View and log customer communications/notes."""
+
+    permission_classes = [IsAdminRole]
+
+    def get(self, request, user_id):
+        user = User.objects.filter(pk=user_id).first()
+        if user is None:
+            return Response(
+                {"message": _("المستخدم غير موجود")}, status=status.HTTP_404_NOT_FOUND
+            )
+        interactions = user.interactions.select_related("staff").order_by("-created_at")
+        return Response({
+            "data": CustomerInteractionSerializer(interactions, many=True).data
+        })
+
+    def post(self, request, user_id):
+        user = User.objects.filter(pk=user_id).first()
+        if user is None:
+            return Response(
+                {"message": _("المستخدم غير موجود")}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        notes = str(request.data.get("notes") or "").strip()
+        interaction_type = str(request.data.get("interaction_type") or "note").strip()
+
+        if not notes:
+            return Response(
+                {"message": "يرجى كتابة نص الملاحظة أو التواصل"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        valid_types = [c[0] for c in CustomerInteraction.InteractionType.choices]
+        if interaction_type not in valid_types:
+            interaction_type = CustomerInteraction.InteractionType.NOTE
+
+        interaction = CustomerInteraction.objects.create(
+            customer=user,
+            staff=request.user,
+            interaction_type=interaction_type,
+            notes=notes,
+        )
+        return Response(
+            {
+                "data": CustomerInteractionSerializer(interaction).data,
+                "message": "تم تسجيل التواصل بنجاح",
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class AdminCustomerInteractionDetailView(APIView):
+    """Only an administrator (or the owner) deletes a log line; nobody edits one (د-3)."""
+
+    permission_classes = [IsAdminOrOwner]
+
+    def delete(self, request, interaction_id):
+        interaction = CustomerInteraction.objects.filter(pk=interaction_id).first()
+        if interaction is None:
+            return Response(
+                {"message": "سجل التواصل غير موجود"}, status=status.HTTP_404_NOT_FOUND
+            )
+        interaction.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AdminUpcomingBirthdaysView(APIView):
+    """Upcoming customer birthdays this week (handling year wraparound)."""
+
+    permission_classes = [IsAdminRole]
+
+    def get(self, request):
+        from . import crm
+        birthdays = crm.get_upcoming_birthdays_this_week()
+        return Response({"data": birthdays})
 
 
 class AdminStaffListView(APIView):
@@ -417,262 +651,3 @@ class AdminStaffDetailView(APIView):
         user.is_staff = False
         user.save(update_fields=["is_active", "role", "is_staff"])
         return Response({"deleted": True, "message": "تم إيقاف حساب الموظف وسحب الصلاحيات الإدارية."})
-
-
-# ---------------------------------------------------------------------------
-# The customer file (CRM) — plan 8, phase د. Numbers come from the orders at
-# request time (`crm.py`); nothing is stored but what staff type.
-# ---------------------------------------------------------------------------
-
-from django.http import HttpResponse  # noqa: E402
-
-from apps.core.models import CustomerInteraction, CustomerTag, ADMIN_ROLES  # noqa: E402
-from apps.core.store_settings import get_store_settings  # noqa: E402
-
-from . import crm  # noqa: E402
-from .permissions import IsAdminOrOwner, IsManagerOrAbove  # noqa: E402
-from .serializers import CustomerInteractionSerializer, CustomerTagSerializer  # noqa: E402
-
-
-def _customer_row(user, settings, now):
-    return {
-        "id": str(user.id),
-        "name": user.name,
-        "phone_number": user.phone_number,
-        "email": user.email,
-        "role": user.role,
-        "is_active": user.is_active,
-        "date_joined": user.date_joined,
-        "birthday": user.birthday,
-        "birthday_today": crm.birthday_is_today(user.birthday),
-        "city": user.last_city or "",
-        "orders_count": user.orders_count,
-        "spend": str(Decimal(user.spend or 0).quantize(Decimal("0.01"))),
-        "last_order_at": user.last_order_at,
-        "segment": crm.segment_of(user.orders_count, user.spend, user.last_order_at, settings, now),
-        "tags": CustomerTagSerializer(user.tags.all(), many=True).data,
-    }
-
-
-def _customer_queryset(request):
-    """The list and the export read the same filters, so what is exported is
-    what is on the screen."""
-    users = crm.annotate_numbers(User.objects.all()).prefetch_related("tags")
-    params = request.query_params
-    role = params.get("role", "").strip()
-    if role == "customer":
-        users = users.filter(role=Role.CUSTOMER)
-    elif role == "staff":
-        users = users.filter(role__in=ADMIN_ROLES)
-    if search := params.get("search", "").strip():
-        users = users.filter(Q(phone_number__icontains=search) | Q(name__icontains=search) | Q(email__icontains=search))
-    if tag := params.get("tag", "").strip():
-        users = users.filter(tags__id=tag)
-    if city := params.get("city", "").strip():
-        users = users.filter(orders__shipping_city_id=city).distinct()
-    ordering = params.get("ordering", "").strip()
-    order_by = {
-        "spend": "spend", "-spend": "-spend",
-        "last_order": "last_order_at", "-last_order": F_desc("last_order_at"),
-        "orders": "orders_count", "-orders": "-orders_count",
-    }.get(ordering, "-date_joined")
-    users = users.order_by(order_by, "-date_joined")
-    return users
-
-
-def F_desc(field):
-    """NULLs (customers with no order yet) last when sorting by last order."""
-    from django.db.models import F
-
-    return F(field).desc(nulls_last=True)
-
-
-def _segment_filter(rows, segment):
-    return [r for r in rows if r["segment"] == segment] if segment else rows
-
-
-class AdminCustomerListView(APIView):
-    permission_classes = [IsAdminRole]
-
-    def get(self, request):
-        settings = get_store_settings()
-        now = timezone.now()
-        users = _customer_queryset(request)
-        segment = request.query_params.get("segment", "").strip()
-        if segment in crm.SEGMENT_LABELS:
-            # The segment is a rule over three numbers, so it is applied to the
-            # annotated rows rather than translated into SQL: it is one pass
-            # over a list that already fits in memory for a store this size.
-            rows = _segment_filter([_customer_row(u, settings, now) for u in users], segment)
-            paginator = StandardPagination()
-            page = paginator.paginate_queryset(rows, request, view=self)
-            return paginator.get_paginated_response(page)
-        paginator = StandardPagination()
-        page = paginator.paginate_queryset(users, request, view=self)
-        return paginator.get_paginated_response([_customer_row(u, settings, now) for u in page])
-
-
-class AdminCustomerBirthdaysView(APIView):
-    """Today's birthdays and the coming week's, for the strip above the list."""
-
-    permission_classes = [IsAdminRole]
-
-    def get(self, request):
-        today = timezone.localdate()
-        rows = crm.birthdays_in_week(User.objects.filter(role=Role.CUSTOMER), today)
-        return Response({"data": [
-            {
-                "id": str(u.id), "name": u.name, "phone_number": u.phone_number,
-                "birthday": u.birthday, "today": crm.birthday_is_today(u.birthday, today),
-            }
-            for u in rows
-        ]})
-
-
-class AdminCustomerExportView(APIView):
-    """The filtered list as CSV (decision 3: manager and above)."""
-
-    permission_classes = [IsManagerOrAbove]
-
-    def get(self, request):
-        settings = get_store_settings()
-        now = timezone.now()
-        users = _customer_queryset(request)
-        segment = request.query_params.get("segment", "").strip()
-        if segment in crm.SEGMENT_LABELS:
-            users = [u for u in users if crm.segment_of(u.orders_count, u.spend, u.last_order_at, settings, now) == segment]
-        body = crm.export_csv(users, settings)
-        response = HttpResponse(body, content_type="text/csv; charset=utf-8")
-        response["Content-Disposition"] = f'attachment; filename="customers-{now:%Y-%m-%d}.csv"'
-        return response
-
-
-class AdminCustomerProfileView(APIView):
-    permission_classes = [IsAdminRole]
-
-    def get(self, request, user_id):
-        user = crm.annotate_numbers(User.objects.filter(pk=user_id)).prefetch_related("tags").first()
-        if user is None:
-            return Response({"message": "المستخدم غير موجود"}, status=status.HTTP_404_NOT_FOUND)
-        settings = get_store_settings()
-        row = _customer_row(user, settings, timezone.now())
-        row.update({
-            "average_order": str(crm.average_order(user.spend, user.orders_count)),
-            "favourite_city": crm.favourite_city(user),
-            "recent_orders": crm.recent_orders(user),
-            "interactions": CustomerInteractionSerializer(
-                user.interactions.select_related("staff")[:50], many=True
-            ).data,
-            "whatsapp_number": crm.whatsapp_number(user.phone_number),
-            "templates": [
-                {"key": key, "label": crm.TEMPLATE_LABELS[key], "text": crm.template_text(settings, key)}
-                for key in crm.TEMPLATE_KEYS
-            ],
-            "coupons": [{"code": d.code, "name": d.name} for d in crm.active_coupons()[:20]],
-            "can_export": request.user.role in (Role.MANAGER, Role.ADMIN, Role.OWNER),
-            "can_delete_interactions": request.user.role in (Role.ADMIN, Role.OWNER),
-        })
-        return Response({"data": row})
-
-
-class AdminCustomerInteractionsView(APIView):
-    permission_classes = [IsAdminRole]
-
-    def post(self, request, user_id):
-        user = User.objects.filter(pk=user_id).first()
-        if user is None:
-            return Response({"message": "المستخدم غير موجود"}, status=status.HTTP_404_NOT_FOUND)
-        serializer = CustomerInteractionSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        interaction = serializer.save(customer=user, staff=request.user)
-        return Response(
-            {"data": CustomerInteractionSerializer(interaction).data, "message": "تم تسجيل التواصل"},
-            status=status.HTTP_201_CREATED,
-        )
-
-
-class AdminCustomerInteractionDetailView(APIView):
-    """Deleting a log line is the administrator's alone; nobody edits one."""
-
-    permission_classes = [IsAdminOrOwner]
-
-    def delete(self, request, user_id, interaction_id):
-        deleted, _ = CustomerInteraction.objects.filter(pk=interaction_id, customer_id=user_id).delete()
-        if not deleted:
-            return Response({"message": "السجل غير موجود"}, status=status.HTTP_404_NOT_FOUND)
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-class AdminCustomerWhatsAppView(APIView):
-    """Builds the wa.me link for one of the three templates and writes the
-    contact log line. Nothing is sent: the operator presses «إرسال» in WhatsApp."""
-
-    permission_classes = [IsAdminRole]
-
-    def post(self, request, user_id):
-        user = User.objects.filter(pk=user_id).first()
-        if user is None:
-            return Response({"message": "المستخدم غير موجود"}, status=status.HTTP_404_NOT_FOUND)
-        template = str(request.data.get("template", "")).strip()
-        if template not in crm.TEMPLATE_KEYS:
-            return Response({"message": "القالب غير معروف"}, status=status.HTTP_400_BAD_REQUEST)
-        settings = get_store_settings()
-        coupon = ""
-        if code := str(request.data.get("coupon", "")).strip():
-            discount = crm.active_coupons().filter(code=code).first()
-            if discount is None:
-                return Response({"message": "هذا الكوبون غير فعّال"}, status=status.HTTP_400_BAD_REQUEST)
-            coupon = discount.code
-        order_number = ""
-        if order_id := str(request.data.get("order", "")).strip():
-            from apps.orders.models import Order
-
-            order = Order.objects.filter(pk=order_id, user=user).first()
-            order_number = order.order_number if order else ""
-        text = crm.render_template(
-            crm.template_text(settings, template),
-            name=user.name, store=settings.store_name, coupon=coupon, order_number=order_number,
-        )
-        from urllib.parse import quote
-
-        url = f"https://wa.me/{crm.whatsapp_number(user.phone_number)}?text={quote(text)}"
-        interaction = CustomerInteraction.objects.create(
-            customer=user, staff=request.user, kind="whatsapp",
-            text=f"واتساب: {crm.TEMPLATE_LABELS[template]}" + (f" ({coupon})" if coupon else ""),
-        )
-        return Response({"data": {
-            "url": url, "text": text,
-            "interaction": CustomerInteractionSerializer(interaction).data,
-        }})
-
-
-class AdminCustomerTagListView(APIView):
-    permission_classes = [IsAdminRole]
-
-    def get(self, request):
-        return Response({"data": CustomerTagSerializer(CustomerTag.objects.all(), many=True).data})
-
-    def post(self, request):
-        serializer = CustomerTagSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        tag = serializer.save()
-        return Response({"data": CustomerTagSerializer(tag).data, "message": "تمت إضافة الوسم"}, status=status.HTTP_201_CREATED)
-
-
-class AdminCustomerTagDetailView(APIView):
-    permission_classes = [IsAdminRole]
-
-    def patch(self, request, tag_id):
-        tag = CustomerTag.objects.filter(pk=tag_id).first()
-        if tag is None:
-            return Response({"message": "الوسم غير موجود"}, status=status.HTTP_404_NOT_FOUND)
-        serializer = CustomerTagSerializer(tag, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response({"data": serializer.data, "message": "تم تحديث الوسم"})
-
-    def delete(self, request, tag_id):
-        deleted, _ = CustomerTag.objects.filter(pk=tag_id).delete()
-        if not deleted:
-            return Response({"message": "الوسم غير موجود"}, status=status.HTTP_404_NOT_FOUND)
-        return Response(status=status.HTTP_204_NO_CONTENT)

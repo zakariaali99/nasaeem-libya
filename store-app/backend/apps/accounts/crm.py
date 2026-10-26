@@ -1,203 +1,436 @@
-"""The customer file (plan 8, phase د): numbers, segment, birthdays and the
-ready WhatsApp messages, in one place.
+"""Customer Relationship Management (CRM) service for Nasaim Libya.
 
-Nothing here is stored. Every figure is computed from the orders when it is
-shown, so it can never drift the way the old `lifetime_spend` / `vip_tier`
-counters did. The aggregation is plain `Count` / `Sum` / `Max` subqueries that
-run the same on the live host's SQLite and on Postgres.
+Calculates live customer metrics, tiers (VIP, repeat, new, inactive),
+tagging, birthday celebrations, communication logs, and CSV exports.
+
+Rules (Plan 08, Decisions 1–5):
+- Spend is calculated from DELIVERED orders only.
+- Total orders count includes all non-cancelled orders.
+- Customer tiers evaluated in strict order:
+  1. Inactive: Has placed orders, but last order > inactive_days ago (default 60).
+  2. VIP: >= vip_min_orders (default 5) OR >= vip_min_spend (default 500 LYD).
+  3. Repeat: >= 2 orders.
+  4. New: <= 1 order.
+- Production is SQLite: avoid Postgres-only functions.
 """
 
 from __future__ import annotations
 
 import csv
-import datetime as dt
+from datetime import date, timedelta
 from decimal import Decimal
-from io import StringIO
+import io
+import re
 
-from django.db.models import (
-    Count, DateTimeField, DecimalField, F, IntegerField, Max, OuterRef, Q, Subquery, Sum,
-)
+from django.db import models
+from django.db.models import Count, F, Max, OuterRef, Q, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
+from django.http import HttpResponse
 from django.utils import timezone
 
-from apps.core.models import StoreSettings, User
+from apps.core.models import CustomerInteraction, CustomerTag, Role, StoreSettings, User
 from apps.orders.models import Discount, Order, OrderStatus
-from apps.orders.stage_service import stage_of
 
-# ---- segments --------------------------------------------------------------
 
-SEGMENT_INACTIVE = "inactive"
-SEGMENT_VIP = "vip"
-SEGMENT_REPEAT = "repeat"
-SEGMENT_NEW = "new"
+def get_crm_thresholds() -> dict[str, int | Decimal]:
+    """Retrieve configurable thresholds from StoreSettings (pk=1)."""
+    settings = StoreSettings.objects.filter(pk=1).first()
+    if settings:
+        return {
+            "vip_min_orders": settings.crm_vip_min_orders or 5,
+            "vip_min_spend": settings.crm_vip_min_spend or Decimal("500.00"),
+            "inactive_days": settings.crm_inactive_days or 60,
+        }
+    return {
+        "vip_min_orders": 5,
+        "vip_min_spend": Decimal("500.00"),
+        "inactive_days": 60,
+    }
 
-SEGMENT_LABELS = {
-    SEGMENT_INACTIVE: "خامل",
-    SEGMENT_VIP: "VIP",
-    SEGMENT_REPEAT: "متكرر",
-    SEGMENT_NEW: "جديد",
+
+def determine_customer_tier(
+    total_orders: int,
+    lifetime_spend: Decimal,
+    last_order_date: timezone.datetime | date | None,
+    thresholds: dict | None = None,
+    now: timezone.datetime | None = None,
+) -> str:
+    """Determine customer tier based on approved priority (Plan 08, d-2)."""
+    if thresholds is None:
+        thresholds = get_crm_thresholds()
+    if now is None:
+        now = timezone.now()
+
+    inactive_days = int(thresholds.get("inactive_days", 60))
+    vip_min_orders = int(thresholds.get("vip_min_orders", 5))
+    vip_min_spend = Decimal(str(thresholds.get("vip_min_spend", "500.00")))
+
+    # 1. Inactive: has orders, but last order was placed more than inactive_days ago
+    if total_orders > 0 and last_order_date is not None:
+        if isinstance(last_order_date, date) and not isinstance(last_order_date, timezone.datetime):
+            last_date = last_order_date
+            today_date = now.date() if isinstance(now, timezone.datetime) else now
+            diff_days = (today_date - last_date).days
+        else:
+            diff_days = (now - last_order_date).days
+
+        if diff_days > inactive_days:
+            return "inactive"
+
+    # 2. VIP: 5 orders or 500 LYD spend
+    if total_orders >= vip_min_orders or lifetime_spend >= vip_min_spend:
+        return "vip"
+
+    # 3. Repeat: 2 or more orders
+    if total_orders >= 2:
+        return "repeat"
+
+    # 4. New: 1 or 0 orders
+    return "new"
+
+
+TIER_LABELS = {
+    "vip": "عميل مميز (VIP)",
+    "repeat": "عميل متكرر",
+    "new": "عميل جديد",
+    "inactive": "عميل خامل",
+}
+
+TIER_SHORT_LABELS = {
+    "vip": "VIP",
+    "repeat": "متكرر",
+    "new": "جديد",
+    "inactive": "خامل",
 }
 
 
-def segment_of(orders_count: int, spend: Decimal, last_order_at, settings: StoreSettings, now=None) -> str:
-    """First rule that applies wins: inactive, then VIP, then repeat, then new.
+def compute_customer_metrics(user: User, thresholds: dict | None = None) -> dict:
+    """Compute detailed CRM metrics for a single user."""
+    if thresholds is None:
+        thresholds = get_crm_thresholds()
 
-    A customer with five orders who has not ordered in two months is inactive,
-    not VIP — the point of the label is who to call."""
-    now = now or timezone.now()
-    if orders_count and last_order_at and (now - last_order_at).days > settings.crm_inactive_days:
-        return SEGMENT_INACTIVE
-    if orders_count >= settings.crm_vip_min_orders or (spend or 0) >= settings.crm_vip_min_spend:
-        return SEGMENT_VIP
-    if orders_count >= 2:
-        return SEGMENT_REPEAT
-    return SEGMENT_NEW
+    # `placed()`: a basket that reached «Continue to checkout» but was never
+    # confirmed is not an order (see OrderQuerySet). Delivered means the
+    # «تم التسليم» stage, which is stored as status=completed.
+    orders_qs = Order.objects.placed().filter(user=user)
+    non_cancelled = orders_qs.exclude(status=OrderStatus.CANCELLED)
+    delivered = orders_qs.filter(status=OrderStatus.COMPLETED)
 
-
-# ---- numbers ---------------------------------------------------------------
-
-def counted_orders():
-    """The orders that count: placed and not cancelled (decision 2)."""
-    return Order.objects.placed().exclude(status=OrderStatus.CANCELLED)
-
-
-def delivered_orders():
-    """The orders whose money counts as spend: delivered ones only."""
-    return Order.objects.placed().filter(status=OrderStatus.COMPLETED)
-
-
-def _per_customer(qs, aggregate):
-    return Subquery(
-        qs.filter(user=OuterRef("pk")).order_by().values("user").annotate(v=aggregate).values("v")[:1]
+    total_orders = non_cancelled.count()
+    delivered_count = delivered.count()
+    lifetime_spend = (
+        delivered.aggregate(s=Coalesce(Sum("total"), Value(Decimal("0.00"))))["s"]
+        or Decimal("0.00")
+    )
+    avg_order_value = (
+        (lifetime_spend / delivered_count).quantize(Decimal("0.01"))
+        if delivered_count > 0
+        else Decimal("0.00")
     )
 
+    last_order = non_cancelled.order_by("-created_at").first()
+    last_order_date = last_order.created_at if last_order else None
 
-def annotate_numbers(users):
-    """`orders_count`, `spend`, `last_order_at` on every row, in one query."""
-    return users.annotate(
-        orders_count=Coalesce(
-            _per_customer(counted_orders(), Count("id")), 0, output_field=IntegerField()
+    tier = determine_customer_tier(
+        total_orders=total_orders,
+        lifetime_spend=lifetime_spend,
+        last_order_date=last_order_date,
+        thresholds=thresholds,
+    )
+
+    # City: most frequent order city or default address
+    top_city_order = (
+        orders_qs.exclude(shipping_city__isnull=True)
+        .values("shipping_city__name")
+        .annotate(c=Count("id"))
+        .order_by("-c")
+        .first()
+    )
+    if top_city_order:
+        city_name = top_city_order["shipping_city__name"]
+    else:
+        addr = user.addresses.select_related("city").filter(is_default=True).first() or user.addresses.select_related("city").first()
+        city_name = addr.city.name if addr and addr.city else ""
+
+    # Birthday check
+    today = timezone.localdate()
+    is_birthday_today = bool(
+        user.birthday
+        and user.birthday.month == today.month
+        and user.birthday.day == today.day
+    )
+
+    return {
+        "total_orders": total_orders,
+        "delivered_orders_count": delivered_count,
+        "lifetime_spend": str(lifetime_spend),
+        "average_order_value": str(avg_order_value),
+        "last_order_date": last_order_date.isoformat() if last_order_date else None,
+        "tier": tier,
+        "tier_label": TIER_LABELS.get(tier, tier),
+        "tier_short_label": TIER_SHORT_LABELS.get(tier, tier),
+        "city": city_name,
+        "is_birthday_today": is_birthday_today,
+        "birthday": user.birthday.isoformat() if user.birthday else None,
+    }
+
+
+def filter_and_annotate_users_queryset(queryset, params: dict, thresholds: dict | None = None):
+    """Annotate and filter users queryset with CRM metrics, working on SQLite and Postgres."""
+    if thresholds is None:
+        thresholds = get_crm_thresholds()
+
+    # Search filter
+    if search := str(params.get("search") or "").strip():
+        queryset = queryset.filter(
+            Q(phone_number__icontains=search)
+            | Q(name__icontains=search)
+            | Q(email__icontains=search)
+        )
+
+    # Tag filter
+    if tag_id := str(params.get("tag_id") or "").strip():
+        queryset = queryset.filter(tags__id=tag_id)
+
+    # City filter
+    if city_id := str(params.get("city_id") or "").strip():
+        queryset = queryset.filter(
+            Q(addresses__city_id=city_id) | Q(orders__shipping_city_id=city_id)
+        ).distinct()
+
+    # One subquery per figure (portable across SQLite and Postgres). Not a
+    # join: a join on addresses (the city filter) or on tags multiplied the
+    # Sum, and a filter on orders placed before annotate() restricted the
+    # Count to the filtered rows only.
+    counted = Order.objects.placed().exclude(status=OrderStatus.CANCELLED).filter(user=OuterRef("pk"))
+    delivered = Order.objects.placed().filter(status=OrderStatus.COMPLETED, user=OuterRef("pk"))
+
+    def per_customer(qs, aggregate):
+        return Subquery(qs.order_by().values("user").annotate(v=aggregate).values("v")[:1])
+
+    annotated = queryset.annotate(
+        crm_total_orders=Coalesce(
+            per_customer(counted, Count("id")), Value(0), output_field=models.IntegerField()
         ),
-        spend=Coalesce(
-            _per_customer(delivered_orders(), Sum("total")), Decimal("0"),
-            output_field=DecimalField(max_digits=12, decimal_places=2),
+        crm_lifetime_spend=Coalesce(
+            per_customer(delivered, Sum("total")),
+            Value(Decimal("0.00")),
+            output_field=models.DecimalField(max_digits=12, decimal_places=2),
         ),
-        last_order_at=Subquery(
-            counted_orders().filter(user=OuterRef("pk")).order_by().values("user")
-            .annotate(v=Max("created_at")).values("v")[:1],
-            output_field=DateTimeField(),
+        crm_last_order_date=Subquery(
+            counted.order_by().values("user").annotate(v=Max("created_at")).values("v")[:1],
+            output_field=models.DateTimeField(),
         ),
-        last_city=Subquery(
-            counted_orders().filter(user=OuterRef("pk"), shipping_city__isnull=False)
-            .order_by("-created_at").values("shipping_city__name")[:1]
+        # The city of the latest order, for customers with no saved address
+        # (most of them: the checkout asks for an address, not an account).
+        crm_last_city=Subquery(
+            counted.filter(shipping_city__isnull=False).order_by("-created_at").values("shipping_city__name")[:1]
         ),
     )
 
+    # Tier filter
+    tier = str(params.get("tier") or "").strip().lower()
+    if tier in ("vip", "repeat", "new", "inactive"):
+        now = timezone.now()
+        inactive_cutoff = now - timedelta(days=int(thresholds["inactive_days"]))
+        vip_min_orders = int(thresholds["vip_min_orders"])
+        vip_min_spend = Decimal(str(thresholds["vip_min_spend"]))
 
-def favourite_city(user: User) -> str:
-    """The city that appears most often on the customer's orders."""
-    row = (
-        counted_orders().filter(user=user, shipping_city__isnull=False)
-        .values("shipping_city__name").annotate(n=Count("id")).order_by("-n", "shipping_city__name").first()
+        is_inactive = Q(crm_total_orders__gt=0, crm_last_order_date__lt=inactive_cutoff)
+        is_vip = ~is_inactive & (
+            Q(crm_total_orders__gte=vip_min_orders)
+            | Q(crm_lifetime_spend__gte=vip_min_spend)
+        )
+        is_repeat = ~is_inactive & ~is_vip & Q(crm_total_orders__gte=2)
+        is_new = ~is_inactive & ~is_vip & Q(crm_total_orders__lte=1)
+
+        if tier == "inactive":
+            annotated = annotated.filter(is_inactive)
+        elif tier == "vip":
+            annotated = annotated.filter(is_vip)
+        elif tier == "repeat":
+            annotated = annotated.filter(is_repeat)
+        elif tier == "new":
+            annotated = annotated.filter(is_new)
+
+    # Sorting
+    sort_key = str(params.get("sort") or "").strip()
+    if sort_key == "spend_desc":
+        annotated = annotated.order_by("-crm_lifetime_spend", "-date_joined")
+    elif sort_key == "spend_asc":
+        annotated = annotated.order_by("crm_lifetime_spend", "-date_joined")
+    elif sort_key == "orders_desc":
+        annotated = annotated.order_by("-crm_total_orders", "-date_joined")
+    elif sort_key == "last_order_desc":
+        annotated = annotated.order_by(
+            models.F("crm_last_order_date").desc(nulls_last=True), "-date_joined"
+        )
+    elif sort_key == "newest":
+        annotated = annotated.order_by("-date_joined")
+    elif sort_key == "oldest":
+        annotated = annotated.order_by("date_joined")
+    elif sort_key == "name":
+        annotated = annotated.order_by("name", "-date_joined")
+    else:
+        annotated = annotated.order_by("-date_joined")
+
+    return annotated
+
+
+def get_upcoming_birthdays_this_week(today: date | None = None) -> list[dict]:
+    """Retrieve customers who celebrate their birthday within the next 7 days.
+
+    Handles year boundary wraparound (e.g., Dec 29 to Jan 2) accurately.
+    """
+    if today is None:
+        today = timezone.localdate()
+
+    next_7_days = [today + timedelta(days=i) for i in range(7)]
+    target_month_days = {(d.month, d.day): d for d in next_7_days}
+
+    users_with_birthday = (
+        User.objects.filter(birthday__isnull=False, is_active=True, role=Role.CUSTOMER)
+        .prefetch_related("tags")
+        .only("id", "name", "phone_number", "birthday")
     )
-    return row["shipping_city__name"] if row else ""
+
+    results = []
+    thresholds = get_crm_thresholds()
+
+    for user in users_with_birthday:
+        bday = user.birthday
+        key = (bday.month, bday.day)
+        if key in target_month_days:
+            match_date = target_month_days[key]
+            is_today = (match_date == today)
+            results.append({
+                "id": str(user.id),
+                "name": user.name or "عميل",
+                "phone_number": user.phone_number,
+                "birthday": bday.isoformat(),
+                "display_date": f"{bday.day:02d}/{bday.month:02d}",
+                "is_today": is_today,
+                "days_until": (match_date - today).days,
+            })
+
+    results.sort(key=lambda x: (x["days_until"], x["name"]))
+    return results
 
 
-def average_order(spend, orders_count) -> Decimal:
-    if not orders_count:
-        return Decimal("0.00")
-    return (Decimal(spend or 0) / orders_count).quantize(Decimal("0.01"))
+def export_customers_csv(queryset) -> HttpResponse:
+    """Export filtered customer list to CSV with UTF-8 BOM for Arabic Excel compatibility."""
+    thresholds = get_crm_thresholds()
+
+    response = HttpResponse(content_type="text/csv; charset=utf-8")
+    filename = f"customers_export_{timezone.localdate().isoformat()}.csv"
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+
+    # UTF-8 BOM so Excel opens Arabic correctly
+    response.write("\ufeff")
+
+    writer = csv.writer(response)
+    writer.writerow([
+        "الاسم",
+        "رقم الهاتف",
+        "البريد الإلكتروني",
+        "المدينة",
+        "التصنيف",
+        "الوسوم",
+        "عدد الطلبات",
+        "إجمالي الإنفاق (د.ل)",
+        "تاريخ آخر طلب",
+        "تاريخ الميلاد",
+        "تاريخ التسجيل",
+    ])
+
+    for user in queryset.prefetch_related("tags"):
+        spend = getattr(user, "crm_lifetime_spend", Decimal("0.00"))
+        total_orders = getattr(user, "crm_total_orders", 0)
+        last_order = getattr(user, "crm_last_order_date", None)
+
+        tier = determine_customer_tier(
+            total_orders=total_orders,
+            lifetime_spend=spend,
+            last_order_date=last_order,
+            thresholds=thresholds,
+        )
+
+        tags_str = ", ".join(t.name for t in user.tags.all())
+        last_order_str = last_order.strftime("%Y-%m-%d %H:%M") if last_order else "لا يوجد"
+        birthday_str = user.birthday.isoformat() if user.birthday else ""
+        date_joined_str = user.date_joined.strftime("%Y-%m-%d")
+
+        # City: the latest order's, else the saved address
+        city_str = getattr(user, "crm_last_city", None) or ""
+        if not city_str:
+            addr = user.addresses.select_related("city").filter(is_default=True).first() or user.addresses.select_related("city").first()
+            city_str = addr.city.name if addr and addr.city else ""
+
+        writer.writerow([
+            user.name or "عميل بدون اسم",
+            user.phone_number,
+            user.email or "",
+            city_str,
+            TIER_LABELS.get(tier, tier),
+            tags_str,
+            total_orders,
+            f"{spend:.2f}",
+            last_order_str,
+            birthday_str,
+            date_joined_str,
+        ])
+
+    return response
 
 
-# ---- birthdays -------------------------------------------------------------
-
-def birthday_is_today(birthday: dt.date | None, today: dt.date | None = None) -> bool:
-    today = today or timezone.localdate()
-    if not birthday:
-        return False
-    if birthday.month == 2 and birthday.day == 29 and not _leap(today.year):
-        return today.month == 3 and today.day == 1
-    return (birthday.month, birthday.day) == (today.month, today.day)
-
-
-def _leap(year: int) -> bool:
-    return year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
+def format_whatsapp_phone(raw_phone: str) -> str:
+    """Format phone number for WhatsApp wa.me links with Libyan country code 218."""
+    digits = re.sub(r"\D", "", str(raw_phone))
+    if digits.startswith("09") and len(digits) == 10:
+        return "218" + digits[1:]
+    if digits.startswith("9") and len(digits) == 9:
+        return "218" + digits
+    if digits.startswith("218"):
+        return digits
+    return digits
 
 
-def birthdays_in_week(users, today: dt.date | None = None):
-    """Customers whose birthday falls in the next seven days, today included.
-    Works across the year end: the week of 29 December includes 2 January."""
-    today = today or timezone.localdate()
-    days = [today + dt.timedelta(days=i) for i in range(7)]
-    wanted = {(d.month, d.day) for d in days}
-    # 29 February is celebrated on 1 March in a common year.
-    if any(d.month == 3 and d.day == 1 for d in days) and not _leap(today.year):
-        wanted.add((2, 29))
-    months = {m for m, _ in wanted}
-    rows = []
-    for user in users.filter(birthday__isnull=False, birthday__month__in=months):
-        key = (user.birthday.month, user.birthday.day)
-        if key in wanted:
-            rows.append(user)
-    # Soonest first.
-    def days_until(u):
-        for i, d in enumerate(days):
-            if (u.birthday.month, u.birthday.day) == (d.month, d.day):
-                return i
-            if u.birthday.month == 2 and u.birthday.day == 29 and (d.month, d.day) == (3, 1):
-                return i
-        return 7
-    rows.sort(key=days_until)
-    return rows
-
-
-# ---- WhatsApp templates ----------------------------------------------------
+# ---- WhatsApp templates (Plan 08, د-4) ---------------------------------------
 
 TEMPLATE_KEYS = {
-    "followup": "crm.whatsapp.followup",
-    "vip": "crm.whatsapp.vip",
+    "follow_up": "crm.whatsapp.followup",
+    "vip_offer": "crm.whatsapp.vip",
     "birthday": "crm.whatsapp.birthday",
 }
 
 TEMPLATE_LABELS = {
-    "followup": "متابعة بعد الشراء",
-    "vip": "عرض VIP",
+    "follow_up": "متابعة بعد الشراء",
+    "vip_offer": "عرض VIP",
     "birthday": "تهنئة عيد ميلاد",
 }
 
-# The built-in wording; the operator's own is stored in StoreSettings.texts
-# under the keys above (edited from «نصوص المتجر»). Kept in step with
-# `frontend/src/lib/siteText.ts`.
+# The built-in wording. The operator's own is stored in StoreSettings.texts
+# under the keys above (edited from «نصوص المتجر»); kept in step with
+# `frontend/src/lib/siteText.ts`. Variables: {الاسم} {المتجر} {الكوبون} {رقم_الطلب}
 TEMPLATE_DEFAULTS = {
-    "followup": "مرحباً {الاسم}، شكراً لطلبك رقم {رقم_الطلب} من {المتجر}. نتمنى أن يكون قد أعجبك، ويسعدنا رأيك أو أي ملاحظة.",
-    "vip": "مرحباً {الاسم}، أنت من عملاء {المتجر} المميزين. لك خصم خاص بالكود {الكوبون} على طلبك القادم.",
+    "follow_up": "مرحباً {الاسم}، شكراً لطلبك رقم {رقم_الطلب} من {المتجر}. نتمنى أن يكون قد أعجبك، ويسعدنا رأيك أو أي ملاحظة.",
+    "vip_offer": "مرحباً {الاسم}، أنت من عملاء {المتجر} المميزين. لك خصم خاص بالكود {الكوبون} على طلبك القادم.",
     "birthday": "كل عام وأنت بخير {الاسم}! هديتنا لك من {المتجر} بمناسبة عيد ميلادك: كود خصم {الكوبون}.",
 }
 
 
-def whatsapp_number(phone: str) -> str:
-    """`09XXXXXXXX` → `2189XXXXXXXX`, the form wa.me expects."""
-    digits = "".join(ch for ch in (phone or "") if ch.isdigit())
-    if digits.startswith("00218"):
-        digits = digits[2:]
-    if digits.startswith("0"):
-        return "218" + digits[1:]
-    if digits and not digits.startswith("218"):
-        return "218" + digits
-    return digits
-
-
-def active_coupons():
-    """Coupons a customer could actually use right now. No made-up codes."""
-    now = timezone.now()
-    return (
-        Discount.objects.filter(is_active=True, code__isnull=False)
-        .exclude(code="")
-        .filter(Q(start_date__isnull=True) | Q(start_date__lte=now))
-        .filter(Q(end_date__isnull=True) | Q(end_date__gte=now))
-        .filter(Q(usage_limit__isnull=True) | Q(usage_count__lt=F("usage_limit")))
-        .order_by("code")
-    )
+def whatsapp_templates(settings: StoreSettings | None = None) -> list[dict]:
+    """The three templates as the dashboard shows them: the operator's wording
+    when typed, otherwise the built-in one."""
+    if settings is None:
+        settings = StoreSettings.objects.filter(pk=1).first()
+    texts = (settings.texts if settings else None) or {}
+    rows = []
+    for key, text_key in TEMPLATE_KEYS.items():
+        stored = texts.get(text_key)
+        text = stored if isinstance(stored, str) and stored.strip() else TEMPLATE_DEFAULTS[key]
+        rows.append({"key": key, "label": TEMPLATE_LABELS[key], "text": text})
+    return rows
 
 
 def render_template(text: str, *, name: str, store: str, coupon: str = "", order_number: str = "") -> str:
@@ -210,47 +443,15 @@ def render_template(text: str, *, name: str, store: str, coupon: str = "", order
     )
 
 
-def template_text(settings: StoreSettings, template: str) -> str:
-    texts = settings.texts or {}
-    stored = texts.get(TEMPLATE_KEYS[template])
-    return stored if isinstance(stored, str) and stored.strip() else TEMPLATE_DEFAULTS[template]
-
-
-# ---- CSV export ------------------------------------------------------------
-
-CSV_HEADERS = ["الاسم", "الهاتف", "المدينة", "التصنيف", "الوسوم", "عدد الطلبات", "الإنفاق", "آخر طلب", "تاريخ الميلاد"]
-
-
-def export_csv(rows, settings: StoreSettings) -> str:
-    """UTF-8 with a BOM, so Excel opens the Arabic correctly."""
-    out = StringIO()
-    out.write("﻿")
-    writer = csv.writer(out)
-    writer.writerow(CSV_HEADERS)
+def active_coupons():
+    """Coupons a customer could use right now: active, with a code, inside
+    their dates and under their usage limit. No made-up codes."""
     now = timezone.now()
-    for u in rows:
-        writer.writerow([
-            u.name,
-            u.phone_number,
-            u.last_city or "",
-            SEGMENT_LABELS[segment_of(u.orders_count, u.spend, u.last_order_at, settings, now)],
-            "، ".join(t.name for t in u.tags.all()),
-            u.orders_count,
-            f"{Decimal(u.spend or 0):.2f}",
-            timezone.localtime(u.last_order_at).strftime("%Y-%m-%d") if u.last_order_at else "",
-            u.birthday.isoformat() if u.birthday else "",
-        ])
-    return out.getvalue()
-
-
-def recent_orders(user: User, limit: int = 10):
-    rows = []
-    for o in Order.objects.placed().filter(user=user).order_by("-created_at")[:limit]:
-        rows.append({
-            "id": str(o.id),
-            "order_number": o.order_number,
-            "stage": stage_of(o),
-            "total": str(o.total),
-            "created_at": o.created_at,
-        })
-    return rows
+    return (
+        Discount.objects.filter(is_active=True, code__isnull=False)
+        .exclude(code="")
+        .filter(Q(start_date__isnull=True) | Q(start_date__lte=now))
+        .filter(Q(end_date__isnull=True) | Q(end_date__gte=now))
+        .filter(Q(usage_limit__isnull=True) | Q(usage_count__lt=F("usage_limit")))
+        .order_by("code")
+    )

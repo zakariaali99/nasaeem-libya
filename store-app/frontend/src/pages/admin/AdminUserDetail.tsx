@@ -1,6 +1,8 @@
 import {
   ArrowRight,
+  Calendar,
   CheckCircle2,
+  DollarSign,
   KeyRound,
   Mail,
   MessageSquare,
@@ -16,14 +18,14 @@ import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { CustomerProfilePanel } from '@/components/admin/CustomerProfilePanel'
+import { CustomerDrawer } from '@/components/admin/CustomerDrawer'
 import { StatusBadge } from '@/components/admin/StatusBadge'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
-import { formatDateTime, formatPrice } from '@/lib/format'
+import { formatDateTime, formatNumber, formatPrice } from '@/lib/format'
 import { usePageTitle } from '@/lib/usePageTitle'
 import type { Order } from '@/types/api'
 
@@ -35,6 +37,8 @@ interface AdminUser {
   role: string
   is_active: boolean
   date_joined: string
+  birthday?: string | null
+  tags?: Array<{ id: string; name: string; color: string }>
   loyalty_points?: number
   lifetime_spend?: string
   vip_tier?: string
@@ -53,6 +57,20 @@ export default function AdminUserDetail() {
   const [customPassword, setCustomPassword] = useState('')
   const [passwordFeedback, setPasswordFeedback] = useState<string | null>(null)
   const [lastSetPassword, setLastSetPassword] = useState<string>('')
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [editingBirthday, setEditingBirthday] = useState(false)
+  const [birthdayValue, setBirthdayValue] = useState('')
+
+  const updateUserMutation = useMutation({
+    mutationFn: async (payload: Partial<AdminUser>) => {
+      const res = await api.patch<AdminUser>(`/admin/users/${userId}/`, payload)
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-user', userId] })
+      setEditingBirthday(false)
+    },
+  })
 
   const userQuery = useQuery({
     queryKey: ['admin-user', userId],
@@ -128,6 +146,7 @@ export default function AdminUserDetail() {
 
   const orders = ordersQuery.data?.items ?? []
   const totalOrders = ordersQuery.data?.meta.total ?? 0
+  const totalSpend = orders.reduce((sum, o) => sum + Number(o.total || 0), 0)
 
   return (
     <div className="space-y-6 animate-fade-rise">
@@ -147,6 +166,15 @@ export default function AdminUserDetail() {
         </div>
 
         <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setDrawerOpen(true)}
+            className="rounded-xl text-xs font-bold gap-1.5 h-9 px-3 border-primary/30 text-primary hover:bg-primary/10 shadow-2xs"
+          >
+            <MessageSquare className="size-3.5" />
+            <span>لوحة CRM والتواصل</span>
+          </Button>
           {user.is_active ? (
             <Badge tone="success" className="text-xs font-bold">حساب نشط</Badge>
           ) : (
@@ -156,11 +184,37 @@ export default function AdminUserDetail() {
         </div>
       </div>
 
-      {/* The customer file: numbers, segment, tags, birthday, WhatsApp, contact log.
-          Numbers are computed from the orders on the server (plan 8, phase د). */}
-      <section className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-xs">
-        <CustomerProfilePanel customerId={user.id} />
-      </section>
+      {/* Customer Quick Metric Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-2xs space-y-1">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>إجمالي الطلبات</span>
+            <Package className="size-4 text-primary" />
+          </div>
+          <p className="font-mono text-xl sm:text-2xl font-black text-foreground">{formatNumber(totalOrders)}</p>
+          <p className="text-[11px] text-muted-foreground">طلب مسجل</p>
+        </div>
+
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-2xs space-y-1">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>إجمالي المشتريات (آخر 10)</span>
+            <DollarSign className="size-4 text-emerald-500" />
+          </div>
+          <p className="font-mono text-xl sm:text-2xl font-black text-price">{formatPrice(totalSpend)}</p>
+          <p className="text-[11px] text-muted-foreground">قيمة المشتريات</p>
+        </div>
+
+        <div className="col-span-2 sm:col-span-1 rounded-2xl border border-border bg-card p-4 shadow-2xs space-y-1">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>تاريخ التسجيل</span>
+            <Calendar className="size-4 text-sky-500" />
+          </div>
+          <p className="font-mono text-sm sm:text-base font-bold text-foreground">
+            {new Date(user.date_joined).toLocaleDateString('ar-LY', { year: 'numeric', month: 'short', day: 'numeric' })}
+          </p>
+          <p className="text-[11px] text-muted-foreground">عضو منذ التسجيل</p>
+        </div>
+      </div>
 
       {/* Main Grid: Details + Orders */}
       <div className="grid gap-6 lg:grid-cols-3">
@@ -194,6 +248,76 @@ export default function AdminUserDetail() {
               <span>الصلاحية:</span>
               <span className="font-semibold text-foreground">{user.role}</span>
             </div>
+
+            <div className="flex items-center justify-between text-muted-foreground pt-2 border-t border-border/60">
+              <div className="flex items-center gap-2">
+                <Calendar className="size-4 text-primary shrink-0" />
+                <span>الميلاد:</span>
+                <span className="font-mono font-medium text-foreground">
+                  {user.birthday || 'غير مسجل'}
+                </span>
+              </div>
+              {!editingBirthday ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBirthdayValue(user.birthday || '')
+                    setEditingBirthday(true)
+                  }}
+                  className="text-[11px] font-bold text-primary hover:underline cursor-pointer"
+                >
+                  تعديل
+                </button>
+              ) : null}
+            </div>
+
+            {editingBirthday && (
+              <div className="flex items-center gap-2 p-2 rounded-xl bg-muted/40 border border-border">
+                <Input
+                  type="date"
+                  value={birthdayValue}
+                  onChange={(e) => setBirthdayValue(e.target.value)}
+                  className="h-8 text-xs font-mono rounded-lg"
+                />
+                <Button
+                  size="sm"
+                  loading={updateUserMutation.isPending}
+                  onClick={() => updateUserMutation.mutate({ birthday: birthdayValue || null })}
+                  className="h-8 text-xs px-2.5 rounded-lg font-bold"
+                >
+                  حفظ
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setEditingBirthday(false)}
+                  className="h-8 text-xs px-2 rounded-lg"
+                >
+                  إلغاء
+                </Button>
+              </div>
+            )}
+
+            {(user.tags || []).length > 0 && (
+              <div className="pt-2 border-t border-border/60 space-y-1">
+                <span className="text-[11px] text-muted-foreground block">وسوم العميل:</span>
+                <div className="flex flex-wrap gap-1">
+                  {user.tags?.map((t) => (
+                    <span
+                      key={t.id}
+                      className="rounded px-2 py-0.5 text-[11px] font-bold border"
+                      style={{
+                        backgroundColor: `${t.color}15`,
+                        color: t.color,
+                        borderColor: `${t.color}35`,
+                      }}
+                    >
+                      {t.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Customer Password & Credentials Governance */}
@@ -374,6 +498,12 @@ export default function AdminUserDetail() {
           )}
         </div>
       </div>
+
+      <CustomerDrawer
+        customerId={userId}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+      />
     </div>
   )
 }

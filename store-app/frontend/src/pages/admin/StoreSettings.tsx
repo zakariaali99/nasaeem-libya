@@ -13,7 +13,6 @@ import {
   Save,
   Sparkles,
   Trash2,
-  Users,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
@@ -65,10 +64,9 @@ const settingsSchema = z.object({
     ),
   email: z.string().email('البريد الإلكتروني غير صحيح').or(z.literal('')),
   bank_transfer_note: z.string().optional(),
-  // Customer segments (plan 8, phase د). Numbers arrive as strings from the API.
-  crm_vip_min_orders: z.coerce.number().int('عدد صحيح').min(1, 'طلب واحد على الأقل'),
-  crm_vip_min_spend: z.coerce.number().min(0, 'لا يكون سالباً'),
-  crm_inactive_days: z.coerce.number().int('عدد صحيح').min(1, 'يوم واحد على الأقل'),
+  crm_vip_min_orders: z.coerce.number().min(1, 'الحد الأدنى لطلبات VIP يجب أن يكون 1 على الأقل').default(5),
+  crm_vip_min_spend: z.coerce.number().min(0, 'الحد الأدنى للإنفاق يجب ألا يقل عن 0').default(500),
+  crm_inactive_days: z.coerce.number().min(7, 'أيام الخمول يجب أن تكون 7 أيام على الأقل').default(60),
 })
 
 type SettingsFormValues = z.infer<typeof settingsSchema>
@@ -127,9 +125,9 @@ export default function AdminStoreSettingsPage() {
           whatsapp: settings.whatsapp || '',
           email: settings.email || '',
           bank_transfer_note: settings.bank_transfer_note || '',
-          crm_vip_min_orders: Number(settings.crm_vip_min_orders ?? 5),
-          crm_vip_min_spend: Number(settings.crm_vip_min_spend ?? 500),
-          crm_inactive_days: Number(settings.crm_inactive_days ?? 60),
+          crm_vip_min_orders: settings.crm_vip_min_orders ?? 5,
+          crm_vip_min_spend: settings.crm_vip_min_spend ? Number(settings.crm_vip_min_spend) : 500,
+          crm_inactive_days: settings.crm_inactive_days ?? 60,
         }
       : undefined,
   })
@@ -147,7 +145,7 @@ export default function AdminStoreSettingsPage() {
 
   const onSaveSettings = async (values: SettingsFormValues) => {
     setSavedSuccess(false)
-    await updateSettings.mutateAsync({ ...values, crm_vip_min_spend: values.crm_vip_min_spend.toFixed(2) })
+    await updateSettings.mutateAsync(values)
     setSavedSuccess(true)
     setTimeout(() => setSavedSuccess(false), 6000)
   }
@@ -400,26 +398,69 @@ export default function AdminStoreSettingsPage() {
           </Field>
         </section>
 
-        {/* Customer segments (CRM) */}
-        <section className="rounded-3xl border border-border bg-card p-6 sm:p-8 shadow-2xs space-y-4">
+        {/* CRM Customer Classification Thresholds */}
+        <section className="rounded-3xl border border-border bg-card p-6 sm:p-8 shadow-2xs space-y-6">
           <div className="border-b border-border/80 pb-3">
             <h2 className="text-base font-black text-foreground flex items-center gap-2">
-              <Users className="size-5 text-primary" />
-              تصنيف العملاء
+              <Sparkles className="size-5 text-amber-500" />
+              معايير تصنيف العملاء (CRM)
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              يُحسب التصنيف من الطلبات عند العرض: «خامل» أولاً، ثم «VIP»، ثم «متكرر» (طلبان فأكثر)، ثم «جديد». الإنفاق من الطلبات المسلَّمة فقط.
+              تحديد الشروط التلقائية لتصنيف العملاء (VIP، متكرر، جديد، خامل) في لوحة التحكم وسجل المبيعات.
             </p>
           </div>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Field id="crm_vip_min_orders" label="VIP عند عدد طلبات" error={errors.crm_vip_min_orders?.message} hint="أو المبلغ المجاور، أيهما تحقق">
-              {(field) => <Input {...field} {...register('crm_vip_min_orders')} type="number" min={1} dir="ltr" className="h-11 rounded-xl font-mono" />}
+
+          <div className="grid gap-5 sm:grid-cols-3">
+            <Field
+              id="crm_vip_min_orders"
+              label="الحد الأدنى لطلبات VIP"
+              hint="عدد الطلبات غير الملغاة لترقية العميل تلقائياً إلى VIP"
+              error={errors.crm_vip_min_orders?.message}
+            >
+              {(field) => (
+                <Input
+                  {...field}
+                  {...register('crm_vip_min_orders')}
+                  type="number"
+                  min={1}
+                  className="h-11 rounded-xl font-mono font-bold text-sm"
+                />
+              )}
             </Field>
-            <Field id="crm_vip_min_spend" label="VIP عند إنفاق (د.ل)" error={errors.crm_vip_min_spend?.message}>
-              {(field) => <Input {...field} {...register('crm_vip_min_spend')} type="number" min={0} step="1" dir="ltr" className="h-11 rounded-xl font-mono" />}
+
+            <Field
+              id="crm_vip_min_spend"
+              label="الحد الأدنى لإنفاق VIP (د.ل)"
+              hint="إجمالي المشتريات المسلّمة لترقية العميل تلقائياً إلى VIP"
+              error={errors.crm_vip_min_spend?.message}
+            >
+              {(field) => (
+                <Input
+                  {...field}
+                  {...register('crm_vip_min_spend')}
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  className="h-11 rounded-xl font-mono font-bold text-sm"
+                />
+              )}
             </Field>
-            <Field id="crm_inactive_days" label="خامل بعد (يوماً بلا طلب)" error={errors.crm_inactive_days?.message}>
-              {(field) => <Input {...field} {...register('crm_inactive_days')} type="number" min={1} dir="ltr" className="h-11 rounded-xl font-mono" />}
+
+            <Field
+              id="crm_inactive_days"
+              label="أيام خمول العميل (يوم)"
+              hint="المدة منذ آخر طلب لاعتبار العميل خاملاً ويحتاج لإعادة تنشيط"
+              error={errors.crm_inactive_days?.message}
+            >
+              {(field) => (
+                <Input
+                  {...field}
+                  {...register('crm_inactive_days')}
+                  type="number"
+                  min={7}
+                  className="h-11 rounded-xl font-mono font-bold text-sm"
+                />
+              )}
             </Field>
           </div>
         </section>

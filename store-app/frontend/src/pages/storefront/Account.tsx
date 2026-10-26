@@ -1,4 +1,4 @@
-import { Cake, CheckCircle2, ChevronLeft, Eye, EyeOff, Heart, KeyRound, Lock, MapPin, Package, User } from 'lucide-react'
+import { CheckCircle2, ChevronLeft, Eye, EyeOff, Heart, KeyRound, Lock, MapPin, Package, Pencil, User } from 'lucide-react'
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from '@/lib/i18nRouter'
@@ -18,6 +18,13 @@ export default function AccountPage() {
   const { data: user } = useMe()
   const logout = useLogout()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
+
+  const [editingProfile, setEditingProfile] = useState(false)
+  const [profileName, setProfileName] = useState(user?.name || '')
+  const [profileBirthday, setProfileBirthday] = useState(user?.birthday || '')
+  const [savingProfile, setSavingProfile] = useState(false)
+  const [profileSuccess, setProfileSuccess] = useState<string | null>(null)
 
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -27,23 +34,22 @@ export default function AccountPage() {
   const [passError, setPassError] = useState<string | null>(null)
   const [passSuccess, setPassSuccess] = useState<string | null>(null)
 
-  const queryClient = useQueryClient()
-  const [birthday, setBirthday] = useState<string | null>(null)
-  const [birthdayState, setBirthdayState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
-
   if (!user) return null
 
-  // Optional: lets the store send a birthday greeting. Saved when the field is
-  // left; an empty value clears it.
-  const saveBirthday = async (value: string) => {
-    if (value === (user.birthday ?? '')) return
-    setBirthdayState('saving')
+  const handleProfileSave = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSavingProfile(true)
     try {
-      await api.patch('/auth/me/', { birthday: value || null })
+      await api.patch('/auth/me/', {
+        name: profileName.trim(),
+        birthday: profileBirthday || null,
+      })
       await queryClient.invalidateQueries({ queryKey: authKeys.me })
-      setBirthdayState('saved')
-    } catch {
-      setBirthdayState('error')
+      setProfileSuccess(t('account.profileSaved'))
+      setEditingProfile(false)
+      setTimeout(() => setProfileSuccess(null), 4000)
+    } finally {
+      setSavingProfile(false)
     }
   }
 
@@ -137,40 +143,92 @@ export default function AccountPage() {
 
       {/* Basic Profile Data */}
       <section className="space-y-3">
-        <h2 className="text-sm font-bold text-foreground">{t('account.basics')}</h2>
-        <dl className="divide-y divide-border rounded-2xl border border-border bg-card shadow-xs">
-          {[
-            [t('account.name'), user.name || t('account.nameFallback')],
-            [t('account.phone'), user.phone_number],
-            [t('account.joined'), formatDate(user.date_joined)],
-          ].map(([label, value]) => (
-            <div key={label} className="flex items-center justify-between gap-4 p-4 text-xs sm:text-sm">
-              <dt className="text-muted-foreground">{label}</dt>
-              <dd className="font-bold text-foreground font-mono">{value}</dd>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold text-foreground">{t('account.basics')}</h2>
+          {!editingProfile && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setProfileName(user.name || '')
+                setProfileBirthday(user.birthday || '')
+                setEditingProfile(true)
+              }}
+              className="h-8 text-xs font-bold gap-1 text-primary hover:bg-primary/10 rounded-xl"
+            >
+              <Pencil className="size-3.5" />
+              <span>{t('account.editProfile')}</span>
+            </Button>
+          )}
+        </div>
+
+        {profileSuccess && (
+          <Alert tone="success">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="size-4 shrink-0 text-emerald-600" />
+              <span>{profileSuccess}</span>
             </div>
-          ))}
-          <div className="flex flex-wrap items-center justify-between gap-3 p-4 text-xs sm:text-sm">
-            <dt className="flex items-center gap-1.5 text-muted-foreground">
-              <Cake className="size-4 text-primary" aria-hidden="true" />
-              <label htmlFor="birthday">{t('account.birthday')}</label>
-            </dt>
-            <dd className="flex items-center gap-2">
+          </Alert>
+        )}
+
+        {editingProfile ? (
+          <form onSubmit={handleProfileSave} className="space-y-4 rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-xs">
+            <Field label={t('account.name')} htmlFor="profile_name">
               <Input
-                id="birthday"
-                type="date"
-                dir="ltr"
-                value={birthday ?? user.birthday ?? ''}
-                max={new Date().toISOString().slice(0, 10)}
-                onChange={(e) => { setBirthday(e.target.value); setBirthdayState('idle') }}
-                onBlur={(e) => saveBirthday(e.target.value)}
-                className="h-10 w-44 rounded-xl text-xs font-mono"
+                id="profile_name"
+                value={profileName}
+                onChange={(e) => setProfileName(e.target.value)}
+                placeholder="اسمك الكريم..."
+                className="h-11 rounded-xl text-xs"
               />
-              <span className="text-[11px] text-muted-foreground" aria-live="polite">
-                {birthdayState === 'saving' ? t('account.birthdaySaving') : birthdayState === 'saved' ? t('account.birthdaySaved') : birthdayState === 'error' ? t('account.birthdayFailed') : t('account.birthdayHint')}
-              </span>
-            </dd>
-          </div>
-        </dl>
+            </Field>
+
+            <Field label={t('account.birthday')} htmlFor="profile_birthday" hint={t('account.birthdayHint')}>
+              <Input
+                id="profile_birthday"
+                type="date"
+                value={profileBirthday}
+                onChange={(e) => setProfileBirthday(e.target.value)}
+                className="h-11 rounded-xl text-xs font-mono"
+              />
+            </Field>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setEditingProfile(false)}
+                className="h-9 rounded-xl text-xs"
+              >
+                إلغاء
+              </Button>
+              <Button
+                type="submit"
+                size="sm"
+                loading={savingProfile}
+                className="h-9 rounded-xl text-xs font-bold px-4"
+              >
+                حفظ التعديلات
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <dl className="divide-y divide-border rounded-2xl border border-border bg-card shadow-xs">
+            {[
+              [t('account.name'), user.name || t('account.nameFallback')],
+              [t('account.phone'), user.phone_number],
+              [t('account.birthday'), user.birthday || '—'],
+              [t('account.joined'), formatDate(user.date_joined)],
+            ].map(([label, value]) => (
+              <div key={label} className="flex items-center justify-between gap-4 p-4 text-xs sm:text-sm">
+                <dt className="text-muted-foreground">{label}</dt>
+                <dd className="font-bold text-foreground font-mono">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
       </section>
 
       {/* Account Security & Password Change */}

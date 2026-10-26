@@ -144,6 +144,12 @@ else:
     }
     SESSION_ENGINE = "django.contrib.sessions.backends.db"
 
+# A per-process cache (the live host has no Redis) is cleared only in the
+# process that handled the save, so the others keep serving the old page for
+# hours. Anything an admin edit or a sale must change at once is cached only
+# when this is True. Tests force it on to exercise the cache paths.
+CACHE_IS_SHARED = bool(REDIS_URL and has_django_redis)
+
 
 # --------------------------------------------------------------------------
 # Identity — a Libyan phone number is the username.

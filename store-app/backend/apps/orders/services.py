@@ -552,15 +552,26 @@ def checkout(
     ])
 
     # ---- reserve stock -----------------------------------------------------
+    # A conditional UPDATE, not read-add-save: SQLite (the live host) ignores
+    # select_for_update(), so two checkouts for the last unit could both pass
+    # the check above. The WHERE clause lets the database pick one of them.
     for line, product, variant, _price, _total in priced_lines:
         if not product.track_quantity:
             continue
-        if variant is not None:
-            variant.reserved_stock += line.quantity
-            variant.save(update_fields=["reserved_stock", "updated_at"])
-        else:
-            product.reserved_stock += line.quantity
-            product.save(update_fields=["reserved_stock", "updated_at"])
+        holder = variant if variant is not None else product
+        taken = type(holder).objects.filter(
+            pk=holder.pk, stock__gte=F("reserved_stock") + line.quantity,
+        ).update(reserved_stock=F("reserved_stock") + line.quantity, updated_at=timezone.now())
+        # Re-read either way: the message must quote what is left now, not
+        # what was on the shelf before the other buyer, and a second line of
+        # the same product below must see the reservation just made.
+        holder.refresh_from_db(fields=["stock", "reserved_stock"])
+        if not taken:
+            p_name = getattr(product, "name_en", "") or product.name if is_en else product.name
+            raise OutOfStock(
+                _("الكمية المتوفرة من «%(name)s» هي %(count)s فقط")
+                % {"name": p_name, "count": max(available_stock(product, variant) or 0, 0)}
+            )
 
     if discount is not None:
         # Inside the same transaction and under the same lock, so a limited-use

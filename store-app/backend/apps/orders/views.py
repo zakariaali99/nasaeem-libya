@@ -850,14 +850,15 @@ class ActiveCartPromotionView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        cached = cache.get("store:promotions:active")
+        cached = cache.get("store:promotions:active") if settings.CACHE_IS_SHARED else None
         if cached is not None:
             return Response({"data": cached})
         promo = CartPromotion.objects.filter(is_active=True).first()
         if promo is None:
             return Response({"data": None})
         serialized_data = CartPromotionSerializer(promo).data
-        cache.set("store:promotions:active", serialized_data, 43200)
+        if settings.CACHE_IS_SHARED:
+            cache.set("store:promotions:active", serialized_data, 43200)
         return Response({"data": serialized_data})
 
 

@@ -138,7 +138,6 @@ def render_page(template, content, lang, version):
         "url_en": e(url["en"]),
         "og_image": e(domain + "/assets/img/og.jpg"),
         "og_locale_alt": e(content[other]["og_locale"]),
-        "font_preload": "cairo-arabic.woff2" if lang == "ar" else "cairo-latin.woff2",
         "version": version,
         "jsonld": json.dumps(jsonld, ensure_ascii=False).replace("</", "<\\/"),
         "nav_items": nav,

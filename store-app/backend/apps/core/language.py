@@ -111,3 +111,26 @@ def lang_key(key: str, request) -> str:
 def forget(*keys: str) -> None:
     """Drop a cached entry in both languages."""
     cache.delete_many([k for key in keys for k in (key, f"{key}:en")])
+
+
+from django.middleware.locale import LocaleMiddleware
+from django.utils import translation
+
+
+class StoreLocaleMiddleware(LocaleMiddleware):
+    """Activates the language for each request.
+
+    Prefers `?lang=en|ar` query param if present (which the storefront passes on
+    every API request from /en/ pages), then falls back to Django's standard
+    Accept-Language / session / cookie resolution.
+    """
+
+    def process_request(self, request):
+        params = getattr(request, "GET", {})
+        lang = params.get("lang")
+        if lang in ("en", "ar"):
+            translation.activate(lang)
+            request.LANGUAGE_CODE = translation.get_language()
+            return None
+        return super().process_request(request)
+

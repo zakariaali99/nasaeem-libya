@@ -1,0 +1,246 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: Nasaim Libya 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-25 21:00+0200\n"
+"PO-Revision-Date: 2026-10-25 21:00+0200\n"
+"Last-Translator: Antigravity\n"
+"Language-Team: English\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "المنتج غير موجود"
+msgstr "Product not found."
+
+msgid "الخيار غير موجود"
+msgstr "Option not found."
+
+msgid "يرجى اختيار أحد خيارات المنتج"
+msgstr "Please select a product option."
+
+msgid "سعر هذا المنتج غير محدد حالياً، يرجى التواصل معنا لطلبه"
+msgstr "This product's price is not set yet, please contact us to order."
+
+msgid "الكمية المتوفرة من «%(name)s» هي %(count)s فقط"
+msgstr "Available quantity of '%(name)s' is %(count)s only."
+
+msgid "تمت الإضافة إلى السلة"
+msgstr "Added to cart."
+
+msgid "العنصر غير موجود في السلة"
+msgstr "Item not found in cart."
+
+msgid "تم تحديث الكمية"
+msgstr "Quantity updated."
+
+msgid "تم حذف العنصر"
+msgstr "Item removed."
+
+msgid "السلة فارغة"
+msgstr "Cart is empty."
+
+msgid "تم إنشاء الطلب"
+msgstr "Order created."
+
+msgid "الطلب غير موجود"
+msgstr "Order not found."
+
+msgid "المنتج «%(name)s» لم يعد متاحاً، احذفه من السلة لإكمال الطلب"
+msgstr "The product '%(name)s' is no longer available. Please remove it from your cart to complete your order."
+
+msgid "الخيار المحدد لـ «%(name)s» لم يعد متاحاً"
+msgstr "The selected option for '%(name)s' is no longer available."
+
+msgid "الكمية يجب أن تكون 1 على الأقل"
+msgstr "Quantity must be at least 1."
+
+msgid "الكمية يجب أن تكون بين 1 و 999"
+msgstr "Quantity must be between 1 and 999."
+
+msgid "سعر «%(name)s» غير محدد حالياً، يرجى حذفه من السلة أو التواصل معنا"
+msgstr "Price for '%(name)s' is not set yet. Please remove it from your cart or contact us."
+
+msgid "كود الخصم غير صحيح"
+msgstr "Invalid discount code."
+
+msgid "كود الخصم غير مفعّل"
+msgstr "Discount code is not active."
+
+msgid "كود الخصم لم يبدأ بعد"
+msgstr "Discount code has not started yet."
+
+msgid "انتهت صلاحية كود الخصم"
+msgstr "Discount code has expired."
+
+msgid "تم استخدام كود الخصم بالكامل"
+msgstr "Discount code has reached its usage limit."
+
+msgid "الحد الأدنى للطلب لاستخدام هذا الكود هو %(min_spend)s د.ل"
+msgstr "The minimum order amount for this code is %(min_spend)s LYD."
+
+msgid "كود الخصم لا ينطبق على المنتجات في السلة"
+msgstr "Discount code does not apply to items in your cart."
+
+msgid "لا توجد مناطق توصيل أو مدن مُعرّفة في المتجر حالياً، يرجى التواصل معنا لإتمام الطلب"
+msgstr "No delivery areas or cities are currently available. Please contact us to complete your order."
+
+msgid "لا توجد مناطق توصيل مُعرّفة في المتجر حالياً، يرجى التواصل معنا لإتمام الطلب"
+msgstr "No delivery areas are currently available. Please contact us to complete your order."
+
+msgid "يرجى اختيار مدينة أو منطقة التوصيل"
+msgstr "Please select a delivery city or region."
+
+msgid "يرجى اختيار منطقة التوصيل"
+msgstr "Please select a delivery region."
+
+msgid "العنوان مطلوب"
+msgstr "Address is required."
+
+msgid "طريقة التوصيل غير متاحة"
+msgstr "Delivery method is not available."
+
+msgid "طريقة الدفع غير متاحة"
+msgstr "Payment method is not available."
+
+msgid "لا يمكن تعديل هذا الطلب"
+msgstr "This order cannot be edited."
+
+msgid "يجب أن يحتوي الطلب على صنف واحد على الأقل"
+msgstr "Order must contain at least one item."
+
+msgid "يجب إضافة منتج واحد على الأقل للطلب"
+msgstr "At least one product must be added to the order."
+
+msgid "المنتج غير متاح"
+msgstr "Product is not available."
+
+msgid "الحجم المحدد لـ «%(name)s» غير متاح"
+msgstr "The selected size for '%(name)s' is not available."
+
+msgid "يرجى اختيار حجم «%(name)s»"
+msgstr "Please select a size for '%(name)s'."
+
+msgid "رقم الهاتف غير صحيح، يجب أن يبدأ بـ 09 ويتكوّن من 10 أرقام"
+msgstr "Invalid phone number. It must start with 09 and consist of 10 digits."
+
+msgid "رقم هاتف العميل غير صالح (8 أرقام على الأقل)"
+msgstr "Invalid customer phone number (at least 8 digits)."
+
+msgid "رقم الهاتف أو كلمة المرور غير صحيحة"
+msgstr "Invalid phone number or password."
+
+msgid "تعذّر إنشاء الحساب بهذا الرقم"
+msgstr "Unable to create account with this phone number."
+
+msgid "كلمة المرور قصيرة جداً، يجب أن تتكوّن من %(min_length)s أحرف على الأقل"
+msgstr "Password is too short. It must be at least %(min_length)s characters."
+
+msgid "يجب أن تتكوّن كلمة المرور من %(min_length)s أحرف على الأقل"
+msgstr "Password must be at least %(min_length)s characters."
+
+msgid "كلمة المرور هذه شائعة جداً، اختر كلمة مرور أقوى"
+msgstr "This password is too common. Please choose a stronger password."
+
+msgid "لا يمكن أن تكون كلمة المرور شائعة الاستخدام"
+msgstr "Password cannot be commonly used."
+
+msgid "كلمة المرور لا يمكن أن تتكوّن من أرقام فقط"
+msgstr "Password cannot consist only of numbers."
+
+msgid "لا يمكن أن تتكوّن كلمة المرور من أرقام فقط"
+msgstr "Password cannot consist only of numbers."
+
+msgid "كلمة المرور تشبه معلوماتك الشخصية كثيراً"
+msgstr "Password is too similar to your personal information."
+
+msgid "المستخدم غير موجود"
+msgstr "User not found."
+
+msgid "العنوان غير موجود"
+msgstr "Address not found."
+
+msgid "تم تغيير كلمة المرور بنجاح"
+msgstr "Password changed successfully."
+
+msgid "اختر المدينة"
+msgstr "Select a city."
+
+msgid "المنطقة لا تتبع المدينة المختارة"
+msgstr "Region does not belong to the selected city."
+
+msgid "المدينة غير موجودة"
+msgstr "City not found."
+
+msgid "المنطقة غير موجودة"
+msgstr "Region not found."
+
+msgid "التصنيف غير موجود"
+msgstr "Category not found."
+
+msgid "المجموعة غير موجودة"
+msgstr "Collection not found."
+
+msgid "التقييم غير موجود"
+msgstr "Review not found."
+
+msgid "التقييم يجب أن يكون بين 1 و 5 نجوم"
+msgstr "Rating must be between 1 and 5 stars."
+
+msgid "يرجى كتابة نص التقييم وتجربتك مع العطر"
+msgstr "Please write your review text and experience with the fragrance."
+
+msgid "طريقة الدفع غير متاحة حالياً"
+msgstr "Payment method is currently unavailable."
+
+msgid "أكمل تفاصيل الطلب قبل الدفع"
+msgstr "Please complete order details before payment."
+
+msgid "تم دفع هذا الطلب مسبقاً"
+msgstr "This order has already been paid."
+
+msgid "طريقة الدفع لا تطابق المختارة عند تأكيد الطلب"
+msgstr "Payment method does not match the one selected during checkout."
+
+msgid "لا يمكن دفع هذا الطلب في حالته الحالية"
+msgstr "Cannot pay for this order in its current status."
+
+msgid "لا توجد عملية دفع لهذا الطلب"
+msgstr "No payment found for this order."
+
+msgid "معرّف المنتج مطلوب"
+msgstr "Product ID is required."
+
+msgid "تمت الإزالة من المفضلة"
+msgstr "Removed from wishlist."
+
+msgid "تمت الإضافة إلى المفضلة"
+msgstr "Added to wishlist."
+
+msgid "شكراً لك! تم نشر تقييمك وإضافة 50 نقطة مكافأة إلى رصيدك الملكي 🎁"
+msgstr "Thank you! Your review has been published and 50 bonus points added to your loyalty balance 🎁"
+
+msgid "شكراً لك! تم نشر تقييمك."
+msgstr "Thank you! Your review has been published."
+
+msgid "كلمة المرور الحالية غير صحيحة"
+msgstr "Current password is incorrect."
+
+msgid "تم حفظ العنوان"
+msgstr "Address saved."
+
+msgid "تم تحديث العنوان"
+msgstr "Address updated."
+
+msgid "لا توجد مناطق توصيل مُعرّفة لهذه المدينة حالياً"
+msgstr "No delivery regions defined for this city currently."
+
+msgid "أدخل رقم الهاتف أو رقم الطلب"
+msgstr "Enter phone number or order number."
+
+msgid "رقم الهاتف غير صحيح"
+msgstr "Invalid phone number."
+
+

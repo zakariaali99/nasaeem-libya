@@ -19,10 +19,12 @@ from apps.core.models import User
 
 from .phone import INVALID_PHONE, normalise_phone
 
+from django.utils.translation import gettext_lazy as _
+
 # The single credential-failure message. Login uses it for every failure mode:
 # unknown phone, wrong password, banned, inactive.
-INVALID_CREDENTIALS = "رقم الهاتف أو كلمة المرور غير صحيحة"
-PHONE_TAKEN = "تعذّر إنشاء الحساب بهذا الرقم"
+INVALID_CREDENTIALS = _("رقم الهاتف أو كلمة المرور غير صحيحة")
+PHONE_TAKEN = _("تعذّر إنشاء الحساب بهذا الرقم")
 
 
 class PhoneField(serializers.CharField):
@@ -152,7 +154,7 @@ class AddressSerializer(serializers.ModelSerializer):
             city = region.city
             attrs["city"] = city
         if city is None:
-            raise serializers.ValidationError({"city": ["اختر المدينة"]})
+            raise serializers.ValidationError({"city": [_("اختر المدينة")]})
         if region is not None and region.city_id != city.id:
-            raise serializers.ValidationError({"region": ["المنطقة لا تتبع المدينة المختارة"]})
+            raise serializers.ValidationError({"region": [_("المنطقة لا تتبع المدينة المختارة")]})
         return attrs

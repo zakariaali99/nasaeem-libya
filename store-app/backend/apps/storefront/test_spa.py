@@ -139,3 +139,44 @@ class TestRobotsAndSitemap:
         from urllib.parse import quote
 
         assert quote(product.slug, safe="") not in body
+
+    def test_sitemap_has_multilingual_entries_and_hreflang(self, client, product):
+        body = client.get("/sitemap.xml").content.decode("utf-8")
+        assert 'xmlns:xhtml="http://www.w3.org/1999/xhtml"' in body
+        assert 'hreflang="ar"' in body
+        assert 'hreflang="en"' in body
+        assert 'hreflang="x-default"' in body
+        assert "/en/products/" in body
+        assert "https://nasaeem.ly/en/</loc>" in body
+
+
+@pytest.mark.django_db
+class TestMultilingualHeadAndMessages:
+    def test_en_product_route_injects_english_canonical_and_hreflang(self, client, product):
+        from urllib.parse import quote
+
+        product.name_en = "Royal Oud"
+        product.save()
+        encoded = quote(product.slug, safe="")
+        html = client.get(f"/en/products/{product.slug}").content.decode("utf-8")
+        assert "Royal Oud" in html
+        assert f'<link rel="canonical" href="https://nasaeem.ly/en/products/{encoded}"' in html
+        assert f'<link rel="alternate" hreflang="ar" href="https://nasaeem.ly/products/{encoded}"' in html
+        assert f'<link rel="alternate" hreflang="en" href="https://nasaeem.ly/en/products/{encoded}"' in html
+        assert f'<link rel="alternate" hreflang="x-default" href="https://nasaeem.ly/products/{encoded}"' in html
+        assert '<meta property="og:locale" content="en_US"' in html
+        assert '<meta property="og:locale:alternate" content="ar_LY"' in html
+
+    def test_english_server_error_messages_via_lang_query_param(self, client):
+        resp = client.get("/api/cart/?lang=en")
+        assert resp.status_code == 200
+        # Empty cart checkout returns translated message
+        resp = client.post("/api/cart/checkout/?lang=en", {}, content_type="application/json")
+        assert resp.status_code == 400
+        assert resp.json().get("message") == "Cart is empty."
+
+    def test_english_server_error_messages_via_accept_language(self, client):
+        resp = client.post("/api/cart/checkout/", {}, content_type="application/json", HTTP_ACCEPT_LANGUAGE="en")
+        assert resp.status_code == 400
+        assert resp.json().get("message") == "Cart is empty."
+

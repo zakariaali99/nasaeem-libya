@@ -132,6 +132,7 @@ export async function request<T>(
 
   const requestHeaders = new Headers(headers)
   requestHeaders.set('Accept', 'application/json')
+  requestHeaders.set('Accept-Language', isEnglish() ? 'en' : 'ar')
   if (isFormData) {
     // Let browser generate multipart/form-data boundary automatically
     requestHeaders.delete('Content-Type')

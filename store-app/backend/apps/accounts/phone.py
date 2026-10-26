@@ -8,12 +8,13 @@ number always reaches the database in a single canonical form.
 import re
 
 from django.core.exceptions import ValidationError
+from django.utils.translation import gettext_lazy as _
 
 # Libyan mobiles are 09X XXX XXXX. Live prefixes: 091/092 (Libyana),
 # 093/094 (Al-Madar), 095 (Hatef Libya / LibyaPhone).
 LIBYAN_MOBILE = re.compile(r"^09[1-5]\d{7}$")
 
-INVALID_PHONE = "رقم الهاتف غير صحيح، يجب أن يبدأ بـ 09 ويتكوّن من 10 أرقام"
+INVALID_PHONE = _("رقم الهاتف غير صحيح، يجب أن يبدأ بـ 09 ويتكوّن من 10 أرقام")
 
 
 def normalise_phone(raw):

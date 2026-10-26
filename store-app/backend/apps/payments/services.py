@@ -21,6 +21,7 @@ import logging
 from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
+from django.utils.translation import gettext as _
 
 from apps.orders.models import Order, OrderStatus, PaymentStatus
 
@@ -49,7 +50,7 @@ def get_configuration(method_code: str):
         method_code=method_code, is_enabled=True
     ).first()
     if configuration is None:
-        raise PaymentError("طريقة الدفع غير متاحة حالياً", status=400, field="method_code")
+        raise PaymentError(_("طريقة الدفع غير متاحة حالياً"), status=400, field="method_code")
     return configuration
 
 
@@ -61,16 +62,16 @@ def initiate_payment(*, order: Order, method_code: str, user_input: dict | None 
     after a COMPLETED payment is refused: one order, one charge.
     """
     if not order.finalised_at:
-        raise PaymentError("أكمل تفاصيل الطلب قبل الدفع", field="order_id")
+        raise PaymentError(_("أكمل تفاصيل الطلب قبل الدفع"), field="order_id")
 
     # Most-specific refusal first: a paid order stays paid whatever else is
     # wrong with the request.
     if Payment.objects.filter(order=order, status=PaymentStatus.COMPLETED).exists():
-        raise PaymentError("تم دفع هذا الطلب مسبقاً")
+        raise PaymentError(_("تم دفع هذا الطلب مسبقاً"))
 
     if not method_code:
         raise PaymentError(
-            "طريقة الدفع لا تطابق المختارة عند تأكيد الطلب", field="method_code"
+            _("طريقة الدفع لا تطابق المختارة عند تأكيد الطلب"), field="method_code"
         )
 
     # Unknown or disabled gateways are answered as "unavailable", never as a
@@ -79,16 +80,16 @@ def initiate_payment(*, order: Order, method_code: str, user_input: dict | None 
         gateway = get_gateway(method_code)
     except KeyError:
         raise PaymentError(
-            "طريقة الدفع غير متاحة حالياً", status=400, field="method_code"
+            _("طريقة الدفع غير متاحة حالياً"), status=400, field="method_code"
         ) from None
 
     if order.payment_method and order.payment_method != method_code:
         raise PaymentError(
-            "طريقة الدفع لا تطابق المختارة عند تأكيد الطلب", field="method_code"
+            _("طريقة الدفع لا تطابق المختارة عند تأكيد الطلب"), field="method_code"
         )
 
     if order.status != OrderStatus.PENDING:
-        raise PaymentError("لا يمكن دفع هذا الطلب في حالته الحالية")
+        raise PaymentError(_("لا يمكن دفع هذا الطلب في حالته الحالية"))
 
     configuration = get_configuration(method_code)
 
@@ -267,7 +268,7 @@ def resolve_redirect(*, order: Order) -> dict:
         .first()
     )
     if payment is None:
-        raise PaymentError("لا توجد عملية دفع لهذا الطلب", field="order_id")
+        raise PaymentError(_("لا توجد عملية دفع لهذا الطلب"), field="order_id")
     if payment.status == PaymentStatus.COMPLETED:
         return {"payment_status": payment.status, "confirmed": True}
 

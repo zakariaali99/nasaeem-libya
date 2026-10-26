@@ -21,6 +21,7 @@ from rest_framework.views import APIView
 from apps.core.models import User, Role
 from apps.core.pagination import StandardPagination
 from apps.core.views import CsrfProtectedAPIView
+from django.utils.translation import gettext as _
 
 from .permissions import IsAdminRole
 from .phone import normalise_phone
@@ -219,7 +220,7 @@ class ChangePasswordView(CsrfProtectedAPIView):
 
         if request.user.has_usable_password() and not request.user.check_password(current_password):
             return Response(
-                {"message": "كلمة المرور الحالية غير صحيحة"},
+                {"message": _("كلمة المرور الحالية غير صحيحة")},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -228,7 +229,7 @@ class ChangePasswordView(CsrfProtectedAPIView):
         from django.contrib.auth import update_session_auth_hash
         update_session_auth_hash(request, request.user)
 
-        return Response({"message": "تم تغيير كلمة المرور بنجاح"})
+        return Response({"message": _("تم تغيير كلمة المرور بنجاح")})
 
 
 class AddressListCreateView(CsrfProtectedAPIView):
@@ -246,7 +247,7 @@ class AddressListCreateView(CsrfProtectedAPIView):
                 request.user.addresses.update(is_default=False)
             address = serializer.save(user=request.user)
         return Response({"data": AddressSerializer(address).data,
-                         "message": "تم حفظ العنوان"}, status=status.HTTP_201_CREATED)
+                         "message": _("تم حفظ العنوان")}, status=status.HTTP_201_CREATED)
 
 
 class AddressDetailView(CsrfProtectedAPIView):
@@ -258,19 +259,19 @@ class AddressDetailView(CsrfProtectedAPIView):
     def patch(self, request, address_id):
         address = self.get_object(request, address_id)
         if address is None:
-            return Response({"message": "العنوان غير موجود"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"message": _("العنوان غير موجود")}, status=status.HTTP_404_NOT_FOUND)
         serializer = AddressSerializer(address, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         with transaction.atomic():
             if serializer.validated_data.get("is_default"):
                 request.user.addresses.exclude(pk=address.pk).update(is_default=False)
             address = serializer.save()
-        return Response({"data": AddressSerializer(address).data, "message": "تم تحديث العنوان"})
+        return Response({"data": AddressSerializer(address).data, "message": _("تم تحديث العنوان")})
 
     def delete(self, request, address_id):
         address = self.get_object(request, address_id)
         if address is None:
-            return Response({"message": "العنوان غير موجود"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"message": _("العنوان غير موجود")}, status=status.HTTP_404_NOT_FOUND)
         address.delete()
         return Response(status=204)
 

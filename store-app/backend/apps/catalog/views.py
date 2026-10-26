@@ -17,6 +17,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Prefetch, Q
 from django.shortcuts import get_object_or_404
+from django.utils.translation import gettext as _
 from rest_framework import status
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -219,7 +220,7 @@ class ProductDetailView(APIView):
         admin = bool(request.user.is_authenticated and getattr(request.user, "is_admin_role", False))
         product = self.get_object(pk, admin=admin)
         if product is None:
-            return Response({"message": "المنتج غير موجود"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"message": _("المنتج غير موجود")}, status=status.HTTP_404_NOT_FOUND)
 
         cache_key = lang_key(f"store:product:{product.id}", request)
         if not admin:
@@ -301,7 +302,7 @@ class ProductBySlugView(APIView):
             product = queryset.filter(slug=slug).first()
 
         if product is None:
-            return Response({"message": "المنتج غير موجود"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"message": _("المنتج غير موجود")}, status=status.HTTP_404_NOT_FOUND)
 
         cache_key = lang_key(f"store:product:{product.slug}", request)
         if not admin:
@@ -382,7 +383,7 @@ class CategoryDetailView(APIView):
     def get(self, request, pk):
         category = self.get_object(pk)
         if category is None or (not _is_admin(request) and _category_hidden(category)):
-            return Response({"message": "التصنيف غير موجود"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"message": _("التصنيف غير موجود")}, status=status.HTTP_404_NOT_FOUND)
         return Response({"data": CategorySerializer(category, context={"request": request}).data})
 
     def patch(self, request, pk):
@@ -471,7 +472,7 @@ class CollectionDetailView(APIView):
     def get(self, request, pk):
         collection = self.get_object(pk)
         if collection is None or (not _is_admin(request) and not collection.is_active):
-            return Response({"message": "المجموعة غير موجودة"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"message": _("المجموعة غير موجودة")}, status=status.HTTP_404_NOT_FOUND)
         return Response({"data": CollectionSerializer(collection, context={"request": request}).data})
 
     def patch(self, request, pk):
@@ -839,20 +840,20 @@ class WishlistToggleView(APIView):
     def post(self, request):
         product_id = request.data.get("product_id")
         if not product_id:
-            return Response({"message": "معرّف المنتج مطلوب"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": _("معرّف المنتج مطلوب")}, status=status.HTTP_400_BAD_REQUEST)
         product = visibility.visible_products(Product.objects.filter(id=product_id)).first()
         if not product:
-            return Response({"message": "المنتج غير موجود"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"message": _("المنتج غير موجود")}, status=status.HTTP_404_NOT_FOUND)
 
         item = WishlistItem.objects.filter(user=request.user, product=product).first()
         if item:
             item.delete()
             is_wishlisted = False
-            message = "تمت الإزالة من المفضلة"
+            message = _("تمت الإزالة من المفضلة")
         else:
             WishlistItem.objects.create(user=request.user, product=product)
             is_wishlisted = True
-            message = "تمت الإضافة إلى المفضلة"
+            message = _("تمت الإضافة إلى المفضلة")
 
         count = WishlistItem.objects.filter(user=request.user).count()
         return Response({
@@ -961,15 +962,15 @@ class ProductReviewsView(APIView):
 
         product = Product.objects.filter(pk=pk).first()
         if product is None:
-            return Response({"message": "المنتج غير موجود"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"message": _("المنتج غير موجود")}, status=status.HTTP_404_NOT_FOUND)
 
         rating = int(request.data.get("rating", 5))
         if rating < 1 or rating > 5:
-            return Response({"message": "التقييم يجب أن يكون بين 1 و 5 نجوم"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": _("التقييم يجب أن يكون بين 1 و 5 نجوم")}, status=status.HTTP_400_BAD_REQUEST)
 
         comment = str(request.data.get("comment", "")).strip()
         if not comment:
-            return Response({"message": "يرجى كتابة نص التقييم وتجربتك مع العطر"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": _("يرجى كتابة نص التقييم وتجربتك مع العطر")}, status=status.HTTP_400_BAD_REQUEST)
 
         title = str(request.data.get("title", "")).strip()
         photo_url = str(request.data.get("photo_url", "")).strip()
@@ -1006,9 +1007,9 @@ class ProductReviewsView(APIView):
             {
                 "data": ProductReviewSerializer(review).data,
                 "message": (
-                    "شكراً لك! تم نشر تقييمك وإضافة 50 نقطة مكافأة إلى رصيدك الملكي 🎁"
+                    _("شكراً لك! تم نشر تقييمك وإضافة 50 نقطة مكافأة إلى رصيدك الملكي 🎁")
                     if settings.FEATURE_LOYALTY
-                    else "شكراً لك! تم نشر تقييمك."
+                    else _("شكراً لك! تم نشر تقييمك.")
                 ),
                 "bonus_points": 50,
             },

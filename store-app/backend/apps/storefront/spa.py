@@ -106,11 +106,26 @@ def _meta_description(product: Product) -> str:
     return text or f"{product.name} — {_SITE_NAME}."
 
 
-def _product_head(request, product: Product) -> tuple[str, str, str]:
+def _product_head(request, product: Product, is_english: bool = False) -> tuple[str, str, str]:
     """Returns (title, description, head_html) for a product page."""
-    title = product.meta_title or f"{product.name} — {_SITE_NAME}"
-    description = _meta_description(product)
-    url = _absolute(request, _product_path(product.slug))
+    site_name = "Nasaeem Libya" if is_english else _SITE_NAME
+    if is_english:
+        p_name = getattr(product, "name_en", "") or product.name
+        title = getattr(product, "meta_title_en", "") or f"{p_name} — {site_name}"
+        description = getattr(product, "meta_description_en", "") or getattr(product, "description_en", "") or _meta_description(product)
+        url = _absolute(request, "/en" + _product_path(product.slug))
+        locale = "en_US"
+        alt_locale = "ar_LY"
+    else:
+        p_name = product.name
+        title = product.meta_title or f"{p_name} — {site_name}"
+        description = _meta_description(product)
+        url = _absolute(request, _product_path(product.slug))
+        locale = "ar_LY"
+        alt_locale = "en_US"
+
+    ar_url = _absolute(request, _product_path(product.slug))
+    en_url = _absolute(request, "/en" + _product_path(product.slug))
     price = _display_price(product)
 
     # `safe="/"` keeps path separators but percent-encodes Unicode filenames,
@@ -138,7 +153,7 @@ def _product_head(request, product: Product) -> tuple[str, str, str]:
     ld: dict = {
         "@context": "https://schema.org",
         "@type": "Product",
-        "name": product.name,
+        "name": p_name,
         "description": description,
         "url": url,
         "offers": offer,
@@ -156,8 +171,13 @@ def _product_head(request, product: Product) -> tuple[str, str, str]:
 
     tags = [
         f'<link rel="canonical" href="{escape(url)}" data-seo>',
+        f'<link rel="alternate" hreflang="ar" href="{escape(ar_url)}" data-seo>',
+        f'<link rel="alternate" hreflang="en" href="{escape(en_url)}" data-seo>',
+        f'<link rel="alternate" hreflang="x-default" href="{escape(ar_url)}" data-seo>',
+        f'<meta property="og:locale" content="{escape(locale)}" data-seo>',
+        f'<meta property="og:locale:alternate" content="{escape(alt_locale)}" data-seo>',
         '<meta property="og:type" content="product" data-seo>',
-        f'<meta property="og:site_name" content="{escape(_SITE_NAME)}" data-seo>',
+        f'<meta property="og:site_name" content="{escape(site_name)}" data-seo>',
         f'<meta property="og:title" content="{escape(title)}" data-seo>',
         f'<meta property="og:description" content="{escape(description)}" data-seo>',
         f'<meta property="og:url" content="{escape(url)}" data-seo>',
@@ -216,24 +236,35 @@ def robots_txt(request):
 def sitemap_xml(request):
     """A flat sitemap: the storefront landmarks plus every active product.
 
-    Kept deliberately simple — no pagination, no lastmod guesswork beyond the
-    product's own `updated_at`. `02-data-model.md` scale (hundreds of products,
-    not millions) fits one document comfortably under the 50k-URL limit."""
-    urls = [(_absolute(request, p), None) for p in ("/", "/products")]
+    Lists each page in both Arabic and English, with alternate hreflang entries
+    for 'ar', 'en', and 'x-default' (pointing to the Arabic default)."""
+    pages = [
+        (_absolute(request, "/"), _absolute(request, "/en/"), None),
+        (_absolute(request, "/products"), _absolute(request, "/en/products"), None),
+    ]
     for product in (
         visible_products(Product.objects.all()).order_by("-updated_at").only("slug", "updated_at")
     ):
         lastmod = product.updated_at.date().isoformat() if product.updated_at else None
-        urls.append((_absolute(request, _product_path(product.slug)), lastmod))
+        ar_path = _product_path(product.slug)
+        en_path = "/en" + ar_path
+        pages.append((_absolute(request, ar_path), _absolute(request, en_path), lastmod))
 
     body = ['<?xml version="1.0" encoding="UTF-8"?>']
-    body.append('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
-    for loc, lastmod in urls:
-        body.append("  <url>")
-        body.append(f"    <loc>{escape(loc)}</loc>")
-        if lastmod:
-            body.append(f"    <lastmod>{lastmod}</lastmod>")
-        body.append("  </url>")
+    body.append(
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" '
+        'xmlns:xhtml="http://www.w3.org/1999/xhtml">'
+    )
+    for ar_url, en_url, lastmod in pages:
+        for loc in (ar_url, en_url):
+            body.append("  <url>")
+            body.append(f"    <loc>{escape(loc)}</loc>")
+            body.append(f'    <xhtml:link rel="alternate" hreflang="ar" href="{escape(ar_url)}" />')
+            body.append(f'    <xhtml:link rel="alternate" hreflang="en" href="{escape(en_url)}" />')
+            body.append(f'    <xhtml:link rel="alternate" hreflang="x-default" href="{escape(ar_url)}" />')
+            if lastmod:
+                body.append(f"    <lastmod>{lastmod}</lastmod>")
+            body.append("  </url>")
     body.append("</urlset>")
     return HttpResponse("\n".join(body), content_type="application/xml; charset=utf-8")
 
@@ -329,8 +360,9 @@ def render_shell(request, path: str = ""):
     gets the shell verbatim (its default head is already correct)."""
     html = _read_index()
 
-    match = re.match(r"^(?:en/)?products/(?P<slug>[^/]+)/?$", path)
+    match = re.match(r"^(?P<prefix>en/)?products/(?P<slug>[^/]+)/?$", path)
     if match:
+        is_en = bool(match.group("prefix"))
         raw_slug = match.group("slug")
         slug = raw_slug
         try:
@@ -348,7 +380,7 @@ def render_shell(request, path: str = ""):
             .first()
         )
         if product is not None:
-            title, description, extra = _product_head(request, product)
+            title, description, extra = _product_head(request, product, is_english=is_en)
             html = _apply_head(html, title=title, description=description, extra=extra)
 
     if "</head>" in html:

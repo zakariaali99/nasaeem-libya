@@ -30,4 +30,7 @@ test-results/
 *.log
 backups/
 store-app/backend/backups/
+store-app/frontend/dist/
+*.tsbuildinfo
+.claude/
 

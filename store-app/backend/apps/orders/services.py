@@ -24,7 +24,8 @@ from django.conf import settings
 from django.db import connection, transaction
 from django.db.models import F
 from django.db.models.functions import Greatest
-from django.utils import timezone
+from django.utils import timezone, translation
+from django.utils.translation import gettext as _
 
 from apps.catalog.models import Product, ProductVariant
 from apps.catalog.visibility import visible_products
@@ -196,22 +197,22 @@ def validate_discount(discount: Discount, *, subtotal: Decimal, products=()) -> 
     now = timezone.now()
 
     if not discount.is_active:
-        raise CheckoutError("كود الخصم غير مفعّل", field="discount_code")
+        raise CheckoutError(_("كود الخصم غير مفعّل"), field="discount_code")
     if discount.start_date and now < discount.start_date:
-        raise CheckoutError("كود الخصم لم يبدأ بعد", field="discount_code")
+        raise CheckoutError(_("كود الخصم لم يبدأ بعد"), field="discount_code")
     if discount.end_date and now > discount.end_date:
-        raise CheckoutError("انتهت صلاحية كود الخصم", field="discount_code")
+        raise CheckoutError(_("انتهت صلاحية كود الخصم"), field="discount_code")
     if discount.usage_limit is not None and discount.usage_count >= discount.usage_limit:
-        raise CheckoutError("تم استخدام كود الخصم بالكامل", field="discount_code")
+        raise CheckoutError(_("تم استخدام كود الخصم بالكامل"), field="discount_code")
     if discount.min_order_amount is not None and subtotal < money(discount.min_order_amount):
         raise CheckoutError(
-            f"الحد الأدنى لاستخدام هذا الكود هو {money(discount.min_order_amount)} د.ل",
+            _("الحد الأدنى لاستخدام هذا الكود هو %(min_spend)s د.ل") % {"min_spend": money(discount.min_order_amount)},
             field="discount_code",
         )
 
     amount = discount_amount(discount, subtotal=subtotal, products=products)
     if amount is None:
-        raise CheckoutError("كود الخصم لا ينطبق على المنتجات في السلة", field="discount_code")
+        raise CheckoutError(_("كود الخصم لا ينطبق على المنتجات في السلة"), field="discount_code")
     return amount
 
 
@@ -274,15 +275,15 @@ def resolve_destination(
 
     if not City.objects.filter(is_active=True).exists() and not Region.objects.filter(is_active=True).exists():
         raise CheckoutError(
-            "لا توجد مناطق توصيل أو مدن مُعرّفة في المتجر حالياً، يرجى التواصل معنا لإتمام الطلب",
+            _("لا توجد مناطق توصيل أو مدن مُعرّفة في المتجر حالياً، يرجى التواصل معنا لإتمام الطلب"),
             field="city_id",
         )
     if not City.objects.filter(is_active=True).exists():
         raise CheckoutError(
-            "لا توجد مناطق توصيل أو مدن مُعرّفة في المتجر حالياً، يرجى التواصل معنا لإتمام الطلب",
+            _("لا توجد مناطق توصيل أو مدن مُعرّفة في المتجر حالياً، يرجى التواصل معنا لإتمام الطلب"),
             field="city_id",
         )
-    raise CheckoutError("يرجى اختيار مدينة أو منطقة التوصيل", field="city_id")
+    raise CheckoutError(_("يرجى اختيار مدينة أو منطقة التوصيل"), field="city_id")
 
 
 def resolve_region(region_id) -> Region:
@@ -292,10 +293,10 @@ def resolve_region(region_id) -> Region:
         return region
     if not Region.objects.filter(is_active=True).exists():
         raise CheckoutError(
-            "لا توجد مناطق توصيل مُعرّفة في المتجر حالياً، يرجى التواصل معنا لإتمام الطلب",
+            _("لا توجد مناطق توصيل مُعرّفة في المتجر حالياً، يرجى التواصل معنا لإتمام الطلب"),
             field="region_id",
         )
-    raise CheckoutError("يرجى اختيار منطقة التوصيل", field="region_id")
+    raise CheckoutError(_("يرجى اختيار منطقة التوصيل"), field="region_id")
 
 
 def delivery_fee(
@@ -383,7 +384,7 @@ def checkout(
         hide_invoice_prices = False
     lines = list(cart.items.select_related("product", "variant").all())
     if not lines:
-        raise CheckoutError("السلة فارغة")
+        raise CheckoutError(_("السلة فارغة"))
 
     # `require_delivery=False` creates a DRAFT: the order exists, stock is
     # reserved and the basket is emptied, but the address has not been chosen
@@ -394,7 +395,7 @@ def checkout(
     if require_delivery:
         region, city = resolve_destination(region_id=region_id, city_id=city_id)
         if not address.strip():
-            raise CheckoutError("العنوان مطلوب", field="address")
+            raise CheckoutError(_("العنوان مطلوب"), field="address")
     else:
         region = _optional_region(region_id)
         city = (
@@ -430,28 +431,33 @@ def checkout(
     }
     subtotal = Decimal("0.00")
     priced_lines = []
+    is_en = translation.get_language() == "en"
     for line in lines:
         product = locked_products.get(line.product_id)
         if product is None or product.id not in on_sale:
+            p_name = getattr(line.product, "name_en", "") or line.product.name if is_en else line.product.name
             raise CheckoutError(
-                f"المنتج «{line.product.name}» لم يعد متاحاً، احذفه من السلة لإكمال الطلب"
+                _("المنتج «%(name)s» لم يعد متاحاً، احذفه من السلة لإكمال الطلب") % {"name": p_name}
             )
 
         variant = locked_variants.get(line.variant_id) if line.variant_id else None
         if line.variant_id and (variant is None or not variant.is_active):
-            raise CheckoutError(f"الخيار المحدد لـ «{product.name}» لم يعد متاحاً")
+            p_name = getattr(product, "name_en", "") or product.name if is_en else product.name
+            raise CheckoutError(_("الخيار المحدد لـ «%(name)s» لم يعد متاحاً") % {"name": p_name})
 
         if line.quantity < 1:
-            raise CheckoutError("الكمية يجب أن تكون 1 على الأقل")
+            raise CheckoutError(_("الكمية يجب أن تكون 1 على الأقل"))
 
         stock = available_stock(product, variant)
         if stock is not None and stock < line.quantity:
+            p_name = getattr(product, "name_en", "") or product.name if is_en else product.name
             raise OutOfStock(
-                f"الكمية المتوفرة من «{product.name}» هي {max(stock, 0)} فقط"
+                _("الكمية المتوفرة من «%(name)s» هي %(count)s فقط") % {"name": p_name, "count": max(stock, 0)}
             )
 
         if not has_price(product, variant):
-            raise CheckoutError(f"سعر «{product.name}» غير محدد حالياً، يرجى حذفه من السلة أو التواصل معنا")
+            p_name = getattr(product, "name_en", "") or product.name if is_en else product.name
+            raise CheckoutError(_("سعر «%(name)s» غير محدد حالياً، يرجى حذفه من السلة أو التواصل معنا") % {"name": p_name})
         price = unit_price(product, variant)
         line_total = money(price * line.quantity)
         subtotal += line_total
@@ -472,7 +478,7 @@ def checkout(
             .first()
         )
         if discount is None:
-            raise CheckoutError("كود الخصم غير صحيح", field="discount_code")
+            raise CheckoutError(_("كود الخصم غير صحيح"), field="discount_code")
         discount_total = validate_discount(
             discount,
             subtotal=subtotal,
@@ -726,7 +732,7 @@ def finalise_order(
             code=delivery_method_code, is_active=True
         ).first()
         if method is None:
-            raise CheckoutError("طريقة التوصيل غير متاحة", field="delivery_method_code")
+            raise CheckoutError(_("طريقة التوصيل غير متاحة"), field="delivery_method_code")
         order.delivery_method = method
 
     order.save()

@@ -67,6 +67,7 @@ MIDDLEWARE = [
     "apps.core.static_files.SafeWhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "apps.core.language.StoreLocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -219,6 +220,13 @@ CORS_ALLOWED_ORIGINS = config(
 # Locale — Arabic only, RTL, Libya.
 # --------------------------------------------------------------------------
 LANGUAGE_CODE = "ar"
+LANGUAGES = [
+    ("ar", "العربية"),
+    ("en", "English"),
+]
+LOCALE_PATHS = [
+    BASE_DIR / "locale",
+]
 TIME_ZONE = "Africa/Tripoli"
 USE_I18N = True
 USE_TZ = True

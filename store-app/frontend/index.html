@@ -6,6 +6,8 @@
     <meta name="theme-color" content="#444943" />
     <title>نسائم ليبيا</title>
     <meta name="description" content="نسائم ليبيا — عطور وزيوت وأطقم هدايا، توصيل إلى جميع مدن ليبيا." />
+    <meta property="og:locale" content="ar_LY" />
+    <meta property="og:locale:alternate" content="en_US" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link
       rel="preload"
@@ -21,6 +23,10 @@
       if (/^\/en(\/|$)/.test(location.pathname)) {
         document.documentElement.lang = 'en'
         document.documentElement.dir = 'ltr'
+        var og = document.querySelector('meta[property="og:locale"]')
+        if (og) og.content = 'en_US'
+        var ogAlt = document.querySelector('meta[property="og:locale:alternate"]')
+        if (ogAlt) ogAlt.content = 'ar_LY'
       }
     </script>
     <script>

@@ -24,8 +24,10 @@ from apps.orders.views import _may_see
 from . import services
 from .serializers import CitySerializer, RegionSerializer
 
-EMPTY_CITIES = "لا توجد مدن توصيل مُعرّفة في المتجر حالياً، يرجى التواصل معنا لإتمام الطلب"
-EMPTY_REGIONS = "لا توجد مناطق توصيل مُعرّفة لهذه المدينة حالياً"
+from django.utils.translation import gettext_lazy as _
+
+EMPTY_CITIES = _("لا توجد مدن توصيل مُعرّفة في المتجر حالياً، يرجى التواصل معنا لإتمام الطلب")
+EMPTY_REGIONS = _("لا توجد مناطق توصيل مُعرّفة لهذه المدينة حالياً")
 
 
 class DeliveryMethodListView(APIView):
@@ -59,7 +61,7 @@ class CityDetailView(APIView):
     def get(self, request, city_id):
         city = City.objects.filter(pk=city_id, is_active=True).first()
         if city is None:
-            return Response({"message": "المدينة غير موجودة"}, status=404)
+            return Response({"message": _("المدينة غير موجودة")}, status=404)
         return Response({"data": CitySerializer(city, context={"request": request}).data})
 
 
@@ -69,7 +71,7 @@ class CityRegionsView(APIView):
     def get(self, request, city_id):
         city = City.objects.filter(pk=city_id, is_active=True).first()
         if city is None:
-            return Response({"message": "المدينة غير موجودة"}, status=404)
+            return Response({"message": _("المدينة غير موجودة")}, status=404)
         regions = city.regions.filter(is_active=True).order_by("name")
         data = RegionSerializer(regions, many=True, context={"request": request}).data
         if wants_english(request):
@@ -86,7 +88,7 @@ class RegionDetailView(APIView):
     def get(self, request, region_id):
         region = Region.objects.select_related("city").filter(pk=region_id).first()
         if region is None:
-            return Response({"message": "المنطقة غير موجودة"}, status=404)
+            return Response({"message": _("المنطقة غير موجودة")}, status=404)
         return Response({"data": RegionSerializer(region, context={"request": request}).data})
 
 
@@ -130,7 +132,7 @@ class AdminShipmentCreateView(APIView):
             return Response({"message": "غير مصرح"}, status=403)
         order = Order.objects.select_related("delivery_method").filter(id=order_id).first()
         if order is None:
-            return Response({"message": "الطلب غير موجود"}, status=404)
+            return Response({"message": _("الطلب غير موجود")}, status=404)
 
         try:
             result = services.start_delivery(

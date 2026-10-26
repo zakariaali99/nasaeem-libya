@@ -20,9 +20,11 @@ from rest_framework.views import APIView
 from apps.accounts.permissions import IsAdminRole
 from apps.catalog.models import Product, ProductVariant
 from apps.catalog.visibility import visible_products
+from apps.core.language import wants_english
 from apps.core.pagination import StandardPagination
 from apps.core.store_settings import get_store_settings
 from apps.core.views import CsrfProtectedAPIView
+from django.utils.translation import gettext as _
 
 from . import services
 from .models import (
@@ -107,7 +109,7 @@ class CartView(CsrfProtectedAPIView):
 
         product = visible_products(Product.objects.filter(id=payload["product_id"])).first()
         if product is None:
-            return Response({"message": "المنتج غير موجود"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"message": _("المنتج غير موجود")}, status=status.HTTP_404_NOT_FOUND)
 
         variant = None
         if payload.get("variant_id"):
@@ -115,16 +117,16 @@ class CartView(CsrfProtectedAPIView):
                 id=payload["variant_id"], product=product, is_active=True
             ).first()
             if variant is None:
-                return Response({"message": "الخيار غير موجود"}, status=status.HTTP_404_NOT_FOUND)
+                return Response({"message": _("الخيار غير موجود")}, status=status.HTTP_404_NOT_FOUND)
         elif product.has_variants:
             return Response(
-                {"message": "يرجى اختيار أحد خيارات المنتج"}, status=status.HTTP_400_BAD_REQUEST
+                {"message": _("يرجى اختيار أحد خيارات المنتج")}, status=status.HTTP_400_BAD_REQUEST
             )
 
         if not services.has_price(product, variant):
             # No price on the size or the product: it would be sold for 0.00.
             return Response(
-                {"message": "سعر هذا المنتج غير محدد حالياً، يرجى التواصل معنا لطلبه"},
+                {"message": _("سعر هذا المنتج غير محدد حالياً، يرجى التواصل معنا لطلبه")},
                 status=status.HTTP_409_CONFLICT,
             )
 
@@ -136,8 +138,9 @@ class CartView(CsrfProtectedAPIView):
         # re-checks under a lock, and that is the check that decides.
         stock = services.available_stock(product, variant)
         if stock is not None and wanted > stock:
+            p_name = getattr(product, "name_en", "") or product.name if wants_english(request) else product.name
             return Response(
-                {"message": f"الكمية المتوفرة من «{product.name}» هي {max(stock, 0)} فقط"},
+                {"message": _("الكمية المتوفرة من «%(name)s» هي %(count)s فقط") % {"name": p_name, "count": max(stock, 0)}},
                 status=status.HTTP_409_CONFLICT,
             )
 
@@ -150,7 +153,7 @@ class CartView(CsrfProtectedAPIView):
             )
 
         return Response(
-            {"data": _cart_payload(request, cart), "message": "تمت الإضافة إلى السلة"},
+            {"data": _cart_payload(request, cart), "message": _("تمت الإضافة إلى السلة")},
             status=status.HTTP_201_CREATED,
         )
 
@@ -170,7 +173,7 @@ class CartItemView(CsrfProtectedAPIView):
     def patch(self, request, item_id):
         cart, item = self.get_item(request, item_id)
         if item is None:
-            return Response({"message": "العنصر غير موجود في السلة"},
+            return Response({"message": _("العنصر غير موجود في السلة")},
                             status=status.HTTP_404_NOT_FOUND)
 
         serializer = CartUpdateSerializer(data=request.data)
@@ -179,22 +182,23 @@ class CartItemView(CsrfProtectedAPIView):
 
         stock = services.available_stock(item.product, item.variant)
         if stock is not None and quantity > stock:
+            p_name = getattr(item.product, "name_en", "") or item.product.name if wants_english(request) else item.product.name
             return Response(
-                {"message": f"الكمية المتوفرة من «{item.product.name}» هي {max(stock, 0)} فقط"},
+                {"message": _("الكمية المتوفرة من «%(name)s» هي %(count)s فقط") % {"name": p_name, "count": max(stock, 0)}},
                 status=status.HTTP_409_CONFLICT,
             )
 
         item.quantity = quantity
         item.save(update_fields=["quantity", "updated_at"])
-        return Response({"data": _cart_payload(request, cart), "message": "تم تحديث الكمية"})
+        return Response({"data": _cart_payload(request, cart), "message": _("تم تحديث الكمية")})
 
     def delete(self, request, item_id):
         cart, item = self.get_item(request, item_id)
         if item is None:
-            return Response({"message": "العنصر غير موجود في السلة"},
+            return Response({"message": _("العنصر غير موجود في السلة")},
                             status=status.HTTP_404_NOT_FOUND)
         item.delete()
-        return Response({"data": _cart_payload(request, cart), "message": "تم حذف العنصر"})
+        return Response({"data": _cart_payload(request, cart), "message": _("تم حذف العنصر")})
 
 
 class CartDetailsView(CsrfProtectedAPIView):
@@ -227,7 +231,7 @@ class CartCheckoutView(CsrfProtectedAPIView):
 
         cart = services.get_or_create_cart(request, create=False)
         if cart is None or not cart.items.exists():
-            return Response({"message": "السلة فارغة"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": _("السلة فارغة")}, status=status.HTTP_400_BAD_REQUEST)
 
         services.maybe_release_expired_drafts()
 
@@ -268,7 +272,7 @@ class CartCheckoutView(CsrfProtectedAPIView):
         request.session.modified = True
         return Response(
             {"data": OrderSerializer(order, context={"request": request}).data,
-             "message": "تم إنشاء الطلب"},
+             "message": _("تم إنشاء الطلب")},
             status=status.HTTP_201_CREATED,
         )
 
@@ -296,7 +300,7 @@ class CheckoutConfirmView(CsrfProtectedAPIView):
         order_id = request.data.get("order_id")
         order = order_queryset().filter(id=order_id).first() if order_id else None
         if order is None or not _may_see(request.user, order, _session_order_ids(request)):
-            return Response({"message": "الطلب غير موجود"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"message": _("الطلب غير موجود")}, status=status.HTTP_404_NOT_FOUND)
 
         serializer = CheckoutSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -453,7 +457,7 @@ class CheckoutStateView(APIView):
     def get(self, request, order_id):
         order = order_queryset().filter(id=order_id).first()
         if order is None or not _may_see(request.user, order, _session_order_ids(request)):
-            return Response({"message": "الطلب غير موجود"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"message": _("الطلب غير موجود")}, status=status.HTTP_404_NOT_FOUND)
         return Response({"data": OrderSerializer(order, context={"request": request}).data})
 
 
@@ -548,7 +552,7 @@ class OrderDetailView(APIView):
     def get(self, request, lookup):
         order = self.get_object(request, lookup)
         if order is None or not _may_see(request.user, order, _session_order_ids(request)):
-            return Response({"message": "الطلب غير موجود"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"message": _("الطلب غير موجود")}, status=status.HTTP_404_NOT_FOUND)
         return Response({"data": OrderSerializer(order, context={"request": request}).data})
 
     def patch(self, request, lookup):
@@ -1374,13 +1378,13 @@ class OrderTrackView(APIView):
         raw_phone = str(request.data.get("phone") or "").strip()
         number = str(request.data.get("number") or "").strip().lstrip("#").upper()
         if not raw_phone and not number:
-            return Response({"message": "أدخل رقم الهاتف أو رقم الطلب"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": _("أدخل رقم الهاتف أو رقم الطلب")}, status=status.HTTP_400_BAD_REQUEST)
 
         queryset = order_queryset().placed()
         if raw_phone:
             phone = normalise_phone(raw_phone)
             if not phone:
-                return Response({"message": "رقم الهاتف غير صحيح"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"message": _("رقم الهاتف غير صحيح")}, status=status.HTTP_400_BAD_REQUEST)
             queryset = queryset.filter(user__phone_number=phone)
         if number:
             queryset = queryset.filter(order_number__iexact=number)

@@ -21,6 +21,7 @@ from rest_framework.views import APIView
 
 from apps.orders.models import Order, PaymentMethodConfiguration, PaymentStatus
 from apps.orders.views import _may_see
+from django.utils.translation import gettext as _
 
 from . import services
 from .models import Payment
@@ -50,7 +51,7 @@ class PaymentInitiateView(APIView):
         order = Order.objects.filter(id=order_id).first() if order_id else None
         if order is None or not _may_see(request.user, order):
             return Response(
-                {"message": "الطلب غير موجود"}, status=http_status.HTTP_404_NOT_FOUND
+                {"message": _("الطلب غير موجود")}, status=http_status.HTTP_404_NOT_FOUND
             )
 
         try:
@@ -66,7 +67,7 @@ class PaymentInitiateView(APIView):
             return Response(body, status=exc.status)
         except KeyError:
             return Response(
-                {"message": "طريقة الدفع غير متاحة حالياً", "errors": {"method_code": ["طريقة الدفع غير متاحة حالياً"]}},
+                {"message": _("طريقة الدفع غير متاحة حالياً"), "errors": {"method_code": [_("طريقة الدفع غير متاحة حالياً")]}},
                 status=http_status.HTTP_400_BAD_REQUEST,
             )
 
@@ -109,7 +110,7 @@ class PaymentRedirectView(APIView):
         order = Order.objects.filter(id=order_id).first()
         if order is None or not _may_see(request.user, order):
             return Response(
-                {"message": "الطلب غير موجود"}, status=http_status.HTTP_404_NOT_FOUND
+                {"message": _("الطلب غير موجود")}, status=http_status.HTTP_404_NOT_FOUND
             )
         try:
             result = services.resolve_redirect(order=order)
@@ -119,7 +120,7 @@ class PaymentRedirectView(APIView):
                 body["errors"] = {exc.field: [exc.message]}
             return Response(body, status=exc.status)
         except KeyError:
-            return Response({"message": "طريقة الدفع غير متاحة"}, status=400)
+            return Response({"message": _("طريقة الدفع غير متاحة")}, status=400)
 
         order.refresh_from_db()
         from apps.orders.serializers import OrderSerializer

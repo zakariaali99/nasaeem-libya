@@ -5,7 +5,7 @@
   var root = document.documentElement;
   var reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // Intro: the CSS animation removes it after ~1.5s; this lets people skip it sooner.
+  // Intro: the CSS timeline lifts it after ~2.8s; this lets people skip it sooner.
   var intro = document.getElementById('intro');
   if (intro && root.classList.contains('intro-on')) {
     var done = false;
@@ -14,7 +14,7 @@
       if (done) return;
       done = true;
       intro.classList.add('is-leaving');
-      setTimeout(remove, 380);
+      setTimeout(remove, 460);
       document.removeEventListener('keydown', onKey);
     };
     var onKey = function (e) { if (e.key === 'Escape') finish(); };
@@ -22,7 +22,7 @@
     document.addEventListener('keydown', onKey);
     // The CSS animation already faded it out; no second fade is needed.
     intro.addEventListener('animationend', function (e) {
-      if (e.target === intro && e.animationName === 'intro-out' && !done) { done = true; remove(); }
+      if (e.target === intro && e.animationName === 'intro-lift' && !done) { done = true; remove(); }
     });
   } else if (intro) {
     intro.remove();

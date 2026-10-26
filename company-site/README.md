@@ -29,4 +29,4 @@ python3 company-site/build.py
    ```
 4. الفحص: `https://nasaeemlibya.ly/` و`/en/` على الحاسوب والهاتف، وزر «تسوّق الآن» يفتح المتجر.
 
-الخطوط والشعارات منسوخة من `store-app/frontend/public/`؛ إن تغيّرت هناك تُنسخ يدوياً إلى `assets/`.
+الشعارات منسوخة من `store-app/frontend/public/`؛ إن تغيّرت هناك تُنسخ يدوياً إلى `assets/`. لا ملفات خطوط: الصفحة تستعمل خط النظام نفسه (San Francisco على أجهزة Apple، Segoe UI على Windows، Roboto على Android).

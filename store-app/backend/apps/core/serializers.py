@@ -42,6 +42,9 @@ class StoreSettingsSerializer(serializers.ModelSerializer):
             "email",
             "bank_transfer_note",
             "texts",
+            "crm_vip_min_orders",
+            "crm_vip_min_spend",
+            "crm_inactive_days",
             "updated_at",
         ]
         read_only_fields = ["updated_at"]

@@ -18,6 +18,7 @@ import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
+import { CustomerDrawer } from '@/components/admin/CustomerDrawer'
 import { StatusBadge } from '@/components/admin/StatusBadge'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -36,6 +37,8 @@ interface AdminUser {
   role: string
   is_active: boolean
   date_joined: string
+  birthday?: string | null
+  tags?: Array<{ id: string; name: string; color: string }>
   loyalty_points?: number
   lifetime_spend?: string
   vip_tier?: string
@@ -54,6 +57,20 @@ export default function AdminUserDetail() {
   const [customPassword, setCustomPassword] = useState('')
   const [passwordFeedback, setPasswordFeedback] = useState<string | null>(null)
   const [lastSetPassword, setLastSetPassword] = useState<string>('')
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [editingBirthday, setEditingBirthday] = useState(false)
+  const [birthdayValue, setBirthdayValue] = useState('')
+
+  const updateUserMutation = useMutation({
+    mutationFn: async (payload: Partial<AdminUser>) => {
+      const res = await api.patch<AdminUser>(`/admin/users/${userId}/`, payload)
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-user', userId] })
+      setEditingBirthday(false)
+    },
+  })
 
   const userQuery = useQuery({
     queryKey: ['admin-user', userId],
@@ -149,6 +166,15 @@ export default function AdminUserDetail() {
         </div>
 
         <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setDrawerOpen(true)}
+            className="rounded-xl text-xs font-bold gap-1.5 h-9 px-3 border-primary/30 text-primary hover:bg-primary/10 shadow-2xs"
+          >
+            <MessageSquare className="size-3.5" />
+            <span>لوحة CRM والتواصل</span>
+          </Button>
           {user.is_active ? (
             <Badge tone="success" className="text-xs font-bold">حساب نشط</Badge>
           ) : (
@@ -222,6 +248,76 @@ export default function AdminUserDetail() {
               <span>الصلاحية:</span>
               <span className="font-semibold text-foreground">{user.role}</span>
             </div>
+
+            <div className="flex items-center justify-between text-muted-foreground pt-2 border-t border-border/60">
+              <div className="flex items-center gap-2">
+                <Calendar className="size-4 text-primary shrink-0" />
+                <span>الميلاد:</span>
+                <span className="font-mono font-medium text-foreground">
+                  {user.birthday || 'غير مسجل'}
+                </span>
+              </div>
+              {!editingBirthday ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBirthdayValue(user.birthday || '')
+                    setEditingBirthday(true)
+                  }}
+                  className="text-[11px] font-bold text-primary hover:underline cursor-pointer"
+                >
+                  تعديل
+                </button>
+              ) : null}
+            </div>
+
+            {editingBirthday && (
+              <div className="flex items-center gap-2 p-2 rounded-xl bg-muted/40 border border-border">
+                <Input
+                  type="date"
+                  value={birthdayValue}
+                  onChange={(e) => setBirthdayValue(e.target.value)}
+                  className="h-8 text-xs font-mono rounded-lg"
+                />
+                <Button
+                  size="sm"
+                  loading={updateUserMutation.isPending}
+                  onClick={() => updateUserMutation.mutate({ birthday: birthdayValue || null })}
+                  className="h-8 text-xs px-2.5 rounded-lg font-bold"
+                >
+                  حفظ
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setEditingBirthday(false)}
+                  className="h-8 text-xs px-2 rounded-lg"
+                >
+                  إلغاء
+                </Button>
+              </div>
+            )}
+
+            {(user.tags || []).length > 0 && (
+              <div className="pt-2 border-t border-border/60 space-y-1">
+                <span className="text-[11px] text-muted-foreground block">وسوم العميل:</span>
+                <div className="flex flex-wrap gap-1">
+                  {user.tags?.map((t) => (
+                    <span
+                      key={t.id}
+                      className="rounded px-2 py-0.5 text-[11px] font-bold border"
+                      style={{
+                        backgroundColor: `${t.color}15`,
+                        color: t.color,
+                        borderColor: `${t.color}35`,
+                      }}
+                    >
+                      {t.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Customer Password & Credentials Governance */}
@@ -402,6 +498,12 @@ export default function AdminUserDetail() {
           )}
         </div>
       </div>
+
+      <CustomerDrawer
+        customerId={userId}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+      />
     </div>
   )
 }

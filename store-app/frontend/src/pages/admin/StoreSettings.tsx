@@ -64,6 +64,9 @@ const settingsSchema = z.object({
     ),
   email: z.string().email('البريد الإلكتروني غير صحيح').or(z.literal('')),
   bank_transfer_note: z.string().optional(),
+  crm_vip_min_orders: z.coerce.number().min(1, 'الحد الأدنى لطلبات VIP يجب أن يكون 1 على الأقل').default(5),
+  crm_vip_min_spend: z.coerce.number().min(0, 'الحد الأدنى للإنفاق يجب ألا يقل عن 0').default(500),
+  crm_inactive_days: z.coerce.number().min(7, 'أيام الخمول يجب أن تكون 7 أيام على الأقل').default(60),
 })
 
 type SettingsFormValues = z.infer<typeof settingsSchema>
@@ -122,6 +125,9 @@ export default function AdminStoreSettingsPage() {
           whatsapp: settings.whatsapp || '',
           email: settings.email || '',
           bank_transfer_note: settings.bank_transfer_note || '',
+          crm_vip_min_orders: settings.crm_vip_min_orders ?? 5,
+          crm_vip_min_spend: settings.crm_vip_min_spend ? Number(settings.crm_vip_min_spend) : 500,
+          crm_inactive_days: settings.crm_inactive_days ?? 60,
         }
       : undefined,
   })
@@ -390,6 +396,73 @@ export default function AdminStoreSettingsPage() {
               />
             )}
           </Field>
+        </section>
+
+        {/* CRM Customer Classification Thresholds */}
+        <section className="rounded-3xl border border-border bg-card p-6 sm:p-8 shadow-2xs space-y-6">
+          <div className="border-b border-border/80 pb-3">
+            <h2 className="text-base font-black text-foreground flex items-center gap-2">
+              <Sparkles className="size-5 text-amber-500" />
+              معايير تصنيف العملاء (CRM)
+            </h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              تحديد الشروط التلقائية لتصنيف العملاء (VIP، متكرر، جديد، خامل) في لوحة التحكم وسجل المبيعات.
+            </p>
+          </div>
+
+          <div className="grid gap-5 sm:grid-cols-3">
+            <Field
+              id="crm_vip_min_orders"
+              label="الحد الأدنى لطلبات VIP"
+              hint="عدد الطلبات غير الملغاة لترقية العميل تلقائياً إلى VIP"
+              error={errors.crm_vip_min_orders?.message}
+            >
+              {(field) => (
+                <Input
+                  {...field}
+                  {...register('crm_vip_min_orders')}
+                  type="number"
+                  min={1}
+                  className="h-11 rounded-xl font-mono font-bold text-sm"
+                />
+              )}
+            </Field>
+
+            <Field
+              id="crm_vip_min_spend"
+              label="الحد الأدنى لإنفاق VIP (د.ل)"
+              hint="إجمالي المشتريات المسلّمة لترقية العميل تلقائياً إلى VIP"
+              error={errors.crm_vip_min_spend?.message}
+            >
+              {(field) => (
+                <Input
+                  {...field}
+                  {...register('crm_vip_min_spend')}
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  className="h-11 rounded-xl font-mono font-bold text-sm"
+                />
+              )}
+            </Field>
+
+            <Field
+              id="crm_inactive_days"
+              label="أيام خمول العميل (يوم)"
+              hint="المدة منذ آخر طلب لاعتبار العميل خاملاً ويحتاج لإعادة تنشيط"
+              error={errors.crm_inactive_days?.message}
+            >
+              {(field) => (
+                <Input
+                  {...field}
+                  {...register('crm_inactive_days')}
+                  type="number"
+                  min={7}
+                  className="h-11 rounded-xl font-mono font-bold text-sm"
+                />
+              )}
+            </Field>
+          </div>
         </section>
 
         {/* Save Settings Bar */}

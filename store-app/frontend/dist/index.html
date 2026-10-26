@@ -6,6 +6,8 @@
     <meta name="theme-color" content="#444943" />
     <title>نسائم ليبيا</title>
     <meta name="description" content="نسائم ليبيا — عطور وزيوت وأطقم هدايا، توصيل إلى جميع مدن ليبيا." />
+    <meta property="og:locale" content="ar_LY" />
+    <meta property="og:locale:alternate" content="en_US" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link
       rel="preload"
@@ -14,15 +16,26 @@
       href="/fonts/cairo-arabic.woff2"
       crossorigin
     />
-    <script type="module" crossorigin src="/assets/index-B2-jcimH.js"></script>
-    <link rel="modulepreload" crossorigin href="/assets/react-B6FDOkqr.js">
-    <link rel="modulepreload" crossorigin href="/assets/query-U7OZ3Y6O.js">
-    <link rel="modulepreload" crossorigin href="/assets/vendor-DLkyQWk-.js">
-    <link rel="modulepreload" crossorigin href="/assets/radix-HIQHkypO.js">
-    <link rel="modulepreload" crossorigin href="/assets/icons-DpRD3lJR.js">
-    <link rel="stylesheet" crossorigin href="/assets/index-B6QTOinO.css">
+    <script type="module" crossorigin src="/assets/index-BtrmCXx2.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/react-3y-dyNal.js">
+    <link rel="modulepreload" crossorigin href="/assets/query-BTH4S3Yc.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-CVrvj3hB.js">
+    <link rel="modulepreload" crossorigin href="/assets/radix-yHU08sg4.js">
+    <link rel="modulepreload" crossorigin href="/assets/icons-Cv2k715d.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-CB7u6SC9.css">
   </head>
   <body>
+    <script>
+      // An English address is set left-to-right before anything paints.
+      if (/^\/en(\/|$)/.test(location.pathname)) {
+        document.documentElement.lang = 'en'
+        document.documentElement.dir = 'ltr'
+        var og = document.querySelector('meta[property="og:locale"]')
+        if (og) og.content = 'en_US'
+        var ogAlt = document.querySelector('meta[property="og:locale:alternate"]')
+        if (ogAlt) ogAlt.content = 'ar_LY'
+      }
+    </script>
     <script>
       /*
        * Product-page priming. Measured, not guessed: Lighthouse put 4,776 ms of
@@ -38,9 +51,10 @@
        * owns every response — it adopts this promise rather than re-requesting.
        */
       (function () {
-        var match = location.pathname.match(/^\/products\/([^/]+)\/?$/)
+        var match = location.pathname.match(/^(?:\/en)?\/products\/([^/]+)\/?$/)
         if (!match) return
-        var url = '/api/products/' + match[1] + '/'
+        // Same address lib/api.ts builds, so it adopts this response.
+        var url = '/api/products/' + match[1] + '/' + (/^\/en\//.test(location.pathname) ? '?lang=en' : '')
         window.__nasaimPreload = {
           url: url,
           promise: fetch(url, { credentials: 'include', headers: { Accept: 'application/json' } })

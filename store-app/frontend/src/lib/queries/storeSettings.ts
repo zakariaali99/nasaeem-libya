@@ -24,6 +24,9 @@ export interface StoreSettingsData {
   whatsapp: string
   email: string
   bank_transfer_note: string
+  crm_vip_min_orders?: number
+  crm_vip_min_spend?: string | number
+  crm_inactive_days?: number
   /** Overrides for the storefront's fixed wording — see `lib/siteText.ts`. */
   texts?: Record<string, string>
   bank_accounts?: BankAccountItem[]

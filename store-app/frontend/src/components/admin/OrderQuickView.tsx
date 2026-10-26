@@ -1,6 +1,8 @@
 import { ArrowUpRight, MapPin, MessageCircle, Phone, Printer } from 'lucide-react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
+import { CustomerDrawer } from '@/components/admin/CustomerDrawer'
 import { OrderStageSelect } from '@/components/admin/OrderStageSelect'
 import { Button } from '@/components/ui/button'
 import { LineThumb } from '@/components/ui/line-thumb'
@@ -21,10 +23,12 @@ export function OrderQuickView({
   onChanged?: (message: string) => void
 }) {
   const { data: order, isPending } = useOrder(orderId ?? undefined)
+  const [customerDrawerOpen, setCustomerDrawerOpen] = useState(false)
   const phone = order?.user?.phone_number ?? ''
   const chat = phone ? whatsappUrl(phone) : null
 
   return (
+    <>
     <Sheet open={Boolean(orderId)} onOpenChange={onOpenChange}>
       <SheetContent side="left" className="w-[92vw] max-w-md overflow-y-auto sm:max-w-md">
         {isPending || !order ? (
@@ -45,7 +49,21 @@ export function OrderQuickView({
             <OrderStageSelect order={order} onChanged={(stage) => onChanged?.(`#${order.order_number}: ${STAGE_BY_VALUE[stage].label}`)} />
 
             <section className="space-y-2 rounded-xl border border-border p-4 text-sm">
-              <p className="font-bold text-foreground">{order.user?.name || 'عميل المتجر'}</p>
+              <div className="flex items-center justify-between">
+                <p className="font-bold text-foreground">{order.user?.name || 'عميل المتجر'}</p>
+                {order.user?.id && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setCustomerDrawerOpen(true)}
+                    className="h-7 text-xs px-2 text-primary hover:bg-primary/10 rounded-lg gap-1"
+                  >
+                    <span>ملف CRM</span>
+                    <ArrowUpRight className="size-3" />
+                  </Button>
+                )}
+              </div>
               {phone ? (
                 <div className="flex flex-wrap items-center gap-2">
                   <a href={`tel:${phone}`} className="inline-flex min-h-11 items-center gap-1.5 font-mono text-muted-foreground hover:text-primary">
@@ -158,5 +176,11 @@ export function OrderQuickView({
         )}
       </SheetContent>
     </Sheet>
+    <CustomerDrawer
+      customerId={order?.user?.id ?? null}
+      open={customerDrawerOpen}
+      onOpenChange={setCustomerDrawerOpen}
+    />
+    </>
   )
 }

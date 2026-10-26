@@ -19,6 +19,7 @@ import {
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
+import { CustomerDrawer } from '@/components/admin/CustomerDrawer'
 import { OrderEditDialog } from '@/components/admin/OrderEditDialog'
 import { OrderStageSelect } from '@/components/admin/OrderStageSelect'
 import { OrderTrackingTimeline } from '@/components/admin/OrderTrackingTimeline'
@@ -58,6 +59,7 @@ export default function AdminOrderDetail() {
   const [copied, setCopied] = useState(false)
   const [copiedTracking, setCopiedTracking] = useState(false)
   const [refundModalOpen, setRefundModalOpen] = useState(false)
+  const [customerDrawerOpen, setCustomerDrawerOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [notesDraft, setNotesDraft] = useState<string | null>(null)
   const [stageMessage, setStageMessage] = useState<string | null>(null)
@@ -388,9 +390,22 @@ export default function AdminOrderDetail() {
         <div className="space-y-6 lg:sticky lg:top-20 lg:self-start">
           {/* Customer Profile Card */}
           <div className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-xs space-y-4">
-            <div className="flex items-center gap-2.5 border-b border-border pb-3">
-              <User className="size-4 text-primary" />
-              <h3 className="font-bold text-sm text-foreground">بيانات العميل</h3>
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <div className="flex items-center gap-2.5">
+                <User className="size-4 text-primary" />
+                <h3 className="font-bold text-sm text-foreground">بيانات العميل</h3>
+              </div>
+              {order.user?.id && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCustomerDrawerOpen(true)}
+                  className="h-7 text-xs px-2.5 rounded-lg border-primary/30 text-primary hover:bg-primary/10 gap-1 font-bold shadow-2xs"
+                >
+                  <span>ملف CRM</span>
+                </Button>
+              )}
             </div>
 
             <div className="space-y-3">
@@ -601,6 +616,12 @@ export default function AdminOrderDetail() {
         order={order}
         open={refundModalOpen}
         onClose={() => setRefundModalOpen(false)}
+      />
+
+      <CustomerDrawer
+        customerId={order.user?.id ?? null}
+        open={customerDrawerOpen}
+        onOpenChange={setCustomerDrawerOpen}
       />
     </div>
   )

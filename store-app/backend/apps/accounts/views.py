@@ -18,12 +18,12 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.core.models import User, Role
+from apps.core.models import User, Role, CustomerTag, CustomerInteraction
 from apps.core.pagination import StandardPagination
 from apps.core.views import CsrfProtectedAPIView
 from django.utils.translation import gettext as _
 
-from .permissions import IsAdminRole
+from .permissions import IsAdminRole, IsManagerOrAbove
 from .phone import normalise_phone
 from .serializers import (
     AdminUserUpdateSerializer,
@@ -32,6 +32,8 @@ from .serializers import (
     UserSerializer,
     AddressSerializer,
     ProfileUpdateSerializer,
+    CustomerTagSerializer,
+    CustomerInteractionSerializer,
 )
 from .throttling import LoginThrottle, RegisterThrottle
 
@@ -280,14 +282,242 @@ class AdminUserListView(APIView):
     permission_classes = [IsAdminRole]
 
     def get(self, request):
-        users = User.objects.order_by("-date_joined")
-        if search := request.query_params.get("search", "").strip():
-            users = users.filter(
-                Q(phone_number__icontains=search) | Q(name__icontains=search)
-            )
+        role = request.query_params.get("role", "").strip()
+        if role:
+            users = User.objects.filter(role=role)
+        else:
+            users = User.objects.all()
+
+        from . import crm
+        users = crm.filter_and_annotate_users_queryset(users, request.query_params)
+
         paginator = StandardPagination()
         page = paginator.paginate_queryset(users, request, view=self)
         return paginator.get_paginated_response(UserSerializer(page, many=True).data)
+
+
+class AdminUserCRMDetailView(APIView):
+    """Full CRM customer dossier for CustomerDrawer and User Detail page."""
+
+    permission_classes = [IsAdminRole]
+
+    def get(self, request, user_id):
+        user = (
+            User.objects.filter(pk=user_id)
+            .prefetch_related("tags", "addresses__city")
+            .first()
+        )
+        if user is None:
+            return Response(
+                {"message": _("المستخدم غير موجود")}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        from . import crm
+        from apps.orders.models import Discount, Order
+        from apps.orders.stage_service import stage_of
+
+        metrics = crm.compute_customer_metrics(user)
+
+        from apps.orders.models import OrderStage
+        orders = (
+            Order.objects.filter(user=user)
+            .select_related("shipping_city")
+            .order_by("-created_at")[:15]
+        )
+        recent_orders = [
+            {
+                "id": str(o.id),
+                "order_number": o.order_number,
+                "stage": stage_of(o),
+                "stage_label": OrderStage(stage_of(o)).label if stage_of(o) in OrderStage.values else stage_of(o),
+                "total": str(o.total),
+                "total_amount": str(o.total),
+                "city": o.shipping_city.name if o.shipping_city else "",
+                "created_at": o.created_at.isoformat(),
+            }
+            for o in orders
+        ]
+
+        interactions = (
+            user.interactions.select_related("staff")
+            .order_by("-created_at")[:50]
+        )
+
+        active_coupons = (
+            Discount.objects.filter(is_active=True)
+            .values("id", "code", "type", "value", "min_order_amount")[:15]
+        )
+
+        return Response({
+            "data": {
+                "user": UserSerializer(user).data,
+                "crm": metrics,
+                "recent_orders": recent_orders,
+                "interactions": CustomerInteractionSerializer(interactions, many=True).data,
+                "active_coupons": list(active_coupons),
+            }
+        })
+
+
+class AdminUserExportCSVView(APIView):
+    """Export customers list as CSV with UTF-8 BOM. Gated to Manager, Admin, Owner."""
+
+    permission_classes = [IsManagerOrAbove]
+
+    def get(self, request):
+        role = request.query_params.get("role", "customer").strip()
+        users = User.objects.filter(role=role) if role else User.objects.all()
+
+        from . import crm
+        annotated = crm.filter_and_annotate_users_queryset(users, request.query_params)
+        return crm.export_customers_csv(annotated)
+
+
+class AdminCustomerTagListView(APIView):
+    """List and create CRM customer tags."""
+
+    permission_classes = [IsAdminRole]
+
+    def get(self, request):
+        from django.db.models import Count
+        tags = CustomerTag.objects.all().annotate(users_count=Count("users")).order_by("name")
+        return Response({
+            "data": [
+                {
+                    "id": str(t.id),
+                    "name": t.name,
+                    "color": t.color,
+                    "users_count": t.users_count,
+                }
+                for t in tags
+            ]
+        })
+
+    def post(self, request):
+        name = str(request.data.get("name") or "").strip()
+        color = str(request.data.get("color") or "#64748b").strip()
+        if not name:
+            return Response(
+                {"message": "اسم الوسم مطلوب"}, status=status.HTTP_400_BAD_REQUEST
+            )
+        tag, created = CustomerTag.objects.get_or_create(
+            name=name, defaults={"color": color}
+        )
+        if not created and color and tag.color != color:
+            tag.color = color
+            tag.save(update_fields=["color"])
+        return Response(
+            {"data": CustomerTagSerializer(tag).data, "message": "تم حفظ الوسم بنجاح"},
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+
+class AdminUserTagManageView(APIView):
+    """Assign or remove a tag from a customer."""
+
+    permission_classes = [IsAdminRole]
+
+    def post(self, request, user_id):
+        user = User.objects.filter(pk=user_id).first()
+        if user is None:
+            return Response(
+                {"message": _("المستخدم غير موجود")}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        tag_id = request.data.get("tag_id")
+        action = str(request.data.get("action") or "add").strip().lower()
+        tag = CustomerTag.objects.filter(pk=tag_id).first()
+        if tag is None:
+            return Response(
+                {"message": "الوسم غير موجود"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        if action == "remove":
+            user.tags.remove(tag)
+        else:
+            user.tags.add(tag)
+
+        return Response({
+            "data": CustomerTagSerializer(user.tags.all(), many=True).data,
+            "message": "تم تحديث وسوم العميل بنجاح",
+        })
+
+
+class AdminUserInteractionListCreateView(APIView):
+    """View and log customer communications/notes."""
+
+    permission_classes = [IsAdminRole]
+
+    def get(self, request, user_id):
+        user = User.objects.filter(pk=user_id).first()
+        if user is None:
+            return Response(
+                {"message": _("المستخدم غير موجود")}, status=status.HTTP_404_NOT_FOUND
+            )
+        interactions = user.interactions.select_related("staff").order_by("-created_at")
+        return Response({
+            "data": CustomerInteractionSerializer(interactions, many=True).data
+        })
+
+    def post(self, request, user_id):
+        user = User.objects.filter(pk=user_id).first()
+        if user is None:
+            return Response(
+                {"message": _("المستخدم غير موجود")}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        notes = str(request.data.get("notes") or "").strip()
+        interaction_type = str(request.data.get("interaction_type") or "note").strip()
+
+        if not notes:
+            return Response(
+                {"message": "يرجى كتابة نص الملاحظة أو التواصل"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        valid_types = [c[0] for c in CustomerInteraction.InteractionType.choices]
+        if interaction_type not in valid_types:
+            interaction_type = CustomerInteraction.InteractionType.NOTE
+
+        interaction = CustomerInteraction.objects.create(
+            customer=user,
+            staff=request.user,
+            interaction_type=interaction_type,
+            notes=notes,
+        )
+        return Response(
+            {
+                "data": CustomerInteractionSerializer(interaction).data,
+                "message": "تم تسجيل التواصل بنجاح",
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class AdminCustomerInteractionDetailView(APIView):
+    """Manager, Admin, Owner can delete a communication note."""
+
+    permission_classes = [IsManagerOrAbove]
+
+    def delete(self, request, interaction_id):
+        interaction = CustomerInteraction.objects.filter(pk=interaction_id).first()
+        if interaction is None:
+            return Response(
+                {"message": "سجل التواصل غير موجود"}, status=status.HTTP_404_NOT_FOUND
+            )
+        interaction.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AdminUpcomingBirthdaysView(APIView):
+    """Upcoming customer birthdays this week (handling year wraparound)."""
+
+    permission_classes = [IsAdminRole]
+
+    def get(self, request):
+        from . import crm
+        birthdays = crm.get_upcoming_birthdays_this_week()
+        return Response({"data": birthdays})
 
 
 class AdminStaffListView(APIView):

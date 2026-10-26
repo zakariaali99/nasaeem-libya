@@ -36,17 +36,75 @@ class PhoneField(serializers.CharField):
         return phone
 
 
+class CustomerTagSerializer(serializers.ModelSerializer):
+    class Meta:
+        from apps.core.models import CustomerTag
+
+        model = CustomerTag
+        fields = ["id", "name", "color", "created_at"]
+        read_only_fields = ["id", "created_at"]
+
+
+class CustomerInteractionSerializer(serializers.ModelSerializer):
+    staff_name = serializers.SerializerMethodField()
+    interaction_type_display = serializers.CharField(source="get_interaction_type_display", read_only=True)
+
+    class Meta:
+        from apps.core.models import CustomerInteraction
+
+        model = CustomerInteraction
+        fields = [
+            "id", "customer", "staff", "staff_name",
+            "interaction_type", "interaction_type_display",
+            "notes", "created_at",
+        ]
+        read_only_fields = ["id", "customer", "staff", "staff_name", "interaction_type_display", "created_at"]
+
+    def get_staff_name(self, obj) -> str:
+        if obj.staff:
+            return obj.staff.name or obj.staff.phone_number
+        return "النظام"
+
+
 class UserSerializer(serializers.ModelSerializer):
+    tags = CustomerTagSerializer(many=True, read_only=True)
+    crm = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = [
             "id", "phone_number", "phone_verified", "name", "email",
-            "role", "is_active", "date_joined",
+            "role", "is_active", "date_joined", "birthday", "tags", "crm",
             "loyalty_points", "lifetime_spend", "vip_tier",
             "is_cod_blacklisted", "cod_rejections_count", "cod_blacklist_reason",
             "banned", "ban_reason", "ban_expires_at",
         ]
         read_only_fields = fields
+
+    def get_crm(self, obj):
+        from django.utils import timezone
+        from .crm import TIER_LABELS, TIER_SHORT_LABELS, compute_customer_metrics, determine_customer_tier
+
+        if hasattr(obj, "crm_lifetime_spend"):
+            spend = getattr(obj, "crm_lifetime_spend", Decimal("0.00"))
+            total_orders = getattr(obj, "crm_total_orders", 0)
+            last_order = getattr(obj, "crm_last_order_date", None)
+            tier = determine_customer_tier(total_orders, spend, last_order)
+            today = timezone.localdate()
+            is_bday = bool(obj.birthday and obj.birthday.month == today.month and obj.birthday.day == today.day)
+            addr = obj.addresses.select_related("city").filter(is_default=True).first() or obj.addresses.select_related("city").first()
+            return {
+                "total_orders": total_orders,
+                "lifetime_spend": str(spend),
+                "last_order_date": last_order.isoformat() if last_order else None,
+                "tier": tier,
+                "tier_label": TIER_LABELS.get(tier, tier),
+                "tier_short_label": TIER_SHORT_LABELS.get(tier, tier),
+                "city": addr.city.name if addr and addr.city else "",
+                "is_birthday_today": is_bday,
+                "birthday": obj.birthday.isoformat() if obj.birthday else None,
+            }
+        return compute_customer_metrics(obj)
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -107,14 +165,14 @@ class AdminUserUpdateSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             "role", "is_active", "banned", "ban_reason", "ban_expires_at", "name",
-            "is_cod_blacklisted", "cod_blacklist_reason",
+            "birthday", "is_cod_blacklisted", "cod_blacklist_reason",
         ]
 
 
 class ProfileUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ["name", "email"]
+        fields = ["name", "email", "birthday"]
 
 
 class AddressSerializer(serializers.ModelSerializer):

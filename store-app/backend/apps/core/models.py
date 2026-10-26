@@ -104,6 +104,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     cod_rejections_count = models.PositiveIntegerField("عدد مرات رفض طلبات COD", default=0)
     cod_blacklist_reason = models.CharField("سبب حظر الدفع عند الاستلام", max_length=255, blank=True)
 
+    # CRM Profile (Plan 08)
+    birthday = models.DateField("تاريخ الميلاد", null=True, blank=True)
+    tags = models.ManyToManyField("core.CustomerTag", related_name="users", blank=True, verbose_name="الوسوم")
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -285,6 +289,12 @@ class StoreSettings(models.Model):
     # badges…), keyed by the ids in the frontend's `lib/siteText.ts`. A key
     # that is absent uses the built-in wording; an empty string hides the line.
     texts = models.JSONField("نصوص المتجر", default=dict, blank=True)
+    # CRM Thresholds (Plan 08, Decision 1)
+    crm_vip_min_orders = models.PositiveIntegerField("الحد الأدنى لطلبات VIP", default=5)
+    crm_vip_min_spend = models.DecimalField(
+        "الحد الأدنى لإنفاق VIP (د.ل)", max_digits=10, decimal_places=2, default=Decimal("500.00")
+    )
+    crm_inactive_days = models.PositiveIntegerField("أيام الخمول للعميل", default=60)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -351,3 +361,62 @@ class BankAccount(models.Model):
 
     def __str__(self):
         return f"{self.bank_name} — {self.account_number}"
+
+
+class CustomerTag(models.Model):
+    """Customer tag for CRM segmentation (e.g. 'تاجر جملة', 'يحب العود')."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField("اسم الوسم", max_length=50, unique=True)
+    color = models.CharField("لون الوسم", max_length=20, default="#64748b")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "وسم عميل"
+        verbose_name_plural = "وسوم العملاء"
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
+class CustomerInteraction(models.Model):
+    """Log of communications and operational notes between staff and customers."""
+
+    class InteractionType(models.TextChoices):
+        CALL = "call", "مكالمة"
+        WHATSAPP = "whatsapp", "واتساب"
+        COMPLAINT = "complaint", "شكوى"
+        FOLLOW_UP = "follow_up", "متابعة"
+        NOTE = "note", "ملاحظة"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    customer = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="interactions", verbose_name="العميل"
+    )
+    staff = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="logged_interactions",
+        verbose_name="الموظف",
+    )
+    interaction_type = models.CharField(
+        "نوع التواصل",
+        max_length=20,
+        choices=InteractionType.choices,
+        default=InteractionType.NOTE,
+    )
+    notes = models.TextField("التفاصيل والملاحظات")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "سجل تواصل"
+        verbose_name_plural = "سجل التواصل"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        date_str = self.created_at.strftime("%Y-%m-%d") if self.created_at else ""
+        return f"{self.customer.phone_number} — {self.get_interaction_type_display()} ({date_str})"
+

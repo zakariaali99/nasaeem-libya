@@ -22,8 +22,8 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.db import connection, transaction
-from django.db.models import F
-from django.db.models.functions import Greatest
+from django.db.models import F, IntegerField, Max
+from django.db.models.functions import Cast, Greatest, Substr
 from django.utils import timezone, translation
 from django.utils.translation import gettext as _
 
@@ -348,7 +348,13 @@ def next_order_number(payment_method: str) -> str:
             cursor.execute("SELECT nextval('order_number_seq')")
             value = cursor.fetchone()[0]
     else:
-        value = Order.objects.count() + 1
+        # No sequence outside PostgreSQL (the live host is SQLite). Counting rows
+        # hands out a number that is already taken the moment one order is
+        # deleted, so continue from the highest sequence ever issued instead.
+        issued = Order.objects.aggregate(
+            last=Max(Cast(Substr("order_number", 10), IntegerField())),
+        )["last"]
+        value = (issued or 0) + 1
 
     code = (payment_method or "UNK")[:3].upper().ljust(3, "X")
     return f"{timezone.localtime():%Y%m}{code}{value:04d}"

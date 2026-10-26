@@ -11,7 +11,7 @@ from decimal import Decimal
 
 import pytest
 from django.core.cache import cache
-from django.db import connections, transaction
+from django.db import connection, connections, transaction
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -521,12 +521,31 @@ class TestOrderNumbers:
         assert number[6:9] == "MOA"
         assert number[9:].isdigit()
 
+    @pytest.mark.skipif(
+        connection.vendor != "postgresql",
+        reason="the digits come from a PostgreSQL sequence; elsewhere they continue "
+               "from the highest saved order, so they only move once an order is saved",
+    )
     def test_numbers_never_repeat(self, db):
         """The reference used Math.random() for these."""
         numbers = {services.next_order_number("moamalat") for _ in range(200)}
         assert len(numbers) == 200
 
-    def test_a_missing_payment_method_still_produces_a_valid_number(self, db):
+    def test_a_deleted_order_does_not_free_its_number(self, buyer_api, product, region):
+        """Without a sequence the number used to be `count() + 1`: delete one
+        order and the next checkout collides with an existing number, and every
+        checkout after it fails until the month changes."""
+        numbers = []
+        for _ in range(3):
+            buyer_api.post(reverse("cart"), {"product_id": str(product.id)}, format="json")
+            numbers.append(buyer_api.post(reverse("cart-checkout"), {
+                "region_id": region.id, "address": "شارع", "payment_method": "moamalat",
+            }, format="json").json()["data"]["order_number"])
+        Order.objects.get(order_number=numbers[1]).delete()
+
+        assert services.next_order_number("moamalat") not in numbers
+        assert int(services.next_order_number("moamalat")[9:]) == int(numbers[2][9:]) + 1
+
         assert services.next_order_number("")[6:9] == "UNK"
 
 
@@ -534,6 +553,11 @@ class TestOrderNumbers:
 # Concurrency — the reason select_for_update() exists
 # --------------------------------------------------------------------------
 
+@pytest.mark.skipif(
+    connection.vendor == "sqlite",
+    reason="SQLite locks the whole table for the second thread instead of making "
+           "it wait on the row lock; the live server runs a single process",
+)
 @pytest.mark.django_db(transaction=True)
 def test_two_checkouts_for_the_last_unit_one_succeeds_one_gets_409(django_db_setup):
     """Two real threads, two real connections, one unit of stock.

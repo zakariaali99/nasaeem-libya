@@ -12,7 +12,7 @@ import shutil
 import sys
 from html import escape
 from pathlib import Path
-from urllib.parse import quote, quote_plus
+from urllib.parse import quote_plus
 
 ROOT = Path(__file__).resolve().parent
 DIST = ROOT / "dist"
@@ -165,7 +165,7 @@ def render_page(template, content, lang, version):
         "label_social": e(t["contact_labels"]["social"]),
         "map_link": e(maps_search(site["map_embed_query"])),
         "map_embed": e(
-            "https://maps.google.com/maps?q=" + quote(site["map_embed_query"])
+            "https://maps.google.com/maps?q=" + site["map_coords"]
             + "&hl=" + lang + "&z=16&output=embed"
         ),
         "social": social,
